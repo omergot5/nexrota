@@ -76,11 +76,35 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FAIR-01 … FAIR-06 | Phase 1 | Pending |
-| UNIF-01 … UNIF-06 | Phase 2 | Pending |
-| QUAL-01 … QUAL-08 | Phase 3 | Pending |
-| POS-01 … POS-05 | Phase 4 | Pending |
-| BOARD-01 … BOARD-04 | Phase 5 | Pending |
+| FAIR-01 | Phase 1 | Pending |
+| FAIR-02 | Phase 1 | Pending |
+| FAIR-03 | Phase 1 | Pending |
+| FAIR-04 | Phase 1 | Pending |
+| FAIR-05 | Phase 1 | Pending |
+| FAIR-06 | Phase 1 | Pending |
+| UNIF-01 | Phase 2 | Pending |
+| UNIF-02 | Phase 2 | Pending |
+| UNIF-03 | Phase 2 | Pending |
+| UNIF-04 | Phase 2 | Pending |
+| UNIF-05 | Phase 2 | Pending |
+| UNIF-06 | Phase 2 | Pending |
+| QUAL-01 | Phase 3 | Pending |
+| QUAL-02 | Phase 3 | Pending |
+| QUAL-03 | Phase 3 | Pending |
+| QUAL-04 | Phase 3 | Pending |
+| QUAL-05 | Phase 3 | Pending |
+| QUAL-06 | Phase 3 | Pending |
+| QUAL-07 | Phase 3 | Pending |
+| QUAL-08 | Phase 3 | Pending |
+| POS-01 | Phase 4 | Pending |
+| POS-02 | Phase 4 | Pending |
+| POS-03 | Phase 4 | Pending |
+| POS-04 | Phase 4 | Pending |
+| POS-05 | Phase 4 | Pending |
+| BOARD-01 | Phase 5 | Pending |
+| BOARD-02 | Phase 5 | Pending |
+| BOARD-03 | Phase 5 | Pending |
+| BOARD-04 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 29 total
@@ -91,4 +115,4 @@
 
 ---
 *Requirements defined: 2026-08-21*
-*Last updated: 2026-08-21 after initial definition*
+*Last updated: 2026-08-21 after roadmap creation — traceability expanded to one row per requirement*
