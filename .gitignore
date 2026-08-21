@@ -14,3 +14,6 @@ skills-lock.json
 /supabase.js
 .vercel
 .env*
+
+# GSD research fetch cache — regenerated on demand, never source of truth
+.planning/research/.cache/
