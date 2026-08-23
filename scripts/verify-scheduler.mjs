@@ -347,5 +347,255 @@ check("מי שנשא לילה לא מקבל גם את שתי משמרות היו
   nextTwo.filter((g) => g === holderOfNight).length <= 1,
   JSON.stringify({ holderOfNight, nextTwo }));
 
+// ---------------------------------------------------------------
+// FAIR-01..04 (Phase 1, Plan 01-01) — נטל בכל מקום, לא רק בניקוד.
+//
+// ה-repro שהניע את הפאזה: 5 בקרים + 3 לילות, 4 שומרים, כולם זמינים, בלי
+// עקיפות כלל. לפני התיקון המנוע דיווח fairnessScore 100 ו-spread 0 בזמן
+// שבפועל אדם אחד נשא 16.0 נטל ושלושה נשאו 19.2 — "הוגנות מושלמת" בזמן
+// שאדם אחד לא נשא אף לילה. הבדיקות כאן מוכיחות שהציון המדווח באמת נגזר
+// מהנטל המדווח, ולא רק "נראה נכון" על התמונה הזו.
+// ---------------------------------------------------------------
+
+const round1 = (n) => Math.round(n * 10) / 10;
+
+// רק א'–ה' (אינדקסים 0–4): יום שישי/שבת היו מפעילים את מכפיל הסופ"ש
+// ומזייפים את החישוב למטה.
+const reproWeek = weekByOffset(1).slice(0, 5);
+const reproGuards = [
+  { id: "r1", name: "גיא" },
+  { id: "r2", name: "מיכל" },
+  { id: "r3", name: "אבי" },
+  { id: "r4", name: "רינה" },
+];
+const reproDayShifts = reproWeek.map((date, i) => ({
+  id: `rd${i}`, date, label: "משמרת יום", type: "day",
+  startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: [],
+}));
+const reproNightShifts = reproWeek.slice(0, 3).map((date, i) => ({
+  id: `rn${i}`, date, label: "משמרת לילה", type: "night",
+  startTime: "23:00", endTime: "07:00", requiredGuards: 1, assignedGuards: [],
+}));
+const reproShifts = [...reproDayShifts, ...reproNightShifts];
+
+console.log("\n=== נטל (FAIR-01..04) ===");
+
+// Test D — הבדיקה שהתיקון תלוי בה: אם המשמרות האלה בטעות נופלות על שישי/שבת
+// כל שאר החשבון למטה שקרי.
+check("FAIR-04 · משמרת יום ב-repro שוקלת 8.0 נטל",
+  Math.abs(shiftLoad(reproDayShifts[0]) - 8.0) < 1e-9, `${shiftLoad(reproDayShifts[0])}`);
+check("FAIR-04 · משמרת לילה ב-repro שוקלת 11.2 נטל",
+  Math.abs(shiftLoad(reproNightShifts[0]) - 11.2) < 1e-9, `${shiftLoad(reproNightShifts[0])}`);
+
+const reproResult = autoAssign({ shifts: reproShifts, guards: reproGuards, availability: {} });
+
+// Test A — לפני התיקון המנוע היה מדווח כאן 100 בדיוק (ספירה מאוזנת גם כשהנטל
+// לא). אחרי התיקון הציון חייב לרדת מתחת ל-100.
+check("FAIR-02 · ציון ההוגנות ב-repro נמוך מ-100 — לא עוד '100 מושלם' שקרי",
+  reproResult.summary.fairnessScore < 100, `fairnessScore=${reproResult.summary.fairnessScore}`);
+
+// Test B (FAIR-04, המבנית) — משחזרים את הציון עצמאית מ-perGuard[].load
+// ומ-perShiftLoad *המדווחים*, באותו סדר פעולות ובאותו רצפת מחלק שהמנוע
+// עצמו משתמש בו. שוויון מוחלט, בלי סבילות — זו בדיוק ההבטחה של FAIR-04.
+const reproLoads = reproResult.fairness.perGuard.map((p) => p.load);
+const reproMeanLoad = reproLoads.reduce((a, b) => a + b, 0) / reproLoads.length;
+const reproVariance = reproLoads.reduce((a, b) => a + (b - reproMeanLoad) ** 2, 0) / reproLoads.length;
+const reproCoefficient = 15 / Math.max(reproResult.fairness.perShiftLoad, 0.001);
+const reproRecomputedScore = Math.max(0, Math.round(100 - Math.sqrt(reproVariance) * reproCoefficient));
+check("FAIR-04 · הציון המדווח נגזר במדויק מהנטל המדווח (בדיקה מבנית, לא צילום מסך)",
+  reproRecomputedScore === reproResult.summary.fairnessScore,
+  `recomputed=${reproRecomputedScore} vs reported=${reproResult.summary.fairnessScore}`);
+
+// Test C — כל שורה נושאת load מספרי, ו-loadSpread הוא בדיוק ההפרש בין
+// המקסימום למינימום *המדווחים*.
+check("FAIR-02 · כל שורת perGuard נושאת שדה load מספרי",
+  reproResult.fairness.perGuard.every((p) => typeof p.load === "number"),
+  JSON.stringify(reproResult.fairness.perGuard));
+check("FAIR-02 · loadSpread שווה למקסימום פחות מינימום מתוך perGuard[].load המדווח",
+  reproResult.fairness.loadSpread === round1(Math.max(...reproLoads) - Math.min(...reproLoads)),
+  `loadSpread=${reproResult.fairness.loadSpread}, expected=${round1(Math.max(...reproLoads) - Math.min(...reproLoads))}`);
+
+// ---------------------------------------------------------------
+// FAIR-01 / FAIR-03 (Phase 1, Plan 01-01, Task 2) — מעבר האיזון ממיין
+// ועוצר לפי נטל, לא לפי ספירת משמרות.
+// ---------------------------------------------------------------
+
+console.log("\n=== מעבר האיזון (FAIR-01/FAIR-03) ===");
+
+// Test E — רוסטר שבו מי שמרובה-במשמרות (שי) ומי שכבד-בנטל (טל) הם שני
+// אנשים שונים בכוונה: שי מחזיק/ה שלוש משמרות קצרות נעולות (נטל נמוך), טל
+// מחזיק/ה לילה אחד נעול (נטל גבוה) ומשמרת יום קצרה שנייה שנופלת עליו/ה
+// במילוי הרגיל דרך הניקוד הרך (לא נעולה — ולכן ניתנת להזזה). המנוע הישן
+// (ספירה) לא היה זז בכלל: 3-2=1 < הסף הישן של 2. המנוע החדש (נטל) חייב
+// להזיז מטל, לא משי.
+const divWeek = reproWeek;
+const divGuards = [
+  { id: "e1", name: "שי" }, // מרובה-במשמרות, קל-בנטל
+  { id: "e2", name: "טל" }, // כבד-בנטל, מעט משמרות
+];
+const divLockedDay = [0, 1, 2].map((i, idx) => ({
+  id: `ed${idx}`, date: divWeek[i], label: "משמרת קצרה", type: "day",
+  startTime: "07:00", endTime: "09:00", requiredGuards: 1, assignedGuards: ["e1"],
+}));
+const divLockedNight = {
+  id: "en0", date: divWeek[3], label: "משמרת לילה", type: "night",
+  startTime: "23:00", endTime: "07:00", requiredGuards: 1, assignedGuards: ["e2"],
+};
+// משמרת קצרה פתוחה, ביום שאין לאף אחד מהם משמרת נעולה בו: הניקוד הרך
+// (טל "מעדיף/ה", שי "אולי") מטה אותה אל טל בזמן המילוי הרגיל, בלי לגעת
+// בזמינות הקשיחה — כדי שמעבר האיזון יוכל להחזיר אותה לשי בלי חסימה.
+const divOpenDay = {
+  id: "ed3", date: divWeek[4], label: "משמרת קצרה", type: "day",
+  startTime: "20:00", endTime: "22:00", requiredGuards: 1, assignedGuards: [],
+};
+const divShifts = [...divLockedDay, divLockedNight, divOpenDay];
+const divAvailability = {};
+for (const g of divGuards) for (const s of divShifts) divAvailability[`${g.id}-${s.id}`] = { status: "available" };
+divAvailability["e1-ed3"] = { status: "maybe" };
+divAvailability["e2-ed3"] = { status: "preferred" };
+const divResult = autoAssign({ shifts: divShifts, guards: divGuards, availability: divAvailability, keepExisting: true });
+
+const e1Row = divResult.fairness.perGuard.find((p) => p.guardId === "e1");
+const e2Row = divResult.fairness.perGuard.find((p) => p.guardId === "e2");
+check("FAIR-01 · ברוסטר הסטייה, המרובה-במשמרות (שי) אינו/ה הכבד/ה-בנטל (טל)",
+  e1Row.shifts > e2Row.shifts && e2Row.load > e1Row.load,
+  JSON.stringify({ e1: e1Row, e2: e2Row }));
+
+const divBalanceLog = divResult.log.find((l) => l.step === "balance");
+check("FAIR-01 · מעבר האיזון מזיז משמרת מהכבד/ה-בנטל (טל), לא מהמרובה-במשמרות (שי)",
+  divResult.summary.balanceMoves === 1 && divBalanceLog?.moves?.[0]?.from === "טל",
+  JSON.stringify({ balanceMoves: divResult.summary.balanceMoves, moves: divBalanceLog?.moves }));
+
+// Test F (FAIR-03, RESEARCH.md Open Question 3) — הסף החדש לא דוחף את
+// הלולאה לתקרת ה-passes ולא מתנדנד; מספר ההזזות בפועל נשאר קטן משמעותית
+// מהתקרה, גם על תיקון-הבאג וגם על שבוע חמשת-השומרים הרגיל שבראש הקובץ.
+check("FAIR-03 · מספר ההזזות בתיקון-הבאג נשאר הרבה מתחת לתקרת balancePasses",
+  reproResult.summary.balanceMoves <= DEFAULT_RULES.balancePasses / 3,
+  `balanceMoves=${reproResult.summary.balanceMoves}, תקרה/3=${DEFAULT_RULES.balancePasses / 3}`);
+check("FAIR-03 · מספר ההזזות בשבוע חמשת-השומרים נשאר הרבה מתחת לתקרת balancePasses",
+  result.summary.balanceMoves <= DEFAULT_RULES.balancePasses / 3,
+  `balanceMoves=${result.summary.balanceMoves}, תקרה/3=${DEFAULT_RULES.balancePasses / 3}`);
+
+// Test G (D-04) — ריצה חוזרת על תיקון-הבאג נותנת בדיוק אותה תוצאה.
+const reproAgain = autoAssign({ shifts: reproShifts, guards: reproGuards, availability: {} });
+check("FAIR-01 · deterministic across runs — תיקון-הבאג נותן אותו byShift ואותו ציון בריצה חוזרת",
+  JSON.stringify(reproAgain.byShift) === JSON.stringify(reproResult.byShift) &&
+    reproAgain.summary.fairnessScore === reproResult.summary.fairnessScore,
+  JSON.stringify({ a: reproAgain.byShift, b: reproResult.byShift }));
+
+// Test H — על תיקון-הבאג עצמו, הפער (3.2) קטן מהסף הנגזר, וכל הזזה חוקית
+// הייתה מזיזה את הפער בלפחות 16.0 (2 × 8.0, המשמרת הקלה ביותר) — כלומר
+// הייתה עוקפת אפס ופותחת פער בכיוון ההפוך. ההתנהגות הנכונה היא לא לזוז.
+check("FAIR-01 · בתיקון-הבאג אין שום הזזה — כל הזזה חוקית הייתה רק מגדילה את הפער",
+  reproResult.summary.balanceMoves === 0,
+  `balanceMoves=${reproResult.summary.balanceMoves}`);
+
+// ---------------------------------------------------------------
+// FAIR-03 (Phase 1, Plan 01-01, Task 3) — מבחני לחץ על שני המקדמים
+// שנוחשו: לא מקבלים אותם כי הם "נראים סבירים", אלא מוכיחים שהם נגזרים
+// מהרוסטר ולא קבועים חדשים שממציאים סולם (D-02).
+// ---------------------------------------------------------------
+
+console.log("\n=== מבחני לחץ על המקדמים (FAIR-03) ===");
+
+// תאום 12 שעות — טרנספורמציה מבנית של תיקון-הבאג: אותם תאריכים ואותם
+// שומרים, רק שעות המשמרת שונות. כל נטל בו בדיוק 1.5× הנטל בגרסת 8 השעות.
+const twinDayShifts = reproWeek.map((date, i) => ({
+  id: `rd${i}`, date, label: "משמרת יום", type: "day",
+  startTime: "07:00", endTime: "19:00", requiredGuards: 1, assignedGuards: [],
+}));
+const twinNightShifts = reproWeek.slice(0, 3).map((date, i) => ({
+  id: `rn${i}`, date, label: "משמרת לילה", type: "night",
+  startTime: "19:00", endTime: "07:00", requiredGuards: 1, assignedGuards: [],
+}));
+const twinShifts = [...twinDayShifts, ...twinNightShifts];
+const twinResult = autoAssign({ shifts: twinShifts, guards: reproGuards, availability: {} });
+
+// תנאי מקדים מפורש: שני הרוסטרים חייבים להיות מאוישים במלואם, אחרת פער
+// בכיסוי היה מתחזה לפער בהוגנות. שעת המנוחה המינימלית (8) מתקיימת בגרסת
+// 8 השעות בדיוק על הגבול — אם מישהו ישנה את גבול המנוחה הזה, הבדיקה הזו
+// היא זו שתיכשל, לא המקדמים.
+check("FAIR-03 · תיקון-הבאג ותאום 12 השעות שניהם מאוישים במלואם (תנאי מקדים לפני השוואת ציונים)",
+  reproResult.summary.filledSlots === reproResult.summary.totalSlots &&
+    twinResult.summary.filledSlots === twinResult.summary.totalSlots,
+  `repro=${reproResult.summary.filledSlots}/${reproResult.summary.totalSlots}, twin=${twinResult.summary.filledSlots}/${twinResult.summary.totalSlots}`);
+
+// Test I — אי-תלות בקנה מידה: perShiftLoad שונה, הציון זהה. מקדם קבוע היה
+// נכשל כאן; רק מקדם שנגזר מ-perShiftLoad יכול לעבור.
+check("FAIR-03 · perShiftLoad שונה בין תיקון-הבאג לתאום 12 השעות (וידוא שהתאום באמת שונה)",
+  reproResult.fairness.perShiftLoad !== twinResult.fairness.perShiftLoad,
+  `repro=${reproResult.fairness.perShiftLoad}, twin=${twinResult.fairness.perShiftLoad}`);
+check("FAIR-03 · ציון ההוגנות זהה בין תיקון-הבאג לתאום 12 השעות — המקדם נגזר, לא קבוע",
+  reproResult.summary.fairnessScore === twinResult.summary.fairnessScore,
+  `repro=${reproResult.summary.fairnessScore}, twin=${twinResult.summary.fairnessScore}`);
+
+// Test J — אי-תלות בקנה מידה של סף האיזון: אותו מספר הזזות, אותה מפת
+// byShift. סף קבוע היה גורם לתאום 12 השעות להתנהג אחרת מגרסת 8 השעות.
+check("FAIR-03 · אותו מספר הזזות איזון בתיקון-הבאג ובתאום 12 השעות",
+  reproResult.summary.balanceMoves === twinResult.summary.balanceMoves,
+  `repro=${reproResult.summary.balanceMoves}, twin=${twinResult.summary.balanceMoves}`);
+check("FAIR-03 · deterministic across runs — אותה מפת byShift בתיקון-הבאג ובתאום 12 השעות",
+  JSON.stringify(reproResult.byShift) === JSON.stringify(twinResult.byShift),
+  JSON.stringify({ repro: reproResult.byShift, twin: twinResult.byShift }));
+
+// Test K — טווח דינמי, בלי מספרי קסם: רוסטר שטוח לחלוטין (כל שומר בדיוק
+// לילה אחד ויום אחד) מקבל 100; תיקון-הבאג נמוך ממנו; רוסטר בסקיו קיצוני
+// (שומר אחד נושא הכול) נמוך מתיקון-הבאג וגבוה מ-0.
+const flatWeek = reproWeek.slice(0, 4);
+const flatGuards = [
+  { id: "k1", name: "כרמל" }, { id: "k2", name: "נועה" }, { id: "k3", name: "עומר" }, { id: "k4", name: "יעל" },
+];
+// נעול: כל שומר מקבל בדיוק יום אחד ולילה אחד — לא סומכים על כך שהמילוי
+// החמדני עצמו יגלה את החלוקה השטוחה (הוא לא בהכרח יעשה זאת).
+const flatDay = flatWeek.map((date, i) => ({
+  id: `kd${i}`, date, label: "משמרת יום", type: "day", startTime: "07:00", endTime: "15:00",
+  requiredGuards: 1, assignedGuards: [flatGuards[i].id],
+}));
+const flatNight = flatWeek.map((date, i) => ({
+  id: `kn${i}`, date, label: "משמרת לילה", type: "night", startTime: "23:00", endTime: "07:00",
+  requiredGuards: 1, assignedGuards: [flatGuards[i].id],
+}));
+const flatShifts = [...flatDay, ...flatNight];
+const flatAvailability = {};
+for (const g of flatGuards) for (const s of flatShifts) flatAvailability[`${g.id}-${s.id}`] = { status: "available" };
+const flatResult = autoAssign({ shifts: flatShifts, guards: flatGuards, availability: flatAvailability, keepExisting: true });
+check("FAIR-03 · הרוסטר השטוח באמת מאויש במלואו ובחלוקה שווה (תנאי מקדים לפני שקוראים ל-100 'הוגנות')",
+  flatResult.summary.filledSlots === flatResult.summary.totalSlots &&
+    flatResult.fairness.perGuard.every((p) => p.shifts === 2),
+  JSON.stringify(flatResult.fairness.perGuard));
+check("FAIR-03 · רוסטר שטוח לחלוטין מקבל ציון 100",
+  flatResult.summary.fairnessScore === 100, `fairnessScore=${flatResult.summary.fairnessScore}`);
+check("FAIR-03 · תיקון-הבאג נמוך מהרוסטר השטוח",
+  reproResult.summary.fairnessScore < flatResult.summary.fairnessScore,
+  `repro=${reproResult.summary.fairnessScore}, flat=${flatResult.summary.fairnessScore}`);
+
+const skewAvailability = {};
+for (const g of reproGuards) {
+  for (const s of reproShifts) {
+    skewAvailability[`${g.id}-${s.id}`] = g.id === reproGuards[0].id ? { status: "available" } : { status: "unavailable" };
+  }
+}
+const skewResult = autoAssign({ shifts: reproShifts, guards: reproGuards, availability: skewAvailability });
+check("FAIR-03 · רוסטר בסקיו קיצוני נמוך מתיקון-הבאג וגבוה מ-0 (יש טווח דינמי אמיתי)",
+  skewResult.summary.fairnessScore < reproResult.summary.fairnessScore && skewResult.summary.fairnessScore > 0,
+  `skew=${skewResult.summary.fairnessScore}, repro=${reproResult.summary.fairnessScore}`);
+
+// Test L — עקביות יחידות מול הנוסחה הישנה: כשכל המשמרות שוות משקל, נטל
+// וספירה פרופורציוניים, אז הנוסחה החדשה חייבת להחזיר בדיוק את מה שהנוסחה
+// הישנה (המבוססת-ספירה) הייתה מחזירה.
+const uniformShifts = reproWeek.map((date, i) => ({
+  id: `ud${i}`, date, label: "משמרת יום", type: "day", startTime: "07:00", endTime: "15:00",
+  requiredGuards: 1, assignedGuards: [],
+}));
+const uniformResult = autoAssign({ shifts: uniformShifts, guards: reproGuards, availability: {} });
+const uniformCounts = uniformResult.fairness.perGuard.map((p) => p.shifts);
+const uniformMeanCount = uniformCounts.reduce((a, b) => a + b, 0) / uniformCounts.length;
+const uniformCountVariance =
+  uniformCounts.reduce((a, b) => a + (b - uniformMeanCount) ** 2, 0) / uniformCounts.length;
+const oldFormulaScore = Math.max(0, Math.round(100 - Math.sqrt(uniformCountVariance) * 15));
+check("FAIR-03 · במשמרות שוות-משקל, הנוסחה החדשה משחזרת בדיוק את הנוסחה הישנה המבוססת-ספירה",
+  uniformResult.summary.fairnessScore === oldFormulaScore,
+  `new=${uniformResult.summary.fairnessScore}, old(count-based)=${oldFormulaScore}, counts=${JSON.stringify(uniformCounts)}`);
+
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);
