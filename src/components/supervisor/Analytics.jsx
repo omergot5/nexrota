@@ -6,6 +6,7 @@ import {
 import { Avatar, Card, EmptyState, PageHeader } from "../ui.jsx";
 import { useTheme } from "../../hooks/useTheme.js";
 import { loadTable } from "../../lib/loadTable.js";
+import { chartTheme } from "../../design/chartTheme.js";
 import { t } from "../../lib/terms.js";
 
 // Kept in its own module and loaded lazily — recharts is roughly half the
@@ -29,16 +30,13 @@ export default function AnalyticsDash({ guards, shifts }) {
   // Recharts styles its axes and tooltips through JS props, not CSS, so it
   // cannot read our custom properties — it has to be told the theme.
   const { resolved } = useTheme();
-  const axis = resolved === "light" ? "#475569" : "#94A3B8";
-  const grid = resolved === "light" ? "rgba(15,23,42,0.10)" : "rgba(255,255,255,0.10)";
-  const tooltipStyle = {
-    background: resolved === "light" ? "#FFFFFF" : "#131C2D",
-    border: `1px solid ${grid}`,
-    borderRadius: 12,
-    color: resolved === "light" ? "#0F172A" : "#F1F5F9",
-    fontSize: 12,
-    direction: "rtl",
-  };
+  // התלות היחידה של הזיכרון הזה היא `resolved`, ולא כקלט לחישוב אלא
+  // כטריגר לקריאה מחדש: חנות ה-theme (useTheme.js) מטביעה את data-theme
+  // על <html> *לפני* שהיא מודיעה למאזינים, ומצב "system" מטופל על ידי
+  // ה-media query שב-tokens.css עוד לפני שהרכיב הזה בכלל נרנדר. אז
+  // ברגע שה-render הזה רץ, getComputedStyle כבר מחזיר את ערכי הערכה
+  // הנכונה — ואין צורך ש-resolved עצמו יהיה קלט לפונקציה.
+  const { axis, grid, tooltip: tooltipStyle } = useMemo(() => chartTheme(), [resolved]);
 
   // הטבלה היחידה שמזינה את שני התרשימים ואת טבלת הפירוט. אף מספר עומס
   // לא מחושב כאן — כולו מגיע דרך teamAverages() בתוך loadTable (01-03).

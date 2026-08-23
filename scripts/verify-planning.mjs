@@ -8,6 +8,7 @@ import { fairnessHint, fairnessPlan, loadShareHint, meanShiftLoad, rollingLoad }
 import { addDays, todayISO } from "../src/lib/dates.js";
 import { shiftLoad, teamAverages } from "../src/lib/autoAssign.js";
 import { loadTable } from "../src/lib/loadTable.js";
+import { chartTheme } from "../src/design/chartTheme.js";
 
 let failures = 0;
 const check = (label, cond, extra = "") => {
@@ -319,6 +320,95 @@ check("FAIR-02 · loadTable · משמרת של שומר שהוסר מהצוות 
   ghostTable.rows.length === 1 && ghostTable.rows[0].guardId === "real" &&
     !Number.isNaN(ghostTable.rows[0].load) && ghostTable.rows[0].load !== undefined,
   JSON.stringify(ghostTable));
+
+// ============================================================
+console.log("\nchartTheme — צבעי המסגרת של תרשימי הדוחות (FAIR-02, Phase 1 Plan 01-03)\n");
+// ============================================================
+
+// ערכי הטוקנים כפי שהם נקראים ישירות מתוך tokens.css, בשתי הערכות.
+const LIGHT_CHART_TOKENS = {
+  "--text-muted": "74 106 100",
+  "--hairline": "rgba(28, 59, 55, 0.11)",
+  "--surface-raised": "rgba(255, 255, 255, 0.97)",
+  "--text": "28 59 55",
+};
+const DARK_CHART_TOKENS = {
+  "--text-muted": "160 190 182",
+  "--hairline": "rgba(174, 222, 210, 0.13)",
+  "--surface-raised": "rgba(19, 45, 41, 0.88)",
+  "--text": "239 238 226",
+};
+
+// Test H — סימון הערוצים המופרדים ברווח הופך ל-rgb() בפסיקים, גם כשהערך
+// מגיע עם הרווח המוביל ש-getComputedStyle מחזיר בדפדפן אמיתי.
+const themeChannels = chartTheme((name) => (name === "--text-muted" ? "74 106 100" : ""));
+check("FAIR-02 · chartTheme · ערוץ RGB מופרד-ברווח הופך ל-rgb() בפסיקים",
+  themeChannels.axis === "rgb(74, 106, 100)", themeChannels.axis);
+const themeChannelsPadded = chartTheme((name) => (name === "--text-muted" ? " 74 106 100" : ""));
+check("FAIR-02 · chartTheme · רווח מוביל אמיתי (getComputedStyle) לא שובר את הצורה",
+  themeChannelsPadded.axis === themeChannels.axis, themeChannelsPadded.axis);
+
+// Test I — ערך rgba() מוגמר עובר בייט-לבייט, גם עם רווח מוביל — ה-alpha
+// הוא העיצוב ולעולם לא נדרס.
+const themeRgba = chartTheme((name) => (name === "--hairline" ? "rgba(28, 59, 55, 0.11)" : ""));
+check("FAIR-02 · chartTheme · rgba() מוגמר עובר ללא שינוי — ה-alpha הוא העיצוב",
+  themeRgba.grid === "rgba(28, 59, 55, 0.11)", themeRgba.grid);
+const themeRgbaPadded = chartTheme((name) => (name === "--hairline" ? " rgba(28, 59, 55, 0.11)" : ""));
+check("FAIR-02 · chartTheme · אותו rgba() עם רווח מוביל מייצר תוצאה זהה בייט-לבייט",
+  themeRgbaPadded.grid === themeRgba.grid, themeRgbaPadded.grid);
+
+// Test J — שום ערך לא ריק, לא NaN, ולא הפניה שלא נפתרה — גם כשהקורא לא
+// מחזיר כלום (המקרה של "אין DOM").
+const themeNoDom = chartTheme(() => "");
+const flatValues = [themeNoDom.axis, themeNoDom.grid, themeNoDom.tooltip.background, themeNoDom.tooltip.color];
+check("FAIR-02 · chartTheme · שום ערך אינו ריק, NaN או הפניה שלא נפתרה",
+  flatValues.every((v) => typeof v === "string" && v.length > 0 && !v.includes("NaN") && !v.includes("var(")),
+  JSON.stringify(themeNoDom));
+
+// Test K — הערכה משיגה בפועל את התרשים: בהיר וכהה מייצרים ציר, רשת
+// ורקע/טקסט tooltip שונים.
+const themeLight = chartTheme((name) => LIGHT_CHART_TOKENS[name] ?? "");
+const themeDark = chartTheme((name) => DARK_CHART_TOKENS[name] ?? "");
+check("FAIR-02 · chartTheme · ערכת בהיר וכהה מייצרות ציר, רשת ו-tooltip שונים",
+  themeLight.axis !== themeDark.axis &&
+    themeLight.grid !== themeDark.grid &&
+    themeLight.tooltip.background !== themeDark.tooltip.background &&
+    themeLight.tooltip.color !== themeDark.tooltip.color,
+  JSON.stringify({ light: themeLight, dark: themeDark }));
+
+// Test L — הרשימה הלבנה היא החוזה: בדיוק ארבעת הטוקנים האלה, לא פחות
+// ולא יותר, ולא אף אחד אחר.
+const requestedTokens = new Set();
+chartTheme((name) => {
+  requestedTokens.add(name);
+  return LIGHT_CHART_TOKENS[name] ?? "";
+});
+check("FAIR-02 · chartTheme · הרשימה הלבנה של הטוקנים היא בדיוק מה שהמודול מבקש",
+  JSON.stringify([...requestedTokens].sort()) ===
+    JSON.stringify(["--hairline", "--surface-raised", "--text", "--text-muted"]),
+  JSON.stringify([...requestedTokens].sort()));
+
+// Test M — הפולבק לא צובע ערכים אמיתיים (נבדק מול כהה, כי הפולבק שווה
+// בכוונה לערכי הבהיר עצמם), וקורא בלי DOM עדיין מחזיר תוצאה שלמה.
+check("FAIR-02 · chartTheme · כשיש ערכים אמיתיים (כהה), אף ערך פולבק לא מופיע בתוצאה",
+  themeDark.axis !== themeNoDom.axis &&
+    themeDark.grid !== themeNoDom.grid &&
+    themeDark.tooltip.background !== themeNoDom.tooltip.background &&
+    themeDark.tooltip.color !== themeNoDom.tooltip.color,
+  JSON.stringify({ dark: themeDark, fallback: themeNoDom }));
+check("FAIR-02 · chartTheme · קורא בלי DOM עדיין מחזיר תוצאה שלמה ולא ריקה, בלי קריסה",
+  typeof themeNoDom.axis === "string" && themeNoDom.axis.length > 0 &&
+    typeof themeNoDom.grid === "string" && themeNoDom.grid.length > 0 &&
+    typeof themeNoDom.tooltip.background === "string" && themeNoDom.tooltip.background.length > 0 &&
+    typeof themeNoDom.tooltip.color === "string" && themeNoDom.tooltip.color.length > 0,
+  JSON.stringify(themeNoDom));
+
+// Test N (T-01-11) — ערך זבל שלא מזוהה כאף צורה נופל לפולבק, ולא מוזרק
+// כמו שהוא לתוך אובייקט ה-style.
+const themeJunk = chartTheme((name) => (name === "--text-muted" ? "javascript:alert(1)" : ""));
+check("FAIR-02 · chartTheme · ערך זבל/לא-מזוהה נופל לפולבק ולעולם לא מוזרק כמו שהוא",
+  themeJunk.axis === themeNoDom.axis && themeJunk.axis !== "javascript:alert(1)",
+  themeJunk.axis);
 
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);
