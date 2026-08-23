@@ -410,5 +410,52 @@ check("FAIR-02 · chartTheme · ערך זבל/לא-מזוהה נופל לפול�
   themeJunk.axis === themeNoDom.axis && themeJunk.axis !== "javascript:alert(1)",
   themeJunk.axis);
 
+// ============================================================
+console.log("\nloadShareHint על מסך הדוחות — התג ההוגנות דרך שדות loadTable (FAIR-02, Phase 1 Plan 01-03 Task 3)\n");
+// ============================================================
+
+// Test O — התג הוא ההכרעה המשותפת, לא אחת מקומית: מזין את loadShareHint
+// אך ורק בשדות שהטבלה כבר חושפת (row.load, table.meanLoad,
+// table.perShiftLoad) על רוסטר שבו אחד ברור מעל הממוצע והשני ברור
+// מתחתיו. ה-level שנבדק נגדו נלקח מהתפיסה החיה של הפרקונדישן, לא הונח.
+const ltGuardsO = [
+  { id: "o1", name: "עמוס" }, // שלושה לילות — כבד
+  { id: "o2", name: "קלה" }, // יום אחד — קל
+];
+const ltShiftsO = [
+  night(ltDate1, "o1"), night(ltDate2, "o1"), night(addDays(weekStart, 2), "o1"),
+  day(ltDate1, "o2"),
+];
+const tableO = loadTable(ltGuardsO, ltShiftsO);
+const rowO1 = tableO.rows.find((r) => r.guardId === "o1");
+const rowO2 = tableO.rows.find((r) => r.guardId === "o2");
+const hintO1 = loadShareHint({ load: rowO1.load, meanLoad: tableO.meanLoad, perShiftLoad: tableO.perShiftLoad });
+const hintO2 = loadShareHint({ load: rowO2.load, meanLoad: tableO.meanLoad, perShiftLoad: tableO.perShiftLoad });
+check("FAIR-02 · loadTable · loadShareHint מזהה מי מעל הממוצע ומי מתחתיו, אך ורק דרך שדות הטבלה",
+  hintO1?.level === "over" && hintO2?.level === "under",
+  JSON.stringify({ rowO1, rowO2, meanLoad: tableO.meanLoad, perShiftLoad: tableO.perShiftLoad, hintO1, hintO2 }));
+
+// Test P — שתיקה היא עדיין תשובה לגיטימית: מי שבדיוק על הממוצע (שני
+// שומרים בנטל זהה, tableF1 מ-Task 1) לא מקבל תג, גם דרך שדות הטבלה.
+const rowAtMean = tableF1.rows[0];
+const hintAtMean = loadShareHint({ load: rowAtMean.load, meanLoad: tableF1.meanLoad, perShiftLoad: tableF1.perShiftLoad });
+check("FAIR-02 · loadTable · מי שבדיוק על הממוצע לא מקבל תג, גם דרך שדות הטבלה",
+  hintAtMean === null,
+  JSON.stringify({ row: rowAtMean, meanLoad: tableF1.meanLoad, perShiftLoad: tableF1.perShiftLoad }));
+
+// Test Q — מילים, לא רק גוון: שני הכיוונים מייצרים טקסטים שונים ולא ריקים.
+check("FAIR-02 · loadTable · שני הכיוונים (מעל/מתחת) מייצרים טקסט שונה ולא ריק — לא רק גוון",
+  hintO1.text !== hintO2.text && hintO1.text.length > 0 && hintO2.text.length > 0,
+  JSON.stringify({ over: hintO1.text, under: hintO2.text }));
+
+// Test R (D-02) — אין סף שני קבוע: אותה סטייה מוחלטת נשארת בשקט על
+// משמרת ממוצעת כבדה ומקבלת תג על משמרת ממוצעת קלה. תכונת 01-02 עצמה,
+// נבדקת מחדש כאן דרך שם השדות שהמסך הזה מספק (meanLoad, perShiftLoad).
+const sameDeviationHeavyViaTable = loadShareHint({ load: 23, meanLoad: 20, perShiftLoad: 10 });
+const sameDeviationLightViaTable = loadShareHint({ load: 23, meanLoad: 20, perShiftLoad: 2 });
+check("FAIR-02 · loadTable · שום סף שני קבוע — אותה סטייה שקטה על משמרת כבדה, מתויגת על משמרת קלה",
+  sameDeviationHeavyViaTable === null && sameDeviationLightViaTable?.level === "over",
+  JSON.stringify({ heavy: sameDeviationHeavyViaTable, light: sameDeviationLightViaTable }));
+
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);

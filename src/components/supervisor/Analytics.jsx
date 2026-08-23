@@ -3,10 +3,11 @@ import { SHIFT_TONES } from "../../design/shiftPalette.js";
 import {
   Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { Avatar, Card, EmptyState, PageHeader } from "../ui.jsx";
+import { Avatar, Badge, Card, EmptyState, PageHeader } from "../ui.jsx";
 import { useTheme } from "../../hooks/useTheme.js";
 import { loadTable } from "../../lib/loadTable.js";
 import { chartTheme } from "../../design/chartTheme.js";
+import { loadShareHint } from "../../lib/fairness.js";
 import { t } from "../../lib/terms.js";
 
 // Kept in its own module and loaded lazily — recharts is roughly half the
@@ -132,8 +133,10 @@ export default function AnalyticsDash({ guards, shifts }) {
 
       <Card className="overflow-x-auto">
         <h2 className="font-bold text-content mb-4">פירוט לפי שומר</h2>
-        <table className="w-full text-sm min-w-[600px]">
-          <caption className="sr-only">פירוט נטל, משמרות ושעות לכל שומר, ממוין מהעמוס ביותר בנטל</caption>
+        <table className="w-full text-sm min-w-[680px]">
+          <caption className="sr-only">
+            פירוט נטל, משמרות, שעות ותג הוגנות לכל שומר, ממוין מהעמוס ביותר בנטל
+          </caption>
           <thead>
             <tr className="border-b border-hairline">
               {[
@@ -144,6 +147,7 @@ export default function AnalyticsDash({ guards, shifts }) {
                 t("unit.nights"),
                 t("unit.shifts"),
                 t("unit.hours"),
+                "הוגנות",
               ].map((h) => (
                 <th
                   key={h}
@@ -156,23 +160,44 @@ export default function AnalyticsDash({ guards, shifts }) {
             </tr>
           </thead>
           <tbody>
-            {table.rows.map((r) => (
-              <tr key={r.guardId} className="border-b border-hairline last:border-0">
-                <th scope="row" className="py-2.5 px-3 text-right font-normal">
-                  <div className="flex items-center gap-2">
-                    <Avatar id={r.guardId} name={r.fullName} size={24} />
-                    <span className="font-medium text-content text-xs">{r.fullName}</span>
-                  </div>
-                </th>
-                <td className="py-2.5 px-3 text-center font-bold text-content">{r.load}</td>
-                <td className="py-2.5 px-3 text-center text-warn font-semibold">{r.morning}</td>
-                <td className="py-2.5 px-3 text-center text-brand font-semibold">{r.afternoon}</td>
-                <td className="py-2.5 px-3 text-center text-info font-semibold">{r.nights}</td>
-                <td className="py-2.5 px-3 text-center text-muted">{r.count}</td>
-                <td className="py-2.5 px-3 text-center text-muted">{r.hours}</td>
-              </tr>
-            ))}
+            {table.rows.map((r) => {
+              // המקום היחיד בכל המוצר שמחליט אם אדם מעל או מתחת לממוצע
+              // *לתצוגה* הוא loadShareHint עצמו — הרכיב מזין אותו אך ורק
+              // בשדות שהטבלה כבר חושפת ומציג את מה שהוא מחזיר, בלי שום
+              // השוואה מקומית משלו מול הממוצע (D-01, D-02).
+              const hint = loadShareHint({ load: r.load, meanLoad: table.meanLoad, perShiftLoad: table.perShiftLoad });
+              return (
+                <tr key={r.guardId} className="border-b border-hairline last:border-0">
+                  <th scope="row" className="py-2.5 px-3 text-right font-normal">
+                    <div className="flex items-center gap-2">
+                      <Avatar id={r.guardId} name={r.fullName} size={24} />
+                      <span className="font-medium text-content text-xs">{r.fullName}</span>
+                    </div>
+                  </th>
+                  <td className="py-2.5 px-3 text-center font-bold text-content">{r.load}</td>
+                  <td className="py-2.5 px-3 text-center text-warn font-semibold">{r.morning}</td>
+                  <td className="py-2.5 px-3 text-center text-brand font-semibold">{r.afternoon}</td>
+                  <td className="py-2.5 px-3 text-center text-info font-semibold">{r.nights}</td>
+                  <td className="py-2.5 px-3 text-center text-muted">{r.count}</td>
+                  <td className="py-2.5 px-3 text-center text-muted">{r.hours}</td>
+                  <td className="py-2.5 px-3 text-center">
+                    {hint && (
+                      <Badge tone={hint.tone} icon={hint.level === "over" ? "up" : "down"}>
+                        {hint.text}
+                      </Badge>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={8} className="py-2 px-3 text-center text-xs text-muted">
+                {t("unit.load")} ממוצע לצוות: {table.meanLoad}
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </Card>
     </div>
