@@ -119,3 +119,32 @@ export function fairnessHint(row) {
   if (row.needs <= -1) return { tone: "warn", text: `מעל הממוצע ב-${Math.abs(row.needs)}`, level: "over" };
   return null;
 }
+
+/**
+ * התג ליד שם ברשימת "חלוקת העומס המוצעת" של המנהל (FAIR-02, D-01, D-05).
+ *
+ * המקום היחיד בכל המוצר שמחליט אם אדם נמצא מעל או מתחת לממוצע *לתצוגה* —
+ * הרכיב מציג את `{tone, text}` שהוא מחזיר ותו לא, בדיוק כמו `fairnessHint`.
+ *
+ * סף הרעש נגזר מ-`perShiftLoad` של הרוסטר הזה עצמו (חצי משמרת ממוצעת),
+ * ולא קבוע — אחרת צוות של משמרות קצרות וצוות של לילות ארוכים היו מקבלים
+ * אותה רגישות למרות שהיחידה שלהם שונה לגמרי (D-02). ערך אפס, שלילי או
+ * חסר נופל לברירת המחדל הקיימת של המודול — יחידה אחת — בדיוק כמו
+ * `fairnessPlan`'s `perShiftLoad || 1`.
+ */
+export function loadShareHint({ load, meanLoad, perShiftLoad } = {}) {
+  const safeLoad = Number(load) || 0;
+  const safeMean = Number(meanLoad) || 0;
+  const rawPerShift = Number(perShiftLoad);
+  const effectivePerShift = rawPerShift > 0 ? rawPerShift : 1;
+  const noiseFloor = effectivePerShift * 0.5;
+
+  const diff = safeLoad - safeMean;
+  if (diff >= noiseFloor) {
+    return { tone: "warn", text: `מעל הממוצע בנטל ב-${round1(diff)}`, level: "over" };
+  }
+  if (diff <= -noiseFloor) {
+    return { tone: "brand", text: `מתחת לממוצע בנטל ב-${round1(Math.abs(diff))}`, level: "under" };
+  }
+  return null;
+}
