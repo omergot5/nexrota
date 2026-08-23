@@ -347,5 +347,73 @@ check("מי שנשא לילה לא מקבל גם את שתי משמרות היו
   nextTwo.filter((g) => g === holderOfNight).length <= 1,
   JSON.stringify({ holderOfNight, nextTwo }));
 
+// ---------------------------------------------------------------
+// FAIR-01..04 (Phase 1, Plan 01-01) — נטל בכל מקום, לא רק בניקוד.
+//
+// ה-repro שהניע את הפאזה: 5 בקרים + 3 לילות, 4 שומרים, כולם זמינים, בלי
+// עקיפות כלל. לפני התיקון המנוע דיווח fairnessScore 100 ו-spread 0 בזמן
+// שבפועל אדם אחד נשא 16.0 נטל ושלושה נשאו 19.2 — "הוגנות מושלמת" בזמן
+// שאדם אחד לא נשא אף לילה. הבדיקות כאן מוכיחות שהציון המדווח באמת נגזר
+// מהנטל המדווח, ולא רק "נראה נכון" על התמונה הזו.
+// ---------------------------------------------------------------
+
+const round1 = (n) => Math.round(n * 10) / 10;
+
+// רק א'–ה' (אינדקסים 0–4): יום שישי/שבת היו מפעילים את מכפיל הסופ"ש
+// ומזייפים את החישוב למטה.
+const reproWeek = weekByOffset(1).slice(0, 5);
+const reproGuards = [
+  { id: "r1", name: "גיא" },
+  { id: "r2", name: "מיכל" },
+  { id: "r3", name: "אבי" },
+  { id: "r4", name: "רינה" },
+];
+const reproDayShifts = reproWeek.map((date, i) => ({
+  id: `rd${i}`, date, label: "משמרת יום", type: "day",
+  startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: [],
+}));
+const reproNightShifts = reproWeek.slice(0, 3).map((date, i) => ({
+  id: `rn${i}`, date, label: "משמרת לילה", type: "night",
+  startTime: "23:00", endTime: "07:00", requiredGuards: 1, assignedGuards: [],
+}));
+const reproShifts = [...reproDayShifts, ...reproNightShifts];
+
+console.log("\n=== נטל (FAIR-01..04) ===");
+
+// Test D — הבדיקה שהתיקון תלוי בה: אם המשמרות האלה בטעות נופלות על שישי/שבת
+// כל שאר החשבון למטה שקרי.
+check("FAIR-04 · משמרת יום ב-repro שוקלת 8.0 נטל",
+  Math.abs(shiftLoad(reproDayShifts[0]) - 8.0) < 1e-9, `${shiftLoad(reproDayShifts[0])}`);
+check("FAIR-04 · משמרת לילה ב-repro שוקלת 11.2 נטל",
+  Math.abs(shiftLoad(reproNightShifts[0]) - 11.2) < 1e-9, `${shiftLoad(reproNightShifts[0])}`);
+
+const reproResult = autoAssign({ shifts: reproShifts, guards: reproGuards, availability: {} });
+
+// Test A — לפני התיקון המנוע היה מדווח כאן 100 בדיוק (ספירה מאוזנת גם כשהנטל
+// לא). אחרי התיקון הציון חייב לרדת מתחת ל-100.
+check("FAIR-02 · ציון ההוגנות ב-repro נמוך מ-100 — לא עוד '100 מושלם' שקרי",
+  reproResult.summary.fairnessScore < 100, `fairnessScore=${reproResult.summary.fairnessScore}`);
+
+// Test B (FAIR-04, המבנית) — משחזרים את הציון עצמאית מ-perGuard[].load
+// ומ-perShiftLoad *המדווחים*, באותו סדר פעולות ובאותו רצפת מחלק שהמנוע
+// עצמו משתמש בו. שוויון מוחלט, בלי סבילות — זו בדיוק ההבטחה של FAIR-04.
+const reproLoads = reproResult.fairness.perGuard.map((p) => p.load);
+const reproMeanLoad = reproLoads.reduce((a, b) => a + b, 0) / reproLoads.length;
+const reproVariance = reproLoads.reduce((a, b) => a + (b - reproMeanLoad) ** 2, 0) / reproLoads.length;
+const reproCoefficient = 15 / Math.max(reproResult.fairness.perShiftLoad, 0.001);
+const reproRecomputedScore = Math.max(0, Math.round(100 - Math.sqrt(reproVariance) * reproCoefficient));
+check("FAIR-04 · הציון המדווח נגזר במדויק מהנטל המדווח (בדיקה מבנית, לא צילום מסך)",
+  reproRecomputedScore === reproResult.summary.fairnessScore,
+  `recomputed=${reproRecomputedScore} vs reported=${reproResult.summary.fairnessScore}`);
+
+// Test C — כל שורה נושאת load מספרי, ו-loadSpread הוא בדיוק ההפרש בין
+// המקסימום למינימום *המדווחים*.
+check("FAIR-02 · כל שורת perGuard נושאת שדה load מספרי",
+  reproResult.fairness.perGuard.every((p) => typeof p.load === "number"),
+  JSON.stringify(reproResult.fairness.perGuard));
+check("FAIR-02 · loadSpread שווה למקסימום פחות מינימום מתוך perGuard[].load המדווח",
+  reproResult.fairness.loadSpread === round1(Math.max(...reproLoads) - Math.min(...reproLoads)),
+  `loadSpread=${reproResult.fairness.loadSpread}, expected=${round1(Math.max(...reproLoads) - Math.min(...reproLoads))}`);
+
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);
