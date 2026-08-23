@@ -14,7 +14,7 @@
 // מגיעים מ-Supabase דרך WebSocket ו-POST ולא כ-GET שאפשר למטמן.
 // ============================================================
 
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL = `shell-${VERSION}`;
 const ASSETS = `assets-${VERSION}`;
 
