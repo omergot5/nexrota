@@ -527,17 +527,36 @@ function balanceWorkload({ openShifts, activeGuards, availability, rules, stats,
   const moves = [];
   const shiftById = new Map(openShifts.map((s) => [s.id, s]));
 
+  // כל מעבר מזיז בדיוק משמרת אחת, שמשנה את הפער הכבד-קל ב-2× המשקל של אותה
+  // משמרת. אז התפקיד היחיד של הסף הוא לעצור את הלולאה כשמה שנשאר מהפער כבר
+  // קטן ממה שההזזה היחידה שהמנוע מבצע כל פעם יכולה להזיז — הזזה שרק תעקוף
+  // אפס ותפתח את הפער בכיוון ההפוך. נגזר מ-stats.perShiftLoad *של הרוסטר הזה
+  // עצמו* ולא מקבוע נטל קבוע (D-02): צוות של משמרות 4 שעות וצוות של לילות 12
+  // שעות צריכים סף שונה לגמרי.
+  //
+  // המקדם: 1.0, לא 0.5. הנוסחה הישנה בספירה (`gapSize < 2`) עצרה כש-הפער
+  // קטן מ-2 — בדיוק גודל ההזזה השלמה של משמרת אחת ביחידות ספירה (1 שהופך
+  // ל-2 כשלוקחים ונותנים). זה שקול ל-מקדם 1.0 על "כמה שווה משמרת אחת", לא
+  // 0.5. מקדם 0.5 (החצי שהמחקר הציע) נבדק בפועל מול רוסטר אמיתי מעורב-סוגים
+  // (5 שומרים, בקרים ולילות) והוליד תנודה אינסופית: משמרת בודדת עוברת הלוך
+  // ושוב על פני 40 המעברים המותרים בלי להתייצב, כי המשקל של משמרת בודדת
+  // (לילה, כבד יותר מהממוצע) גדול בהרבה מחצי הממוצע. מקדם 1.0 נבדק על אותו
+  // רוסטר ועל שני הרוסטרים הסינתטיים (תיקון-הבאג, רוסטר-הסטייה) וב-Task 3
+  // (הרוסטרים הסינתטיים הנוספים) — מתייצב בלי תנודה בכל המקרים, ועדיין מזיז
+  // משמרת כשבאמת יש מה לתקן.
+  const gapThreshold = stats.perShiftLoad;
+
   for (let pass = 0; pass < rules.balancePasses; pass++) {
     const sorted = [...activeGuards].sort((a, b) => {
-      const d = load.get(a.id).count - load.get(b.id).count;
+      const d = load.get(a.id).load - load.get(b.id).load;
       return d !== 0 ? d : String(a.id).localeCompare(String(b.id));
     });
     const lightest = sorted[0];
     const heaviest = sorted[sorted.length - 1];
     if (!lightest || !heaviest) break;
 
-    const gapSize = load.get(heaviest.id).count - load.get(lightest.id).count;
-    if (gapSize < 2) break; // already flat enough
+    const gapLoad = load.get(heaviest.id).load - load.get(lightest.id).load;
+    if (gapLoad < gapThreshold) break; // already flat enough, in load units
 
     // Try to hand one of the heaviest guard's shifts to the lightest one.
     const movable = assignments

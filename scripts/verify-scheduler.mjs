@@ -415,5 +415,80 @@ check("FAIR-02 · loadSpread שווה למקסימום פחות מינימום �
   reproResult.fairness.loadSpread === round1(Math.max(...reproLoads) - Math.min(...reproLoads)),
   `loadSpread=${reproResult.fairness.loadSpread}, expected=${round1(Math.max(...reproLoads) - Math.min(...reproLoads))}`);
 
+// ---------------------------------------------------------------
+// FAIR-01 / FAIR-03 (Phase 1, Plan 01-01, Task 2) — מעבר האיזון ממיין
+// ועוצר לפי נטל, לא לפי ספירת משמרות.
+// ---------------------------------------------------------------
+
+console.log("\n=== מעבר האיזון (FAIR-01/FAIR-03) ===");
+
+// Test E — רוסטר שבו מי שמרובה-במשמרות (שי) ומי שכבד-בנטל (טל) הם שני
+// אנשים שונים בכוונה: שי מחזיק/ה שלוש משמרות קצרות נעולות (נטל נמוך), טל
+// מחזיק/ה לילה אחד נעול (נטל גבוה) ומשמרת יום קצרה שנייה שנופלת עליו/ה
+// במילוי הרגיל דרך הניקוד הרך (לא נעולה — ולכן ניתנת להזזה). המנוע הישן
+// (ספירה) לא היה זז בכלל: 3-2=1 < הסף הישן של 2. המנוע החדש (נטל) חייב
+// להזיז מטל, לא משי.
+const divWeek = reproWeek;
+const divGuards = [
+  { id: "e1", name: "שי" }, // מרובה-במשמרות, קל-בנטל
+  { id: "e2", name: "טל" }, // כבד-בנטל, מעט משמרות
+];
+const divLockedDay = [0, 1, 2].map((i, idx) => ({
+  id: `ed${idx}`, date: divWeek[i], label: "משמרת קצרה", type: "day",
+  startTime: "07:00", endTime: "09:00", requiredGuards: 1, assignedGuards: ["e1"],
+}));
+const divLockedNight = {
+  id: "en0", date: divWeek[3], label: "משמרת לילה", type: "night",
+  startTime: "23:00", endTime: "07:00", requiredGuards: 1, assignedGuards: ["e2"],
+};
+// משמרת קצרה פתוחה, ביום שאין לאף אחד מהם משמרת נעולה בו: הניקוד הרך
+// (טל "מעדיף/ה", שי "אולי") מטה אותה אל טל בזמן המילוי הרגיל, בלי לגעת
+// בזמינות הקשיחה — כדי שמעבר האיזון יוכל להחזיר אותה לשי בלי חסימה.
+const divOpenDay = {
+  id: "ed3", date: divWeek[4], label: "משמרת קצרה", type: "day",
+  startTime: "20:00", endTime: "22:00", requiredGuards: 1, assignedGuards: [],
+};
+const divShifts = [...divLockedDay, divLockedNight, divOpenDay];
+const divAvailability = {};
+for (const g of divGuards) for (const s of divShifts) divAvailability[`${g.id}-${s.id}`] = { status: "available" };
+divAvailability["e1-ed3"] = { status: "maybe" };
+divAvailability["e2-ed3"] = { status: "preferred" };
+const divResult = autoAssign({ shifts: divShifts, guards: divGuards, availability: divAvailability, keepExisting: true });
+
+const e1Row = divResult.fairness.perGuard.find((p) => p.guardId === "e1");
+const e2Row = divResult.fairness.perGuard.find((p) => p.guardId === "e2");
+check("FAIR-01 · ברוסטר הסטייה, המרובה-במשמרות (שי) אינו/ה הכבד/ה-בנטל (טל)",
+  e1Row.shifts > e2Row.shifts && e2Row.load > e1Row.load,
+  JSON.stringify({ e1: e1Row, e2: e2Row }));
+
+const divBalanceLog = divResult.log.find((l) => l.step === "balance");
+check("FAIR-01 · מעבר האיזון מזיז משמרת מהכבד/ה-בנטל (טל), לא מהמרובה-במשמרות (שי)",
+  divResult.summary.balanceMoves === 1 && divBalanceLog?.moves?.[0]?.from === "טל",
+  JSON.stringify({ balanceMoves: divResult.summary.balanceMoves, moves: divBalanceLog?.moves }));
+
+// Test F (FAIR-03, RESEARCH.md Open Question 3) — הסף החדש לא דוחף את
+// הלולאה לתקרת ה-passes ולא מתנדנד; מספר ההזזות בפועל נשאר קטן משמעותית
+// מהתקרה, גם על תיקון-הבאג וגם על שבוע חמשת-השומרים הרגיל שבראש הקובץ.
+check("FAIR-03 · מספר ההזזות בתיקון-הבאג נשאר הרבה מתחת לתקרת balancePasses",
+  reproResult.summary.balanceMoves <= DEFAULT_RULES.balancePasses / 3,
+  `balanceMoves=${reproResult.summary.balanceMoves}, תקרה/3=${DEFAULT_RULES.balancePasses / 3}`);
+check("FAIR-03 · מספר ההזזות בשבוע חמשת-השומרים נשאר הרבה מתחת לתקרת balancePasses",
+  result.summary.balanceMoves <= DEFAULT_RULES.balancePasses / 3,
+  `balanceMoves=${result.summary.balanceMoves}, תקרה/3=${DEFAULT_RULES.balancePasses / 3}`);
+
+// Test G (D-04) — ריצה חוזרת על תיקון-הבאג נותנת בדיוק אותה תוצאה.
+const reproAgain = autoAssign({ shifts: reproShifts, guards: reproGuards, availability: {} });
+check("FAIR-01 · deterministic across runs — תיקון-הבאג נותן אותו byShift ואותו ציון בריצה חוזרת",
+  JSON.stringify(reproAgain.byShift) === JSON.stringify(reproResult.byShift) &&
+    reproAgain.summary.fairnessScore === reproResult.summary.fairnessScore,
+  JSON.stringify({ a: reproAgain.byShift, b: reproResult.byShift }));
+
+// Test H — על תיקון-הבאג עצמו, הפער (3.2) קטן מהסף הנגזר, וכל הזזה חוקית
+// הייתה מזיזה את הפער בלפחות 16.0 (2 × 8.0, המשמרת הקלה ביותר) — כלומר
+// הייתה עוקפת אפס ופותחת פער בכיוון ההפוך. ההתנהגות הנכונה היא לא לזוז.
+check("FAIR-01 · בתיקון-הבאג אין שום הזזה — כל הזזה חוקית הייתה רק מגדילה את הפער",
+  reproResult.summary.balanceMoves === 0,
+  `balanceMoves=${reproResult.summary.balanceMoves}`);
+
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);
