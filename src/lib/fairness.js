@@ -69,6 +69,18 @@ function tally(guards, shifts, inWindow) {
  * `planned` הוא מה שכבר שובץ לשבוע *הזה*, כדי שההמלצה תרד תוך כדי עבודה
  * ולא תישאר תלושה מהמסך.
  */
+/**
+ * כמה "שווה" משמרת ממוצעת אצל הרשימה הזאת — הנטל הממוצע לתורנות בודדת.
+ *
+ * ההגדרה היחידה של הגודל הזה מעל המנוע: `fairnessPlan` קוראת לה במקום
+ * לגזור בעצמה, ו-`loadTable` (מסך הדוחות, 01-03) קוראת לה גם היא — כדי
+ * שהסף שנמדד נגדו (D-02) יהיה תמיד אותו מספר. רשימה ריקה חוזרת ל-1,
+ * בדיוק כמו ברירת המחדל הקודמת של `fairnessPlan`.
+ */
+export function meanShiftLoad(shifts = []) {
+  return shifts.length ? shifts.reduce((a, s) => a + shiftLoad(s), 0) / shifts.length : 1;
+}
+
 export function fairnessPlan({ guards = [], history = [], planned = [], until = todayISO(), days = 14 }) {
   const active = guards.filter((g) => g.active !== false);
   if (!active.length) return { rows: [], avgLoad: 0, perShiftLoad: 1, window: { days } };
@@ -81,10 +93,7 @@ export function fairnessPlan({ guards = [], history = [], planned = [], until = 
 
   // כמה "שווה" משמרת ממוצעת אצל הצוות הזה. בלי זה החוב היה מתורגם ליחידות
   // מדומות שלא מתאימות לתמהיל האמיתי.
-  const all = [...history, ...planned];
-  const perShiftLoad = all.length
-    ? all.reduce((a, s) => a + shiftLoad(s), 0) / all.length
-    : 1;
+  const perShiftLoad = meanShiftLoad([...history, ...planned]);
 
   const rows = active
     .map((g) => {

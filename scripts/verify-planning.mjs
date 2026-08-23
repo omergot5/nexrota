@@ -4,8 +4,11 @@
 // Both modules are pure, so they run here with no browser and no database.
 
 import { compatIndex, findConflicts, pairKey, pairRule, taskWindow } from "../src/lib/conflicts.js";
-import { fairnessHint, fairnessPlan, loadShareHint, rollingLoad } from "../src/lib/fairness.js";
+import { fairnessHint, fairnessPlan, loadShareHint, meanShiftLoad, rollingLoad } from "../src/lib/fairness.js";
 import { addDays, todayISO } from "../src/lib/dates.js";
+import { shiftLoad, teamAverages } from "../src/lib/autoAssign.js";
+import { loadTable } from "../src/lib/loadTable.js";
+import { chartTheme } from "../src/design/chartTheme.js";
 
 let failures = 0;
 const check = (label, cond, extra = "") => {
@@ -203,6 +206,256 @@ const degenerate = [
 check("FAIR-02 · קלטים מנוונים לעולם לא מייצרים NaN בטקסט, בלי קריסה",
   degenerate.every((r) => !String(r?.text ?? "").includes("NaN")),
   JSON.stringify(degenerate));
+
+// ============================================================
+console.log("\nloadTable — טבלת מסך הדוחות (FAIR-02, Phase 1 Plan 01-03)\n");
+// ============================================================
+
+const ltDate1 = weekStart;
+const ltDate2 = addDays(weekStart, 1);
+
+// Test A (the whole point of the task) — שני שומרים עם אותה ספירה, אחד
+// נושא לילות. אותם תאריכים משני הצדדים כדי שמכפיל הסופ"ש יהיה זהה בין
+// השניים ורק מכפיל הסוג יסביר את הפער.
+const ltGuardsA = [
+  { id: "la1", name: "רועי כהן" },
+  { id: "la2", name: "דנה לוי" },
+];
+const ltShiftsA = [
+  day(ltDate1, "la1"), day(ltDate2, "la1"),
+  night(ltDate1, "la2"), night(ltDate2, "la2"),
+];
+const tableA = loadTable(ltGuardsA, ltShiftsA);
+const rowA1 = tableA.rows.find((r) => r.guardId === "la1");
+const rowA2 = tableA.rows.find((r) => r.guardId === "la2");
+check("FAIR-02 · loadTable · אותה ספירה, נטל שונה — מי שנשא לילה נחשב עמוס יותר",
+  rowA1.count === rowA2.count && rowA1.load !== rowA2.load && rowA2.load > rowA1.load,
+  JSON.stringify({ rowA1, rowA2 }));
+
+// Test B (chain of custody) — כל שורה, לכל שומר, תואמת בדיוק את
+// teamAverages לאותו שומר. לא שורה אחת — כולן.
+const ltGuardsB = [
+  { id: "g1", name: "אלה" },
+  { id: "g2", name: "יניר" },
+  { id: "g3", name: "נועה" },
+];
+const ltShiftsB = [
+  day(ltDate1, "g1"), day(ltDate2, "g1"),
+  night(ltDate1, "g2"), night(ltDate2, "g2"),
+  day(ltDate1, "g3"),
+];
+const tableB = loadTable(ltGuardsB, ltShiftsB);
+const taB = teamAverages(ltGuardsB, ltShiftsB);
+const chainOfCustody = tableB.rows.every((r) => {
+  const src = taB.perGuard[r.guardId];
+  return (
+    Math.abs(r.load - Math.round(src.load * 10) / 10) < 1e-9 &&
+    r.hours === Math.round(src.hours) &&
+    r.count === src.count &&
+    r.nights === src.nights
+  );
+});
+check("FAIR-02 · loadTable · כל שורה תואמת את teamAverages לאותו שומר — לא רק שורה אחת",
+  chainOfCustody && tableB.rows.length === ltGuardsB.length, JSON.stringify(tableB.rows));
+
+// Test C (the regression that would otherwise be silent) — לפחות שומר
+// אחד שבו הנטל שונה מהשעות בדיוק שהטבלה מדפיסה.
+check("FAIR-02 · loadTable · עמודת הנטל אינה עמודת השעות בהסוואה",
+  tableB.rows.some((r) => r.load !== r.hours), JSON.stringify(tableB.rows));
+
+// Test D (the team average is not a fourth formula) — meanLoad זהה
+// בדיוק ל-teamAverages().avg.load, כולל כלל האוכלוסייה שלו: שומר שלא
+// שובץ בכלל עדיין נספר במכנה, והממוצע יורד כשמוסיפים אותו.
+check("FAIR-02 · loadTable · meanLoad זהה בדיוק ל-teamAverages().avg.load",
+  tableB.meanLoad === taB.avg.load, JSON.stringify({ table: tableB.meanLoad, ta: taB.avg.load }));
+const ltGuardsD = [...ltGuardsB, { id: "g4", name: "עומר" }];
+const tableD = loadTable(ltGuardsD, ltShiftsB);
+check("FAIR-02 · loadTable · שומר שלא שובץ עדיין נספר במכנה — הממוצע יורד",
+  tableD.meanLoad < tableB.meanLoad, JSON.stringify({ before: tableB.meanLoad, after: tableD.meanLoad }));
+
+// Test E (`meanShiftLoad` is behaviour-preserving) — אותה תוצאה כמו חישוב
+// עצמאי מאותה רשימת משמרות, ו-fairnessPlan עדיין מחזיר perShiftLoad תקין.
+const independentMean = ltShiftsB.length
+  ? ltShiftsB.reduce((a, s) => a + shiftLoad(s), 0) / ltShiftsB.length
+  : 1;
+check("FAIR-02 · loadTable · meanShiftLoad זהה לחישוב עצמאי מאותה רשימת משמרות",
+  meanShiftLoad(ltShiftsB) === independentMean,
+  JSON.stringify({ meanShiftLoad: meanShiftLoad(ltShiftsB), independentMean }));
+const planWithExtracted = fairnessPlan({ guards: ltGuardsB, history: ltShiftsB, planned: [], until: weekStart, days: 14 });
+check("FAIR-02 · loadTable · fairnessPlan עדיין מחזיר perShiftLoad תקין אחרי המיצוי ל-meanShiftLoad",
+  Math.abs(planWithExtracted.perShiftLoad - Math.round(independentMean * 10) / 10) < 1e-9,
+  String(planWithExtracted.perShiftLoad));
+
+// Test F (determinism and ordering, D-04) — מיון יורד לפי נטל, שובר שוויון
+// לקסיקוגרפי יציב על מזהה השומר, ושתי הרצות על אותו קלט מזהות לחלוטין.
+const ltGuardsF = [
+  { id: "fz2", name: "שני" },
+  { id: "fz1", name: "אחד" },
+];
+const ltShiftsF = [day(ltDate1, "fz1"), day(ltDate1, "fz2")]; // נטל זהה בדיוק
+const tableF1 = loadTable(ltGuardsF, ltShiftsF);
+const tableF2 = loadTable(ltGuardsF, ltShiftsF);
+check("FAIR-02 · loadTable · שני שומרים בנטל זהה ממוינים לקסיקוגרפית לפי מזהה",
+  tableF1.rows[0].guardId === "fz1" && tableF1.rows[1].guardId === "fz2",
+  JSON.stringify(tableF1.rows.map((r) => r.guardId)));
+check("FAIR-02 · loadTable · שתי הרצות על אותו קלט מחזירות תוצאה זהה לחלוטין (דטרמיניזם)",
+  JSON.stringify(tableF1) === JSON.stringify(tableF2));
+const tableBAgain = loadTable(ltGuardsB, ltShiftsB);
+check("FAIR-02 · loadTable · הסדר יורד לפי נטל על פני רוסטר מעורב, ועקבי בין הרצות",
+  tableB.rows.every((r, i) => i === 0 || tableB.rows[i - 1].load >= r.load) &&
+    JSON.stringify(tableB) === JSON.stringify(tableBAgain));
+
+// Test G (degenerate input) — צוות ריק, משמרות ריקות, ומשמרת ששייכת
+// לשומר שכבר לא בצוות — לעולם לא קריסה, NaN או undefined בשורה.
+const emptyTable = loadTable([], []);
+check("FAIR-02 · loadTable · צוות ומשמרות ריקים לא מפילים את החישוב",
+  emptyTable.rows.length === 0 && emptyTable.meanLoad === 0 && emptyTable.totalAssigned === 0 &&
+    emptyTable.guardCount === 0 && !Number.isNaN(emptyTable.perShiftLoad),
+  JSON.stringify(emptyTable));
+const ghostTable = loadTable(
+  [{ id: "real", name: "קיים" }],
+  [day(ltDate1, "ghost"), day(ltDate1, "real")]
+);
+check("FAIR-02 · loadTable · משמרת של שומר שהוסר מהצוות לא קורסת ולא מייצרת NaN/undefined",
+  ghostTable.rows.length === 1 && ghostTable.rows[0].guardId === "real" &&
+    !Number.isNaN(ghostTable.rows[0].load) && ghostTable.rows[0].load !== undefined,
+  JSON.stringify(ghostTable));
+
+// ============================================================
+console.log("\nchartTheme — צבעי המסגרת של תרשימי הדוחות (FAIR-02, Phase 1 Plan 01-03)\n");
+// ============================================================
+
+// ערכי הטוקנים כפי שהם נקראים ישירות מתוך tokens.css, בשתי הערכות.
+const LIGHT_CHART_TOKENS = {
+  "--text-muted": "74 106 100",
+  "--hairline": "rgba(28, 59, 55, 0.11)",
+  "--surface-raised": "rgba(255, 255, 255, 0.97)",
+  "--text": "28 59 55",
+};
+const DARK_CHART_TOKENS = {
+  "--text-muted": "160 190 182",
+  "--hairline": "rgba(174, 222, 210, 0.13)",
+  "--surface-raised": "rgba(19, 45, 41, 0.88)",
+  "--text": "239 238 226",
+};
+
+// Test H — סימון הערוצים המופרדים ברווח הופך ל-rgb() בפסיקים, גם כשהערך
+// מגיע עם הרווח המוביל ש-getComputedStyle מחזיר בדפדפן אמיתי.
+const themeChannels = chartTheme((name) => (name === "--text-muted" ? "74 106 100" : ""));
+check("FAIR-02 · chartTheme · ערוץ RGB מופרד-ברווח הופך ל-rgb() בפסיקים",
+  themeChannels.axis === "rgb(74, 106, 100)", themeChannels.axis);
+const themeChannelsPadded = chartTheme((name) => (name === "--text-muted" ? " 74 106 100" : ""));
+check("FAIR-02 · chartTheme · רווח מוביל אמיתי (getComputedStyle) לא שובר את הצורה",
+  themeChannelsPadded.axis === themeChannels.axis, themeChannelsPadded.axis);
+
+// Test I — ערך rgba() מוגמר עובר בייט-לבייט, גם עם רווח מוביל — ה-alpha
+// הוא העיצוב ולעולם לא נדרס.
+const themeRgba = chartTheme((name) => (name === "--hairline" ? "rgba(28, 59, 55, 0.11)" : ""));
+check("FAIR-02 · chartTheme · rgba() מוגמר עובר ללא שינוי — ה-alpha הוא העיצוב",
+  themeRgba.grid === "rgba(28, 59, 55, 0.11)", themeRgba.grid);
+const themeRgbaPadded = chartTheme((name) => (name === "--hairline" ? " rgba(28, 59, 55, 0.11)" : ""));
+check("FAIR-02 · chartTheme · אותו rgba() עם רווח מוביל מייצר תוצאה זהה בייט-לבייט",
+  themeRgbaPadded.grid === themeRgba.grid, themeRgbaPadded.grid);
+
+// Test J — שום ערך לא ריק, לא NaN, ולא הפניה שלא נפתרה — גם כשהקורא לא
+// מחזיר כלום (המקרה של "אין DOM").
+const themeNoDom = chartTheme(() => "");
+const flatValues = [themeNoDom.axis, themeNoDom.grid, themeNoDom.tooltip.background, themeNoDom.tooltip.color];
+check("FAIR-02 · chartTheme · שום ערך אינו ריק, NaN או הפניה שלא נפתרה",
+  flatValues.every((v) => typeof v === "string" && v.length > 0 && !v.includes("NaN") && !v.includes("var(")),
+  JSON.stringify(themeNoDom));
+
+// Test K — הערכה משיגה בפועל את התרשים: בהיר וכהה מייצרים ציר, רשת
+// ורקע/טקסט tooltip שונים.
+const themeLight = chartTheme((name) => LIGHT_CHART_TOKENS[name] ?? "");
+const themeDark = chartTheme((name) => DARK_CHART_TOKENS[name] ?? "");
+check("FAIR-02 · chartTheme · ערכת בהיר וכהה מייצרות ציר, רשת ו-tooltip שונים",
+  themeLight.axis !== themeDark.axis &&
+    themeLight.grid !== themeDark.grid &&
+    themeLight.tooltip.background !== themeDark.tooltip.background &&
+    themeLight.tooltip.color !== themeDark.tooltip.color,
+  JSON.stringify({ light: themeLight, dark: themeDark }));
+
+// Test L — הרשימה הלבנה היא החוזה: בדיוק ארבעת הטוקנים האלה, לא פחות
+// ולא יותר, ולא אף אחד אחר.
+const requestedTokens = new Set();
+chartTheme((name) => {
+  requestedTokens.add(name);
+  return LIGHT_CHART_TOKENS[name] ?? "";
+});
+check("FAIR-02 · chartTheme · הרשימה הלבנה של הטוקנים היא בדיוק מה שהמודול מבקש",
+  JSON.stringify([...requestedTokens].sort()) ===
+    JSON.stringify(["--hairline", "--surface-raised", "--text", "--text-muted"]),
+  JSON.stringify([...requestedTokens].sort()));
+
+// Test M — הפולבק לא צובע ערכים אמיתיים (נבדק מול כהה, כי הפולבק שווה
+// בכוונה לערכי הבהיר עצמם), וקורא בלי DOM עדיין מחזיר תוצאה שלמה.
+check("FAIR-02 · chartTheme · כשיש ערכים אמיתיים (כהה), אף ערך פולבק לא מופיע בתוצאה",
+  themeDark.axis !== themeNoDom.axis &&
+    themeDark.grid !== themeNoDom.grid &&
+    themeDark.tooltip.background !== themeNoDom.tooltip.background &&
+    themeDark.tooltip.color !== themeNoDom.tooltip.color,
+  JSON.stringify({ dark: themeDark, fallback: themeNoDom }));
+check("FAIR-02 · chartTheme · קורא בלי DOM עדיין מחזיר תוצאה שלמה ולא ריקה, בלי קריסה",
+  typeof themeNoDom.axis === "string" && themeNoDom.axis.length > 0 &&
+    typeof themeNoDom.grid === "string" && themeNoDom.grid.length > 0 &&
+    typeof themeNoDom.tooltip.background === "string" && themeNoDom.tooltip.background.length > 0 &&
+    typeof themeNoDom.tooltip.color === "string" && themeNoDom.tooltip.color.length > 0,
+  JSON.stringify(themeNoDom));
+
+// Test N (T-01-11) — ערך זבל שלא מזוהה כאף צורה נופל לפולבק, ולא מוזרק
+// כמו שהוא לתוך אובייקט ה-style.
+const themeJunk = chartTheme((name) => (name === "--text-muted" ? "javascript:alert(1)" : ""));
+check("FAIR-02 · chartTheme · ערך זבל/לא-מזוהה נופל לפולבק ולעולם לא מוזרק כמו שהוא",
+  themeJunk.axis === themeNoDom.axis && themeJunk.axis !== "javascript:alert(1)",
+  themeJunk.axis);
+
+// ============================================================
+console.log("\nloadShareHint על מסך הדוחות — התג ההוגנות דרך שדות loadTable (FAIR-02, Phase 1 Plan 01-03 Task 3)\n");
+// ============================================================
+
+// Test O — התג הוא ההכרעה המשותפת, לא אחת מקומית: מזין את loadShareHint
+// אך ורק בשדות שהטבלה כבר חושפת (row.load, table.meanLoad,
+// table.perShiftLoad) על רוסטר שבו אחד ברור מעל הממוצע והשני ברור
+// מתחתיו. ה-level שנבדק נגדו נלקח מהתפיסה החיה של הפרקונדישן, לא הונח.
+const ltGuardsO = [
+  { id: "o1", name: "עמוס" }, // שלושה לילות — כבד
+  { id: "o2", name: "קלה" }, // יום אחד — קל
+];
+const ltShiftsO = [
+  night(ltDate1, "o1"), night(ltDate2, "o1"), night(addDays(weekStart, 2), "o1"),
+  day(ltDate1, "o2"),
+];
+const tableO = loadTable(ltGuardsO, ltShiftsO);
+const rowO1 = tableO.rows.find((r) => r.guardId === "o1");
+const rowO2 = tableO.rows.find((r) => r.guardId === "o2");
+const hintO1 = loadShareHint({ load: rowO1.load, meanLoad: tableO.meanLoad, perShiftLoad: tableO.perShiftLoad });
+const hintO2 = loadShareHint({ load: rowO2.load, meanLoad: tableO.meanLoad, perShiftLoad: tableO.perShiftLoad });
+check("FAIR-02 · loadTable · loadShareHint מזהה מי מעל הממוצע ומי מתחתיו, אך ורק דרך שדות הטבלה",
+  hintO1?.level === "over" && hintO2?.level === "under",
+  JSON.stringify({ rowO1, rowO2, meanLoad: tableO.meanLoad, perShiftLoad: tableO.perShiftLoad, hintO1, hintO2 }));
+
+// Test P — שתיקה היא עדיין תשובה לגיטימית: מי שבדיוק על הממוצע (שני
+// שומרים בנטל זהה, tableF1 מ-Task 1) לא מקבל תג, גם דרך שדות הטבלה.
+const rowAtMean = tableF1.rows[0];
+const hintAtMean = loadShareHint({ load: rowAtMean.load, meanLoad: tableF1.meanLoad, perShiftLoad: tableF1.perShiftLoad });
+check("FAIR-02 · loadTable · מי שבדיוק על הממוצע לא מקבל תג, גם דרך שדות הטבלה",
+  hintAtMean === null,
+  JSON.stringify({ row: rowAtMean, meanLoad: tableF1.meanLoad, perShiftLoad: tableF1.perShiftLoad }));
+
+// Test Q — מילים, לא רק גוון: שני הכיוונים מייצרים טקסטים שונים ולא ריקים.
+check("FAIR-02 · loadTable · שני הכיוונים (מעל/מתחת) מייצרים טקסט שונה ולא ריק — לא רק גוון",
+  hintO1.text !== hintO2.text && hintO1.text.length > 0 && hintO2.text.length > 0,
+  JSON.stringify({ over: hintO1.text, under: hintO2.text }));
+
+// Test R (D-02) — אין סף שני קבוע: אותה סטייה מוחלטת נשארת בשקט על
+// משמרת ממוצעת כבדה ומקבלת תג על משמרת ממוצעת קלה. תכונת 01-02 עצמה,
+// נבדקת מחדש כאן דרך שם השדות שהמסך הזה מספק (meanLoad, perShiftLoad).
+const sameDeviationHeavyViaTable = loadShareHint({ load: 23, meanLoad: 20, perShiftLoad: 10 });
+const sameDeviationLightViaTable = loadShareHint({ load: 23, meanLoad: 20, perShiftLoad: 2 });
+check("FAIR-02 · loadTable · שום סף שני קבוע — אותה סטייה שקטה על משמרת כבדה, מתויגת על משמרת קלה",
+  sameDeviationHeavyViaTable === null && sameDeviationLightViaTable?.level === "over",
+  JSON.stringify({ heavy: sameDeviationHeavyViaTable, light: sameDeviationLightViaTable }));
 
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);

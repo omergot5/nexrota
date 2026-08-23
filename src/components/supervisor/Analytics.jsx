@@ -3,9 +3,12 @@ import { SHIFT_TONES } from "../../design/shiftPalette.js";
 import {
   Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { Avatar, Card, EmptyState, PageHeader } from "../ui.jsx";
+import { Avatar, Badge, Card, EmptyState, PageHeader } from "../ui.jsx";
 import { useTheme } from "../../hooks/useTheme.js";
-import { shiftHours } from "../../lib/dates.js";
+import { loadTable } from "../../lib/loadTable.js";
+import { chartTheme } from "../../design/chartTheme.js";
+import { loadShareHint } from "../../lib/fairness.js";
+import { t } from "../../lib/terms.js";
 
 // Kept in its own module and loaded lazily — recharts is roughly half the
 // bundle, and reports are never the first screen a supervisor opens.
@@ -16,56 +19,39 @@ const SHIFT_TYPES = [
   { type: "night", label: "לילה", color: SHIFT_TONES.night },
 ];
 
-const TYPE_LABEL = Object.fromEntries(SHIFT_TYPES.map((t) => [t.type, t.label]));
+// `loadTable` מדווח את ספירת הלילות לכל שומר בשדה `nights` (לא `night`),
+// כדי לא להתנגש עם שם הטיפוס `night` ב-SHIFT_TYPES. הכינוי הזה שומר על
+// תווית ה-Tooltip קריאה בלי לשכפל את מפת SHIFT_TYPES.
+const TYPE_LABEL = {
+  ...Object.fromEntries(SHIFT_TYPES.map((d) => [d.type, d.label])),
+  nights: SHIFT_TYPES.find((d) => d.type === "night").label,
+};
 
 export default function AnalyticsDash({ guards, shifts }) {
   // Recharts styles its axes and tooltips through JS props, not CSS, so it
   // cannot read our custom properties — it has to be told the theme.
   const { resolved } = useTheme();
-  const axis = resolved === "light" ? "#475569" : "#94A3B8";
-  const grid = resolved === "light" ? "rgba(15,23,42,0.10)" : "rgba(255,255,255,0.10)";
-  const tooltipStyle = {
-    background: resolved === "light" ? "#FFFFFF" : "#131C2D",
-    border: `1px solid ${grid}`,
-    borderRadius: 12,
-    color: resolved === "light" ? "#0F172A" : "#F1F5F9",
-    fontSize: 12,
-    direction: "rtl",
-  };
+  // התלות היחידה של הזיכרון הזה היא `resolved`, ולא כקלט לחישוב אלא
+  // כטריגר לקריאה מחדש: חנות ה-theme (useTheme.js) מטביעה את data-theme
+  // על <html> *לפני* שהיא מודיעה למאזינים, ומצב "system" מטופל על ידי
+  // ה-media query שב-tokens.css עוד לפני שהרכיב הזה בכלל נרנדר. אז
+  // ברגע שה-render הזה רץ, getComputedStyle כבר מחזיר את ערכי הערכה
+  // הנכונה — ואין צורך ש-resolved עצמו יהיה קלט לפונקציה.
+  const { axis, grid, tooltip: tooltipStyle } = useMemo(() => chartTheme(), [resolved]);
 
-  const stats = useMemo(
-    () =>
-      guards.map((g) => {
-        const mine = shifts.filter((s) => s.assignedGuards.includes(g.id));
-        return {
-          name: g.name.split(" ")[0],
-          fullName: g.name,
-          id: g.id,
-          total: mine.length,
-          morning: mine.filter((s) => s.type === "morning").length,
-          afternoon: mine.filter((s) => s.type === "afternoon").length,
-          night: mine.filter((s) => s.type === "night").length,
-          hours: Math.round(mine.reduce((n, s) => n + shiftHours(s), 0)),
-        };
-      }),
-    [guards, shifts]
-  );
+  // הטבלה היחידה שמזינה את שני התרשימים ואת טבלת הפירוט. אף מספר עומס
+  // לא מחושב כאן — כולו מגיע דרך teamAverages() בתוך loadTable (01-03).
+  const table = useMemo(() => loadTable(guards, shifts), [guards, shifts]);
 
   const typeStats = useMemo(
     () =>
-      SHIFT_TYPES.map((d) => ({
-        name: d.label,
-        color: d.color,
-        value: shifts
-          .filter((s) => s.type === d.type)
-          .reduce((n, s) => n + s.assignedGuards.length, 0),
-      })).filter((d) => d.value > 0),
-    [shifts]
+      SHIFT_TYPES.map((d) => ({ name: d.label, color: d.color, value: table.byType[d.type] || 0 })).filter(
+        (d) => d.value > 0
+      ),
+    [table]
   );
 
-  const totalAssigned = shifts.reduce((n, s) => n + s.assignedGuards.length, 0);
-
-  if (!guards.length || totalAssigned === 0) {
+  if (!table.guardCount || table.totalAssigned === 0) {
     return (
       <div className="space-y-6">
         <PageHeader title="דוחות" subtitle="סטטיסטיקות עומס ומעקב" />
@@ -80,13 +66,16 @@ export default function AnalyticsDash({ guards, shifts }) {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="דוחות" subtitle={`${totalAssigned} שיבוצים · ${guards.length} שומרים`} />
+      <PageHeader
+        title="דוחות"
+        subtitle={`${table.totalAssigned} שיבוצים · ${table.guardCount} שומרים · ${t("unit.load")} ממוצע ${table.meanLoad}`}
+      />
 
       <div className="grid lg:grid-cols-2 gap-5">
         <Card>
           <h2 className="font-bold text-content mb-4">משמרות לפי שומר</h2>
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={stats} layout="vertical" margin={{ right: 8, left: 0 }}>
+            <BarChart data={table.rows} layout="vertical" margin={{ right: 8, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={grid} />
               <XAxis type="number" tick={{ fontSize: 11, fill: axis }} allowDecimals={false} stroke={grid} />
               <YAxis type="category" dataKey="name" width={60} tick={{ fontSize: 11, fill: axis }} stroke={grid} />
@@ -97,20 +86,20 @@ export default function AnalyticsDash({ guards, shifts }) {
               />
               <Bar dataKey="morning" stackId="a" fill={SHIFT_TONES.morning} />
               <Bar dataKey="afternoon" stackId="a" fill={SHIFT_TONES.afternoon} />
-              <Bar dataKey="night" stackId="a" fill={SHIFT_TONES.night} radius={[0, 4, 4, 0]} />
+              <Bar dataKey="nights" stackId="a" fill={SHIFT_TONES.night} radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
           {/* An explicit legend: the stacked bars are distinguished only by
               colour, which is not enough on its own. */}
           <div className="flex gap-4 justify-center mt-2 text-xs text-muted flex-wrap">
-            {SHIFT_TYPES.map((t) => (
-              <span key={t.type} className="flex items-center gap-1.5">
+            {SHIFT_TYPES.map((d) => (
+              <span key={d.type} className="flex items-center gap-1.5">
                 <span
                   className="w-2.5 h-2.5 rounded-sm inline-block"
-                  style={{ background: t.color }}
+                  style={{ background: d.color }}
                   aria-hidden="true"
                 />
-                {t.label}
+                {d.label}
               </span>
             ))}
           </div>
@@ -144,11 +133,22 @@ export default function AnalyticsDash({ guards, shifts }) {
 
       <Card className="overflow-x-auto">
         <h2 className="font-bold text-content mb-4">פירוט לפי שומר</h2>
-        <table className="w-full text-sm min-w-[480px]">
-          <caption className="sr-only">פירוט משמרות ושעות לכל שומר</caption>
+        <table className="w-full text-sm min-w-[680px]">
+          <caption className="sr-only">
+            פירוט נטל, משמרות, שעות ותג הוגנות לכל שומר, ממוין מהעמוס ביותר בנטל
+          </caption>
           <thead>
             <tr className="border-b border-hairline">
-              {["שומר", "בוקר/יום", "צהריים", "לילה", 'סה"כ', "שעות"].map((h) => (
+              {[
+                "שומר",
+                t("unit.load"),
+                "בוקר/יום",
+                "צהריים",
+                t("unit.nights"),
+                t("unit.shifts"),
+                t("unit.hours"),
+                "הוגנות",
+              ].map((h) => (
                 <th
                   key={h}
                   scope="col"
@@ -160,22 +160,44 @@ export default function AnalyticsDash({ guards, shifts }) {
             </tr>
           </thead>
           <tbody>
-            {stats.map((s) => (
-              <tr key={s.id} className="border-b border-hairline last:border-0">
-                <th scope="row" className="py-2.5 px-3 text-right font-normal">
-                  <div className="flex items-center gap-2">
-                    <Avatar id={s.id} name={s.fullName} size={24} />
-                    <span className="font-medium text-content text-xs">{s.fullName}</span>
-                  </div>
-                </th>
-                <td className="py-2.5 px-3 text-center text-warn font-semibold">{s.morning}</td>
-                <td className="py-2.5 px-3 text-center text-brand font-semibold">{s.afternoon}</td>
-                <td className="py-2.5 px-3 text-center text-info font-semibold">{s.night}</td>
-                <td className="py-2.5 px-3 text-center font-bold text-content">{s.total}</td>
-                <td className="py-2.5 px-3 text-center text-muted">{s.hours}</td>
-              </tr>
-            ))}
+            {table.rows.map((r) => {
+              // המקום היחיד בכל המוצר שמחליט אם אדם מעל או מתחת לממוצע
+              // *לתצוגה* הוא loadShareHint עצמו — הרכיב מזין אותו אך ורק
+              // בשדות שהטבלה כבר חושפת ומציג את מה שהוא מחזיר, בלי שום
+              // השוואה מקומית משלו מול הממוצע (D-01, D-02).
+              const hint = loadShareHint({ load: r.load, meanLoad: table.meanLoad, perShiftLoad: table.perShiftLoad });
+              return (
+                <tr key={r.guardId} className="border-b border-hairline last:border-0">
+                  <th scope="row" className="py-2.5 px-3 text-right font-normal">
+                    <div className="flex items-center gap-2">
+                      <Avatar id={r.guardId} name={r.fullName} size={24} />
+                      <span className="font-medium text-content text-xs">{r.fullName}</span>
+                    </div>
+                  </th>
+                  <td className="py-2.5 px-3 text-center font-bold text-content">{r.load}</td>
+                  <td className="py-2.5 px-3 text-center text-warn font-semibold">{r.morning}</td>
+                  <td className="py-2.5 px-3 text-center text-brand font-semibold">{r.afternoon}</td>
+                  <td className="py-2.5 px-3 text-center text-info font-semibold">{r.nights}</td>
+                  <td className="py-2.5 px-3 text-center text-muted">{r.count}</td>
+                  <td className="py-2.5 px-3 text-center text-muted">{r.hours}</td>
+                  <td className="py-2.5 px-3 text-center">
+                    {hint && (
+                      <Badge tone={hint.tone} icon={hint.level === "over" ? "up" : "down"}>
+                        {hint.text}
+                      </Badge>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={8} className="py-2 px-3 text-center text-xs text-muted">
+                {t("unit.load")} ממוצע לצוות: {table.meanLoad}
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </Card>
     </div>

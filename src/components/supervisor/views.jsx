@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { SHIFT_TONES } from "../../design/shiftPalette.js";
+import { loadTable } from "../../lib/loadTable.js";
 import {
   Alert, Avatar, Badge, Btn, Card, EmptyState, Field, guardColor, IconBtn, Input, Meter, Modal,
   PageHeader, readableInk, Select, StatCard, Textarea,
@@ -91,10 +92,13 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
   const doneCount = steps.filter((s) => s.done).length;
   const isNew = doneCount < steps.length;
 
-  const maxLoad = Math.max(
-    1,
-    ...guards.map((g) => shifts.filter((s) => s.assignedGuards.includes(g.id)).length)
-  );
+  // הכרטיס "עומס השומרים" קורא אך ורק מ-loadTable — אותו מודול שמזין את
+  // מסך הדוחות (01-03 Task 1). זו הייתה בדיוק אותה טעות בשני מקומות:
+  // הכרטיס הזה חישב ספירת משמרות גולמית בעצמו, בדיוק כמו שהטבלה עשתה
+  // לפני שתוקנה. אין כאן שום חשבון עומס נוסף — רק Math.max על שדה
+  // load שכבר הגיע מוכן מ-loadTable.
+  const { rows: loadRows } = useMemo(() => loadTable(guards, shifts), [guards, shifts]);
+  const maxLoad = Math.max(1, ...loadRows.map((r) => r.load));
 
   return (
     <div className="space-y-6">
@@ -211,27 +215,29 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
             <Icon name="users" size={17} className="text-muted" />
             עומס השומרים
           </h2>
-          {guards.length === 0 ? (
+          {loadRows.length === 0 ? (
             <p className="text-muted text-sm text-center py-8">אין שומרים עדיין</p>
           ) : (
             <div className="space-y-3">
-              {guards.map((g) => {
-                const count = shifts.filter((s) => s.assignedGuards.includes(g.id)).length;
-                return (
-                  <div key={g.id}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Avatar id={g.id} name={g.name} size={26} />
-                        <span className="text-sm font-medium text-content truncate">{g.name}</span>
-                      </div>
-                      <span className="text-xs text-muted flex-shrink-0" data-numeric>
-                        {count} משמרות
-                      </span>
+              {loadRows.map((row) => (
+                <div key={row.guardId}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Avatar id={row.guardId} name={row.fullName} size={26} />
+                      <span className="text-sm font-medium text-content truncate">{row.fullName}</span>
                     </div>
-                    <Meter value={count} max={maxLoad} color={guardColor(g.id)} label={`עומס של ${g.name}`} />
+                    <span className="text-xs text-muted flex-shrink-0" data-numeric>
+                      {row.load} {t("unit.load")}
+                    </span>
                   </div>
-                );
-              })}
+                  <Meter
+                    value={row.load}
+                    max={maxLoad}
+                    color={guardColor(row.guardId)}
+                    label={`עומס של ${row.fullName}`}
+                  />
+                </div>
+              ))}
             </div>
           )}
         </Card>
