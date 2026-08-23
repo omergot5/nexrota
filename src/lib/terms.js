@@ -38,6 +38,11 @@ const BASE = {
   // פעולות חוזרות
   "action.rerun":   "הרץ מחדש",
   "action.publish": "שלח לצוות",
+
+  // יחידות מידה בכיתובי עומס והוגנות
+  "unit.load":   "נטל",
+  "unit.shifts": "משמרות",
+  "unit.nights": "לילות",
 };
 
 /**
@@ -66,6 +71,7 @@ const PROFILE_TERMS = {
     "guard.nav.availability": "דיווח זמינות",
     "guard.nav.swaps":        "חילופים",
     "action.publish":   "הפץ סד\"כ",
+    "unit.shifts":      "תורנויות",
   },
 };
 

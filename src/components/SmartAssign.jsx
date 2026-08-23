@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { autoAssign, availStatus, DEFAULT_RULES, explainUnfilled } from "../lib/autoAssign.js";
 import { formatDateHe, rangeLabelHe, shortDate } from "../lib/dates.js";
+import { loadShareHint } from "../lib/fairness.js";
 import { t } from "../lib/terms.js";
 import { Icon } from "./icons.jsx";
 import {
@@ -359,7 +360,7 @@ export default function SmartAssign({ weekDates, shifts, guards, availability, o
             <Kpi
               label="ציון הוגנות"
               value={plan.summary.fairnessScore}
-              hint={`פער של ${plan.fairness.spread} משמרות בין הכי עמוס לפנוי`}
+              hint={`פער של ${plan.fairness.loadSpread} ${t("unit.load")} בין הכי עמוס/ה לפנוי/ה`}
               meter={plan.summary.fairnessScore}
               meterColor="rgb(var(--brand))"
             />
@@ -432,30 +433,44 @@ export default function SmartAssign({ weekDates, shifts, guards, availability, o
 
           <Card>
             <h2 className="font-bold text-content mb-1">חלוקת העומס המוצעת</h2>
-            <p className="text-xs text-muted mb-4">
-              ממוצע של {plan.summary.targetPerGuard} משמרות לשומר
+            <p className="text-xs text-muted mb-4" data-numeric>
+              ממוצע {plan.fairness.loadMean} {t("unit.load")} לשומר · יעד {plan.summary.targetPerGuard}{" "}
+              {t("unit.shifts")}
             </p>
             <div className="space-y-3">
-              {plan.fairness.perGuard.map((p) => (
-                <div key={p.guardId}>
-                  <div className="flex items-center justify-between mb-1.5 gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Avatar id={p.guardId} name={p.name} size={26} />
-                      <span className="text-sm font-medium text-content truncate">{p.name}</span>
+              {plan.fairness.perGuard.map((p) => {
+                const hint = loadShareHint({
+                  load: p.load,
+                  meanLoad: plan.fairness.loadMean,
+                  perShiftLoad: plan.fairness.perShiftLoad,
+                });
+                return (
+                  <div key={p.guardId}>
+                    <div className="flex items-center justify-between mb-1.5 gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Avatar id={p.guardId} name={p.name} size={26} />
+                        <span className="text-sm font-medium text-content truncate">{p.name}</span>
+                        {hint && (
+                          <Badge tone={hint.tone} icon={hint.level === "over" ? "up" : "down"}>
+                            {hint.text}
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted flex-shrink-0" data-numeric>
+                        {p.load} {t("unit.load")} · {p.shifts} {t("unit.shifts")} · {p.nights}{" "}
+                        {t("unit.nights")} · {p.hours} ש'
+                      </span>
                     </div>
-                    <span className="text-xs text-muted flex-shrink-0" data-numeric>
-                      {p.shifts} משמרות · {p.nights} לילות · {p.hours} ש'
-                    </span>
+                    <Meter
+                      value={p.load}
+                      max={Math.max(plan.fairness.loadMax, 1)}
+                      color={guardColor(p.guardId)}
+                      height={7}
+                      label={`נטל של ${p.name}: ${p.load} מתוך ${Math.max(plan.fairness.loadMax, 1)}`}
+                    />
                   </div>
-                  <Meter
-                    value={p.shifts}
-                    max={Math.max(plan.fairness.max, 1)}
-                    color={guardColor(p.guardId)}
-                    height={7}
-                    label={`עומס של ${p.name}`}
-                  />
-                </div>
-              ))}
+                );
+              })}
             </div>
           </Card>
 

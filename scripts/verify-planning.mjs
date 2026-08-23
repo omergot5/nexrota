@@ -4,7 +4,7 @@
 // Both modules are pure, so they run here with no browser and no database.
 
 import { compatIndex, findConflicts, pairKey, pairRule, taskWindow } from "../src/lib/conflicts.js";
-import { fairnessHint, fairnessPlan, rollingLoad } from "../src/lib/fairness.js";
+import { fairnessHint, fairnessPlan, loadShareHint, rollingLoad } from "../src/lib/fairness.js";
 import { addDays, todayISO } from "../src/lib/dates.js";
 
 let failures = 0;
@@ -154,6 +154,55 @@ check("נטל ולא ספירה — מי שנשא לילה נחשב עמוס י�
   nightHolder.deficit < 0, JSON.stringify(evenCount.rows));
 
 check("צוות ריק לא מפיל את החישוב", fairnessPlan({ guards: [] }).rows.length === 0);
+
+// ============================================================
+console.log("\nloadShareHint — תג עומס-מעל/מתחת (FAIR-02, Phase 1 Plan 01-02)\n");
+// ============================================================
+
+// Test A — מי שנמצא בדיוק על הממוצע לא מקבל תג. שתיקה היא תשובה לגיטימית.
+check("FAIR-02 · על הממוצע בדיוק — בלי תג",
+  loadShareHint({ load: 20, meanLoad: 20, perShiftLoad: 8 }) === null);
+
+// Test B — משמרת ממוצעת שלמה מעל הממוצע: over, טקסט לא ריק, tone בטוח.
+const overHint = loadShareHint({ load: 28, meanLoad: 20, perShiftLoad: 8 });
+check("FAIR-02 · משמרת שלמה מעל הממוצע מסומן over עם טקסט וטון תקינים",
+  overHint?.level === "over" && typeof overHint.text === "string" && overHint.text.length > 0 &&
+    ["brand", "warn", "danger", "accent", "info"].includes(overHint.tone),
+  JSON.stringify(overHint));
+
+// Test C — משמרת ממוצעת שלמה מתחת לממוצע: under, טקסט לא ריק, tone בטוח.
+const underHint = loadShareHint({ load: 12, meanLoad: 20, perShiftLoad: 8 });
+check("FAIR-02 · משמרת שלמה מתחת לממוצע מסומן under עם טקסט וטון תקינים",
+  underHint?.level === "under" && typeof underHint.text === "string" && underHint.text.length > 0 &&
+    ["brand", "warn", "danger", "accent", "info"].includes(underHint.tone),
+  JSON.stringify(underHint));
+
+// Test D (D-05) — הכיוון קריא גם בלי הצבע: שני הכיוונים מייצרים טקסטים שונים.
+check("FAIR-02 · over ו-under מייצרים טקסט שונה (D-05 — לא רק גוון)",
+  overHint.text !== underHint.text, JSON.stringify({ over: overHint.text, under: underHint.text }));
+
+// Test E (D-02) — סף הרעש נגזר מהרוסטר, לא קבוע: אותה סטייה מוחלטת (3) נשארת
+// בשקט על רוסטר של משמרות כבדות (perShiftLoad=10 -> סף 5) ומקבלת תג על רוסטר
+// של משמרות קלות (perShiftLoad=2 -> סף 1). קבוע קשיח לא יכול לעבור את זה.
+const sameDeviationHeavy = loadShareHint({ load: 23, meanLoad: 20, perShiftLoad: 10 });
+const sameDeviationLight = loadShareHint({ load: 23, meanLoad: 20, perShiftLoad: 2 });
+check("FAIR-02 · סף הרעש נגזר מ-perShiftLoad — שקט על משמרות כבדות",
+  sameDeviationHeavy === null, JSON.stringify(sameDeviationHeavy));
+check("FAIR-02 · סף הרעש נגזר מ-perShiftLoad — מקבל תג על משמרות קלות (אותה סטייה)",
+  sameDeviationLight !== null && sameDeviationLight.level === "over", JSON.stringify(sameDeviationLight));
+
+// Test F — קלטים מנוונים: perShiftLoad אפס/שלילי/חסר, ושורה חסרה. לעולם לא
+// NaN, לא undefined בטקסט, ולא קריסה.
+const degenerate = [
+  loadShareHint({ load: 10, meanLoad: 5, perShiftLoad: 0 }),
+  loadShareHint({ load: 10, meanLoad: 5, perShiftLoad: -3 }),
+  loadShareHint({ load: 10, meanLoad: 5 }),
+  loadShareHint(undefined),
+  loadShareHint({}),
+];
+check("FAIR-02 · קלטים מנוונים לעולם לא מייצרים NaN בטקסט, בלי קריסה",
+  degenerate.every((r) => !String(r?.text ?? "").includes("NaN")),
+  JSON.stringify(degenerate));
 
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);
