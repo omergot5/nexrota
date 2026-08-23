@@ -1,10 +1,17 @@
 ---
-gsd_state_version: '1.0'
-status: planning
+gsd_state_version: 1.0
+current_phase: 01
+current_phase_name: כיול ההוגנות — נטל בכל מקום
+status: executing
+stopped_at: תכנון פאזה 1 הושלם — 01-01 (מנוע), 01-02 (מסכים ושחרור), 01-03 (מסך הדוחות). plan-check אישר את 01-01 ו-01-02 אחרי תיקון שבעה פגמי שער; 01-03 נוסף בעקבות ממצא חוסם ועדיין לא נבדק.
+last_updated: "2026-08-23T12:17:39.184Z"
+last_activity: 2026-08-23
+last_activity_desc: Phase 01 execution started
+state_head: f2202d48306eb450624257b63c3ab34135986aff
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
+  total_plans: 3
   completed_plans: 0
   percent: 0
 ---
@@ -16,20 +23,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-21)
 
 **Core value:** אדם שמקבל את האפליקציה לידיו מסיים סידור שבועי מלא בלי שאף אחד יסביר לו כלום — ומה שהמערכת אומרת לו על עצמה הוא נכון.
-**Current focus:** Phase 1 — כיול ההוגנות: נטל בכל מקום
+**Current focus:** Phase 01 — כיול ההוגנות — נטל בכל מקום
 
 ## Current Position
 
-Phase: 1 of 5 (כיול ההוגנות — נטל בכל מקום)
-Plan: 0 of 3 in current phase
-Status: Planned — ready to execute
-Last activity: 2026-08-23 — שלוש תוכניות לפאזה 1 נכתבו ועברו plan-check. הבאג שוחזר בהרצה: fairnessScore 100 מול נטל 16.0/19.2/19.2/19.2.
+Phase: 01 (כיול ההוגנות — נטל בכל מקום) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 01
+Last activity: 2026-08-23 — Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0
 - Average duration: —
 - Total execution time: —
@@ -41,6 +49,7 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 **Recent Trend:**
+
 - Last 5 plans: —
 - Trend: —
 
