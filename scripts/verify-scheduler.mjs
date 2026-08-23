@@ -4,7 +4,7 @@
 // Asserts the hard constraints actually hold on a generated week, and prints
 // the coverage/fairness numbers so regressions are obvious.
 
-import { autoAssign, checkAssignment, DEFAULT_RULES, shiftLoad } from "../src/lib/autoAssign.js";
+import { autoAssign, checkAssignment, DEFAULT_RULES, shiftLoad, teamAverages } from "../src/lib/autoAssign.js";
 import { shiftInterval, weekByOffset } from "../src/lib/dates.js";
 
 const HOUR = 3600000;
@@ -596,6 +596,89 @@ const oldFormulaScore = Math.max(0, Math.round(100 - Math.sqrt(uniformCountVaria
 check("FAIR-03 · במשמרות שוות-משקל, הנוסחה החדשה משחזרת בדיוק את הנוסחה הישנה המבוססת-ספירה",
   uniformResult.summary.fairnessScore === oldFormulaScore,
   `new=${uniformResult.summary.fairnessScore}, old(count-based)=${oldFormulaScore}, counts=${JSON.stringify(uniformCounts)}`);
+
+// ---------------------------------------------------------------
+// FAIR-05 (Phase 1, Plan 01-02, Task 2) — הנטל שהמשתתף רואה מרותך לנטל
+// שהמנוע חילק לפיו. שני הנתיבים (teamAverages ל-GuardApp.jsx, perGuard[]
+// ל-SmartAssign.jsx) קוראים לאותו shiftLoad מאותו קובץ — הבדיקות כאן
+// מוכיחות זאת מבנית, על הרוסטר-repro של 01-01, ולא רק "נראה תואם".
+// ---------------------------------------------------------------
+
+console.log("\n=== FAIR-05 — נטל המשתתף מרותך לנטל המנוע ===");
+
+// עותק, לא מוטציה: reproShifts משמש בדיקות אחרות מעל ומתחת, ומוטציה שלו
+// הייתה הופכת את סדר הריצה בקובץ למשמעותי.
+const reproPublishedShifts = reproShifts.map((s) => ({
+  ...s,
+  assignedGuards: reproResult.byShift[s.id] || [],
+  published: true,
+}));
+
+const { perGuard: participantPerGuard, avg: participantAvg } = teamAverages(reproGuards, reproPublishedShifts);
+const engineLoadByGuard = Object.fromEntries(reproResult.fairness.perGuard.map((p) => [p.guardId, p.load]));
+
+// Test G — ה-single-meter check, וכל FAIR-05: לכל שומר, הנטל שמוצג למשתתף
+// שווה לנטל שמדווח המנוע. הסבילות: המנוע מעגל ל-עשירית אחת, teamAverages
+// מחזיר גלם — אז הסבילות היא פחות מחצי מהעשירית האחרונה שמדווח המנוע.
+const loadMismatches = reproGuards.filter((g) => {
+  const participantLoad = participantPerGuard[g.id]?.load ?? NaN;
+  const engineLoad = engineLoadByGuard[g.id] ?? NaN;
+  return !(Math.abs(participantLoad - engineLoad) < 0.05);
+});
+check("FAIR-05 · לכל שומר, הנטל שמוצג למשתתף (teamAverages) שווה לנטל שמדווח המנוע (fairness.perGuard)",
+  loadMismatches.length === 0,
+  JSON.stringify(loadMismatches.map((g) => ({ id: g.id, participant: participantPerGuard[g.id]?.load, engine: engineLoadByGuard[g.id] }))));
+
+// Test H — עצמאית מהמנוע (דפוס FAIR-04, מיושם על נתיב המשתתף): הנטל שווה
+// לסכום shiftLoad על המשמרות שהוקצו לאותו שומר, מחושב כאן מחדש מאפס — לא
+// רק עקבי עם עצמו. הסבילות כאן היא רק רעש צף, כי שני הצדדים גלמיים.
+const recomputedLoads = Object.fromEntries(reproGuards.map((g) => {
+  const total = reproPublishedShifts
+    .filter((s) => s.assignedGuards.includes(g.id))
+    .reduce((a, s) => a + shiftLoad(s), 0);
+  return [g.id, total];
+}));
+const recomputeMismatches = reproGuards.filter(
+  (g) => Math.abs(participantPerGuard[g.id].load - recomputedLoads[g.id]) > 1e-9
+);
+check("FAIR-05 · הנטל של המשתתף נגזר עצמאית מסכום shiftLoad על המשמרות שהוקצו לו",
+  recomputeMismatches.length === 0, JSON.stringify(recomputeMismatches));
+
+// Test I — הרגרסיה שהייתה נשארת שקטה: על הרוסטר הזה יש לפחות שומר אחד
+// שהנטל שלו שונה מהשעות שלו בשלמים — אם עריכה עתידית הופכת בשקט את שורת
+// הנטל לשורת שעות לא-שקולה, הבדיקה הזו נכשלת.
+const loadHoursDiverge = reproGuards.some(
+  (g) => Math.round(participantPerGuard[g.id].load) !== Math.round(participantPerGuard[g.id].hours)
+);
+check("FAIR-05 · לפחות שומר אחד: הנטל שונה מהשעות בשלמים — שורת הנטל לא הפכה לשורת שעות",
+  loadHoursDiverge, JSON.stringify(reproGuards.map((g) => participantPerGuard[g.id])));
+
+// Test J — הממוצע הוא ממוצע אותם ערכים, לא נוסחה שלישית.
+const participantLoads = reproGuards.map((g) => participantPerGuard[g.id].load);
+const expectedAvgLoad = round1(participantLoads.reduce((a, b) => a + b, 0) / participantLoads.length);
+check("FAIR-05 · avg.load הוא ממוצע אותם ערכי load של perGuard, מעוגל באותה שיטה",
+  Math.abs(participantAvg.load - expectedAvgLoad) < 0.05,
+  `avg.load=${participantAvg.load}, expected=${expectedAvgLoad}`);
+
+// Test K — סקופ, לא יחידה: כשכל השומרים פעילים וכל המשמרות מפורסמות (תנאי
+// הפיקסצ'ר עצמו), avg.load של המשתתף ו-loadMean של המנוע מסכימים בתוך
+// העיגול. שני המספרים יכולים להיפרד לגיטימית כשהצוות מחזיק שומרים שהתוכנית
+// לא שקלה — זה פער של *אוכלוסייה*, לא של *יחידה*, וזה בדיוק מה ששורת
+// המשתתף אמורה לחשוף (לא נבדק כאן — התנאי המקדים חסום ל"כולם" בכוונה).
+check("FAIR-05 · avg.load של המשתתף ו-loadMean של המנוע מסכימים כשהאוכלוסייה זהה",
+  Math.abs(participantAvg.load - reproResult.fairness.loadMean) < 0.15,
+  `participant avg.load=${participantAvg.load}, engine loadMean=${reproResult.fairness.loadMean}`);
+
+// Test L — דטרמיניזם (D-04): הרצה חוזרת של כל הרצף נותנת אותם ערכי נטל.
+const reproPublishedShiftsAgain = reproShifts.map((s) => ({
+  ...s,
+  assignedGuards: reproResult.byShift[s.id] || [],
+  published: true,
+}));
+const { perGuard: participantPerGuardAgain } = teamAverages(reproGuards, reproPublishedShiftsAgain);
+check("FAIR-05 · דטרמיניסטי — הרצה חוזרת נותנת בדיוק אותם ערכי load למשתתף",
+  reproGuards.every((g) => participantPerGuardAgain[g.id].load === participantPerGuard[g.id].load),
+  JSON.stringify({ a: participantPerGuardAgain, b: participantPerGuard }));
 
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);

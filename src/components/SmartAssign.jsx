@@ -360,7 +360,7 @@ export default function SmartAssign({ weekDates, shifts, guards, availability, o
             <Kpi
               label="ציון הוגנות"
               value={plan.summary.fairnessScore}
-              hint={`פער של ${plan.fairness.spread} משמרות בין הכי עמוס לפנוי`}
+              hint={`פער של ${plan.fairness.loadSpread} ${t("unit.load")} בין הכי עמוס/ה לפנוי/ה`}
               meter={plan.summary.fairnessScore}
               meterColor="rgb(var(--brand))"
             />
