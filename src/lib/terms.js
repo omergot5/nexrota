@@ -43,6 +43,7 @@ const BASE = {
   "unit.load":   "נטל",
   "unit.shifts": "משמרות",
   "unit.nights": "לילות",
+  "unit.hours":  "שעות",
 };
 
 /**

@@ -4,8 +4,10 @@
 // Both modules are pure, so they run here with no browser and no database.
 
 import { compatIndex, findConflicts, pairKey, pairRule, taskWindow } from "../src/lib/conflicts.js";
-import { fairnessHint, fairnessPlan, loadShareHint, rollingLoad } from "../src/lib/fairness.js";
+import { fairnessHint, fairnessPlan, loadShareHint, meanShiftLoad, rollingLoad } from "../src/lib/fairness.js";
 import { addDays, todayISO } from "../src/lib/dates.js";
+import { shiftLoad, teamAverages } from "../src/lib/autoAssign.js";
+import { loadTable } from "../src/lib/loadTable.js";
 
 let failures = 0;
 const check = (label, cond, extra = "") => {
@@ -203,6 +205,120 @@ const degenerate = [
 check("FAIR-02 · קלטים מנוונים לעולם לא מייצרים NaN בטקסט, בלי קריסה",
   degenerate.every((r) => !String(r?.text ?? "").includes("NaN")),
   JSON.stringify(degenerate));
+
+// ============================================================
+console.log("\nloadTable — טבלת מסך הדוחות (FAIR-02, Phase 1 Plan 01-03)\n");
+// ============================================================
+
+const ltDate1 = weekStart;
+const ltDate2 = addDays(weekStart, 1);
+
+// Test A (the whole point of the task) — שני שומרים עם אותה ספירה, אחד
+// נושא לילות. אותם תאריכים משני הצדדים כדי שמכפיל הסופ"ש יהיה זהה בין
+// השניים ורק מכפיל הסוג יסביר את הפער.
+const ltGuardsA = [
+  { id: "la1", name: "רועי כהן" },
+  { id: "la2", name: "דנה לוי" },
+];
+const ltShiftsA = [
+  day(ltDate1, "la1"), day(ltDate2, "la1"),
+  night(ltDate1, "la2"), night(ltDate2, "la2"),
+];
+const tableA = loadTable(ltGuardsA, ltShiftsA);
+const rowA1 = tableA.rows.find((r) => r.guardId === "la1");
+const rowA2 = tableA.rows.find((r) => r.guardId === "la2");
+check("FAIR-02 · loadTable · אותה ספירה, נטל שונה — מי שנשא לילה נחשב עמוס יותר",
+  rowA1.count === rowA2.count && rowA1.load !== rowA2.load && rowA2.load > rowA1.load,
+  JSON.stringify({ rowA1, rowA2 }));
+
+// Test B (chain of custody) — כל שורה, לכל שומר, תואמת בדיוק את
+// teamAverages לאותו שומר. לא שורה אחת — כולן.
+const ltGuardsB = [
+  { id: "g1", name: "אלה" },
+  { id: "g2", name: "יניר" },
+  { id: "g3", name: "נועה" },
+];
+const ltShiftsB = [
+  day(ltDate1, "g1"), day(ltDate2, "g1"),
+  night(ltDate1, "g2"), night(ltDate2, "g2"),
+  day(ltDate1, "g3"),
+];
+const tableB = loadTable(ltGuardsB, ltShiftsB);
+const taB = teamAverages(ltGuardsB, ltShiftsB);
+const chainOfCustody = tableB.rows.every((r) => {
+  const src = taB.perGuard[r.guardId];
+  return (
+    Math.abs(r.load - Math.round(src.load * 10) / 10) < 1e-9 &&
+    r.hours === Math.round(src.hours) &&
+    r.count === src.count &&
+    r.nights === src.nights
+  );
+});
+check("FAIR-02 · loadTable · כל שורה תואמת את teamAverages לאותו שומר — לא רק שורה אחת",
+  chainOfCustody && tableB.rows.length === ltGuardsB.length, JSON.stringify(tableB.rows));
+
+// Test C (the regression that would otherwise be silent) — לפחות שומר
+// אחד שבו הנטל שונה מהשעות בדיוק שהטבלה מדפיסה.
+check("FAIR-02 · loadTable · עמודת הנטל אינה עמודת השעות בהסוואה",
+  tableB.rows.some((r) => r.load !== r.hours), JSON.stringify(tableB.rows));
+
+// Test D (the team average is not a fourth formula) — meanLoad זהה
+// בדיוק ל-teamAverages().avg.load, כולל כלל האוכלוסייה שלו: שומר שלא
+// שובץ בכלל עדיין נספר במכנה, והממוצע יורד כשמוסיפים אותו.
+check("FAIR-02 · loadTable · meanLoad זהה בדיוק ל-teamAverages().avg.load",
+  tableB.meanLoad === taB.avg.load, JSON.stringify({ table: tableB.meanLoad, ta: taB.avg.load }));
+const ltGuardsD = [...ltGuardsB, { id: "g4", name: "עומר" }];
+const tableD = loadTable(ltGuardsD, ltShiftsB);
+check("FAIR-02 · loadTable · שומר שלא שובץ עדיין נספר במכנה — הממוצע יורד",
+  tableD.meanLoad < tableB.meanLoad, JSON.stringify({ before: tableB.meanLoad, after: tableD.meanLoad }));
+
+// Test E (`meanShiftLoad` is behaviour-preserving) — אותה תוצאה כמו חישוב
+// עצמאי מאותה רשימת משמרות, ו-fairnessPlan עדיין מחזיר perShiftLoad תקין.
+const independentMean = ltShiftsB.length
+  ? ltShiftsB.reduce((a, s) => a + shiftLoad(s), 0) / ltShiftsB.length
+  : 1;
+check("FAIR-02 · loadTable · meanShiftLoad זהה לחישוב עצמאי מאותה רשימת משמרות",
+  meanShiftLoad(ltShiftsB) === independentMean,
+  JSON.stringify({ meanShiftLoad: meanShiftLoad(ltShiftsB), independentMean }));
+const planWithExtracted = fairnessPlan({ guards: ltGuardsB, history: ltShiftsB, planned: [], until: weekStart, days: 14 });
+check("FAIR-02 · loadTable · fairnessPlan עדיין מחזיר perShiftLoad תקין אחרי המיצוי ל-meanShiftLoad",
+  Math.abs(planWithExtracted.perShiftLoad - Math.round(independentMean * 10) / 10) < 1e-9,
+  String(planWithExtracted.perShiftLoad));
+
+// Test F (determinism and ordering, D-04) — מיון יורד לפי נטל, שובר שוויון
+// לקסיקוגרפי יציב על מזהה השומר, ושתי הרצות על אותו קלט מזהות לחלוטין.
+const ltGuardsF = [
+  { id: "fz2", name: "שני" },
+  { id: "fz1", name: "אחד" },
+];
+const ltShiftsF = [day(ltDate1, "fz1"), day(ltDate1, "fz2")]; // נטל זהה בדיוק
+const tableF1 = loadTable(ltGuardsF, ltShiftsF);
+const tableF2 = loadTable(ltGuardsF, ltShiftsF);
+check("FAIR-02 · loadTable · שני שומרים בנטל זהה ממוינים לקסיקוגרפית לפי מזהה",
+  tableF1.rows[0].guardId === "fz1" && tableF1.rows[1].guardId === "fz2",
+  JSON.stringify(tableF1.rows.map((r) => r.guardId)));
+check("FAIR-02 · loadTable · שתי הרצות על אותו קלט מחזירות תוצאה זהה לחלוטין (דטרמיניזם)",
+  JSON.stringify(tableF1) === JSON.stringify(tableF2));
+const tableBAgain = loadTable(ltGuardsB, ltShiftsB);
+check("FAIR-02 · loadTable · הסדר יורד לפי נטל על פני רוסטר מעורב, ועקבי בין הרצות",
+  tableB.rows.every((r, i) => i === 0 || tableB.rows[i - 1].load >= r.load) &&
+    JSON.stringify(tableB) === JSON.stringify(tableBAgain));
+
+// Test G (degenerate input) — צוות ריק, משמרות ריקות, ומשמרת ששייכת
+// לשומר שכבר לא בצוות — לעולם לא קריסה, NaN או undefined בשורה.
+const emptyTable = loadTable([], []);
+check("FAIR-02 · loadTable · צוות ומשמרות ריקים לא מפילים את החישוב",
+  emptyTable.rows.length === 0 && emptyTable.meanLoad === 0 && emptyTable.totalAssigned === 0 &&
+    emptyTable.guardCount === 0 && !Number.isNaN(emptyTable.perShiftLoad),
+  JSON.stringify(emptyTable));
+const ghostTable = loadTable(
+  [{ id: "real", name: "קיים" }],
+  [day(ltDate1, "ghost"), day(ltDate1, "real")]
+);
+check("FAIR-02 · loadTable · משמרת של שומר שהוסר מהצוות לא קורסת ולא מייצרת NaN/undefined",
+  ghostTable.rows.length === 1 && ghostTable.rows[0].guardId === "real" &&
+    !Number.isNaN(ghostTable.rows[0].load) && ghostTable.rows[0].load !== undefined,
+  JSON.stringify(ghostTable));
 
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);
