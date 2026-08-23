@@ -40,7 +40,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3
   - 01-01 — כיול המנוע: מעבר האיזון, ציון ההוגנות, וגזירת שני המקדמים (FAIR-01, FAIR-02, FAIR-03, FAIR-04)
   - 01-02 — המסכים והשחרור: חלוקת העומס אצל המנהל, נעילת שורת המשתתף, גרסת service worker (FAIR-02, FAIR-05, FAIR-06)
-  - 01-03 — מסך הדוחות: טבלת האנליטיקה עוברת לנטל, וצבעי הגרף עוברים לטוקנים (FAIR-02, FAIR-04)
+  - 01-03 — מסך הדוחות ומסך הבית: שתי טבלאות עומס (Analytics + SupDashboard) עוברות לנטל, וצבעי הגרף עוברים לטוקנים (FAIR-02, FAIR-04)
 **Risks**: החלפת `.count` ב-`.load` בלי גזירה מחדש של `gapSize < 2` ושל מקדם ה-`× 15` (Pitfall 6); שחרור בלי הגדלת גרסת ה-service worker, כלומר שני מנהלים ושני מספרים לאותו שבוע (Pitfall 7).
 
 ### Phase 2: איחוד משימה ומשמרת
