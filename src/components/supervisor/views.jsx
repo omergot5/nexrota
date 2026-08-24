@@ -7,8 +7,8 @@ import {
 } from "../ui.jsx";
 import { Dot, Icon } from "../icons.jsx";
 import {
-  availabilityDeadline, dayName, formatDateHe, fromISODate, rangeLabelHe, shiftHours, shortDate,
-  toISODate, todayISO, weekByOffset,
+  availabilityDeadline, dayName, formatDateHe, fromISODate, isSingleDayTask, rangeLabelHe, shiftHours,
+  shortDate, toISODate, todayISO, weekByOffset,
 } from "../../lib/dates.js";
 import { availStatus, checkAssignment } from "../../lib/autoAssign.js";
 import { PROFILES, subscribeTerms, t, termProfile } from "../../lib/terms.js";
@@ -1391,6 +1391,9 @@ export function TaskMgmt({
     title: "", description: "", category: UNFILED, assignees: [],
     priority: "medium", startDate: weekDates[0], dueDate: weekDates[6] || weekDates[0],
     overrideNote: "",
+    // ריקות בכוונה, בלי ברירת מחדל (D-05): שעה שמישהו לא הקליד בעצמו לא
+    // נכנסת למנוע בשקט.
+    startTime: "", endTime: "",
   };
   const [form, setForm] = useState(blank);
   const field = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -1416,6 +1419,7 @@ export function TaskMgmt({
       assignees: task.assignees || [], priority: task.priority,
       startDate: task.startDate || "", dueDate: task.dueDate || "",
       overrideNote: task.overrideNote || "",
+      startTime: task.startTime || "", endTime: task.endTime || "",
     });
     setEditing(task.id);
     setOverride(Boolean(task.overrideNote));
@@ -1439,16 +1443,30 @@ export function TaskMgmt({
   // הופכת את המתג לכפתור "המשך" — וזה בדיוק מה שהוא לא אמור להיות.
   const blocked = conflicts.length > 0 && (!override || !form.overrideNote.trim());
 
+  // שדות השעה נראים רק למשימה חד-יומית (D-01) — אותה פונקציה בדיוק שהמנוע
+  // עצמו נשען עליה, כדי שלא ייווצר מצב שבו הטופס "רואה" יום אחד והמנוע רואה
+  // אחרת. שם נפרד מ-`blocked`: זה לא מתנגשות, וכפתור עם התווית שהתנגשות
+  // מייצרת (`blocked`) היה מטעה כאן.
+  const showHours = isSingleDayTask(form);
+  const hoursInvalid = showHours && Boolean(form.startTime) !== Boolean(form.endTime);
+
   const save = async () => {
-    if (!form.title.trim() || blocked) return;
+    if (!form.title.trim() || blocked || hoursInvalid) return;
     // חלון הפוך הוא שגיאת הקלדה, לא כוונה — מיישרים אותו במקום לחסום.
     const clean =
       form.startDate && form.dueDate && form.startDate > form.dueDate
         ? { ...form, startDate: form.dueDate, dueDate: form.startDate }
         : form;
+    // אכיפת D-01 בזמן השמירה, לא רק בזמן התצוגה: מנהל שממלא שעות למשימה
+    // חד-יומית ואז מרחיב את הטווח לפני שמירה חייב שהשעות יתנקו — אחרת
+    // השורה הייתה נושאת שעות שהמנוע לעולם לא היה קורא (isTaskEngineEligible
+    // דורש יום בודד), וזה בדיוק הפער ש-D-01 סוגר.
+    const withHours = isSingleDayTask(clean)
+      ? clean
+      : { ...clean, startTime: "", endTime: "" };
     // ההצדקה שייכת להתנגשות. אין התנגשות — אין מה להצדיק, והשדה מתנקה
     // כדי שלא תישאר בשורה סיבה לדבר שכבר לא קורה.
-    const withNote = { ...clean, overrideNote: conflicts.length ? clean.overrideNote : "" };
+    const withNote = { ...withHours, overrideNote: conflicts.length ? withHours.overrideNote : "" };
     if (editing) await actions.editTask(editing, withNote);
     else await actions.createTask(withNote);
     setShowForm(false);
@@ -1744,7 +1762,7 @@ export function TaskMgmt({
             <Btn
               onClick={save}
               loading={busy}
-              disabled={!form.title.trim() || blocked}
+              disabled={!form.title.trim() || blocked || hoursInvalid}
               className="flex-1"
             >
               {blocked ? "יש התנגשות" : "שמור"}
@@ -1799,6 +1817,36 @@ export function TaskMgmt({
               <Input type="date" value={form.dueDate || ""} onChange={field("dueDate")} />
             </Field>
           </div>
+
+          {/* ---- שעות משימה (UNIF-01, D-01, D-05) ----
+            * נראות רק למשימה חד-יומית — אותה `isSingleDayTask` שהמנוע נשען
+            * עליה, כדי שהטופס לא "יבטיח" שעות שהמנוע לעולם לא יקרא. ריקות
+            * כברירת מחדל: שום שעה לא מנוחשת עבור המנהל (D-05). */}
+          {showHours ? (
+            <div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field
+                  label="משעה"
+                  error={hoursInvalid && !form.startTime ? "חסרה שעת התחלה" : undefined}
+                >
+                  <Input type="time" value={form.startTime} onChange={field("startTime")} />
+                </Field>
+                <Field
+                  label="עד שעה"
+                  error={hoursInvalid && !form.endTime ? "חסרה שעת סיום" : undefined}
+                >
+                  <Input type="time" value={form.endTime} onChange={field("endTime")} />
+                </Field>
+              </div>
+              <p className="text-xs text-faint mt-1.5">
+                משימה עם שעות נספרת במנוחה, ברצף, בתקרה השבועית ובנטל — בדיוק כמו משמרת.
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-faint">
+              שדות שעה זמינים כשתאריך ההתחלה ותאריך הסיום של המשימה זהים.
+            </p>
+          )}
 
           <Field label="עדיפות">
             <Select value={form.priority} onChange={field("priority")}>

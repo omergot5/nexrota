@@ -19,6 +19,10 @@ import {
 import { shiftLoad, teamAverages } from "../src/lib/autoAssign.js";
 import { loadTable } from "../src/lib/loadTable.js";
 import { chartTheme } from "../src/design/chartTheme.js";
+// api.js imports the Supabase client at module load — that construction is
+// synchronous and makes no network call, so this import stays offline like
+// every other module this script imports (UNIF-01, Phase 2 Plan 02-02 Task 2).
+import { taskColumns, taskFromRow } from "../src/lib/api.js";
 
 let failures = 0;
 const check = (label, cond, extra = "") => {
@@ -670,6 +674,63 @@ check("UNIF-02 · fairnessPlan · החובות עדיין מתאפסים בקי�
   String(fpPlan.rows.reduce((a, r) => a + r.deficit, 0)));
 check("UNIF-02 · fairnessPlan · perShiftLoad נשאר סופי וחיובי אחרי מיזוג משימות",
   Number.isFinite(fpPlan.perShiftLoad) && fpPlan.perShiftLoad > 0, String(fpPlan.perShiftLoad));
+
+// ============================================================
+console.log("\napi.js — שעות משימה חוצות את נקודת החנק (UNIF-01, Phase 2 Plan 02-02 Task 2)\n");
+// ============================================================
+
+// Test V (read direction) — taskFromRow מקצר "HH:MM:SS" ל-"HH:MM" בדיוק כמו
+// hhmm כבר עושה למשמרות; שתי עמודות ריקות נופלות ל-null בשתיהן, לא למחרוזת
+// ריקה ולא ל-undefined; ושורה שקדמה למיגרציה (השדות פשוט חסרים) מקבלת אותה
+// תוצאה בדיוק — כי היעדר-עמודה והיעדר-ערך הם אותו מצב.
+const taskRowWithHours = {
+  id: "tv1", title: "מטבח", description: "", category: "מטבח",
+  assignees: ["g1"], status: "open", priority: "medium",
+  start_date: mon, due_date: mon, override_note: null,
+  start_time: "06:00:00", end_time: "14:00:00",
+};
+const taskMappedWithHours = taskFromRow(taskRowWithHours);
+check("UNIF-01 · taskFromRow מקצר שעה מ-DB עם שניות לחמישה תווים בשני השדות",
+  taskMappedWithHours.startTime === "06:00" && taskMappedWithHours.endTime === "14:00",
+  JSON.stringify({ startTime: taskMappedWithHours.startTime, endTime: taskMappedWithHours.endTime }));
+
+const taskRowNullHours = { ...taskRowWithHours, start_time: null, end_time: null };
+const taskMappedNullHours = taskFromRow(taskRowNullHours);
+check("UNIF-01 · taskFromRow עם שתי עמודות השעה null מחזיר null לשתיהן — לא מחרוזת ריקה, לא undefined",
+  taskMappedNullHours.startTime === null && taskMappedNullHours.endTime === null,
+  JSON.stringify({ startTime: taskMappedNullHours.startTime, endTime: taskMappedNullHours.endTime }));
+
+const taskRowPreMigration = { ...taskRowWithHours };
+delete taskRowPreMigration.start_time;
+delete taskRowPreMigration.end_time;
+const taskMappedPreMigration = taskFromRow(taskRowPreMigration);
+check("UNIF-01 · taskFromRow על שורה שקדמה למיגרציה (עמודות השעה חסרות לגמרי) מחזיר null לשתיהן",
+  taskMappedPreMigration.startTime === null && taskMappedPreMigration.endTime === null,
+  JSON.stringify({ startTime: taskMappedPreMigration.startTime, endTime: taskMappedPreMigration.endTime }));
+
+// Test W (round trip) — מיפוי חזרה דרך taskColumns משחזר בדיוק את שתי עמודות
+// בסיס הנתונים שמהן הגיע האובייקט, כך שעריכה לא יכולה להפיל שעות בשקט.
+const taskColumnsFromMapped = taskColumns(taskMappedWithHours);
+check("UNIF-01 · taskColumns על אובייקט שמופה מ-taskFromRow משחזר את שתי השעות בדיוק (round trip)",
+  taskColumnsFromMapped.start_time === "06:00" && taskColumnsFromMapped.end_time === "14:00",
+  JSON.stringify({ start_time: taskColumnsFromMapped.start_time, end_time: taskColumnsFromMapped.end_time }));
+
+// Test X (write direction, absent means absent) — משימה בלי שעות מפיקה null
+// מפורש לשתי העמודות, לא השמטת מפתח — אותה מוסכמה ש-override_note כבר נוהג
+// בה, כי מפתח שהושמט משאיר בשורה ערך ישן שאף מסך לא יראה יותר.
+const taskColumnsNoHours = taskColumns({ title: "בדיקה", assignees: [] });
+check("UNIF-01 · taskColumns על משימה בלי שעות מפיק null מפורש לשתי העמודות, לא השמטת מפתח",
+  "start_time" in taskColumnsNoHours && "end_time" in taskColumnsNoHours &&
+    taskColumnsNoHours.start_time === null && taskColumnsNoHours.end_time === null,
+  JSON.stringify(taskColumnsNoHours));
+
+// Test Y (החוזה הקפוא נסגר על פני גבול השכבה) — משימה שמופתה משורה שקדמה
+// למיגרציה נדחית ע"י isTaskEngineEligible; משימה עם שתי השעות באותו יום מתקבלת.
+// זה UNIF-04 נבדק דרך גבול api.js<->dates.js, לא רק בתוך מודול אחד.
+check("UNIF-01 · isTaskEngineEligible דוחה משימה שמופתה משורה שקדמה למיגרציה (UNIF-04 חוצה שכבה)",
+  isTaskEngineEligible(taskMappedPreMigration) === false);
+check("UNIF-01 · isTaskEngineEligible מקבל משימה שמופתה משורה עם שתי השעות באותו יום",
+  isTaskEngineEligible(taskMappedWithHours) === true);
 
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);

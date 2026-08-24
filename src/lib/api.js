@@ -90,6 +90,11 @@ export const taskFromRow = (row) => ({
   startDate: row.start_date || null,
   dueDate: row.due_date,
   overrideNote: row.override_note || "",
+  // שתי עמודות nullable מ-0005_task_hours.sql (Phase 2, UNIF-01). `null` ולא
+  // מחרוזת ריקה — אותה מוסכמה ש-`startDate` כבר נוהג בה, כי שדה חסר שנראה
+  // שונה משדה חסר אחר באותו אובייקט הוא בדיוק איך שהקורא הבא מתבלבל.
+  startTime: row.start_time ? hhmm(row.start_time) : null,
+  endTime: row.end_time ? hhmm(row.end_time) : null,
 });
 
 // ---------- auth ----------
@@ -501,14 +506,17 @@ export async function decideSwap(swap, status) {
 // ---------- tasks ----------
 
 /**
- * העמודות שנוספו עם התיקיות. אם המיגרציה עוד לא רצה, Postgres מחזיר
- * שגיאת "עמודה לא קיימת" — ואז עדיף להגיד את זה במילים מפורשות מאשר
- * לשמור בשקט משימה בלי תיקייה ובלי משויכים ולתת למשתמש לגלות לבד.
+ * העמודות שנוספו במיגרציות המשימה. אם המיגרציה החדשה ביותר עוד לא רצה,
+ * Postgres מחזיר שגיאת "עמודה לא קיימת" — ואז עדיף להגיד את זה במילים
+ * מפורשות מאשר לשמור בשקט משימה בלי השדה החדש ולתת למשתמש לגלות לבד.
  */
 const MIGRATION_HINT =
-  "בסיס הנתונים עדיין לא מכיר תיקיות משימות. הרץ את supabase/migrations/0002_task_folders.sql ואז נסה שוב.";
+  "בסיס הנתונים לא מעודכן. הרץ את המיגרציות בתיקיית supabase/migrations — האחרונה היא 0005_task_hours.sql — ואז נסה שוב.";
 
-const taskColumns = (task) => ({
+// Exported (like shiftToRow) so the round-trip mappers can be asserted
+// directly from scripts/verify-planning.mjs (UNIF-01 Tests W/X) — the same
+// pure-function testability every other row<->app mapper in this file has.
+export const taskColumns = (task) => ({
   title: task.title,
   description: task.description || null,
   category: task.category || null,
@@ -521,12 +529,17 @@ const taskColumns = (task) => ({
   // עקיפה מודעת. `null` מפורש ולא השמטה: מנהל שהסיר את ההתנגשות בעריכה
   // צריך שההצדקה הישנה תימחק איתה, אחרת נשאר בשורה תירוץ לדבר שכבר לא קורה.
   override_note: task.overrideNote || null,
+  // שעות משימה חד-יומית (Phase 2, UNIF-01). `null` מפורש ולא השמטה: מנהל
+  // שמרחיב משימה משלושה ימים חייב שהשעות הישנות יימחקו איתה, אחרת נשאר
+  // בשורה ערך שאף מסך לא יראה יותר.
+  start_time: task.startTime || null,
+  end_time: task.endTime || null,
 });
 
 const asTaskError = (error) => {
   const m = String(error.message || "");
   return new Error(
-    /column .*(category|assignees|start_date)/i.test(m) || error.code === "PGRST204"
+    /column .*(category|assignees|start_date|start_time|end_time)/i.test(m) || error.code === "PGRST204"
       ? MIGRATION_HINT
       : m
   );
@@ -565,8 +578,14 @@ export async function updateTask(id, patch) {
   const row = patch.full ? taskColumns(patch) : {};
   if (patch.status) row.status = patch.status;
   if (!patch.full && patch.title) row.title = patch.title;
-  const { error } = await supabase.from("gs_tasks").update(row).eq("id", id);
+  // קריאה חוזרת ולא עדכון עיוור: כש-RLS מסננת את כל השורות, Supabase מחזירה
+  // error: null ומערך ריק — כלומר "הצלחה" שלא כתבה כלום. בלי הבדיקה הזאת
+  // מנהל ששינה שעות משימה היה רואה אותן נעלמות ברענון הבא בלי שום הסבר.
+  const { data, error } = await supabase.from("gs_tasks").update(row).eq("id", id).select();
   if (error) throw asTaskError(error);
+  if (!data?.length) {
+    throw new Error("העדכון לא נשמר — כנראה שאין לך הרשאה לשנות משימה זו");
+  }
 }
 
 export async function deleteTask(id) {
