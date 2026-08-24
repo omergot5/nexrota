@@ -13,6 +13,8 @@ import {
   taskInterval,
   shiftInterval,
   windowsOverlap,
+  taskAsShiftShape,
+  withEngineTasks,
 } from "../src/lib/dates.js";
 import { shiftLoad, teamAverages } from "../src/lib/autoAssign.js";
 import { loadTable } from "../src/lib/loadTable.js";
@@ -554,6 +556,120 @@ const sameDeviationLightViaTable = loadShareHint({ load: 23, meanLoad: 20, perSh
 check("FAIR-02 · loadTable · שום סף שני קבוע — אותה סטייה שקטה על משמרת כבדה, מתויגת על משמרת קלה",
   sameDeviationHeavyViaTable === null && sameDeviationLightViaTable?.level === "over",
   JSON.stringify({ heavy: sameDeviationHeavyViaTable, light: sameDeviationLightViaTable }));
+
+// ============================================================
+console.log("\nwithEngineTasks — מיזוג משמרות ומשימות (UNIF-02, Phase 2 Plan 02-01 Task 3)\n");
+// ============================================================
+
+// Test S (`withEngineTasks` הוא total וישר) — total: undefined בשני הצדדים
+// מחזיר מערך שמיש. ישר: משימה קפואה/רב-יומית לא מוסיפה כלום, ומשימה
+// eligible אחת מוסיפה אלמנט אחד בדיוק, נושא בדיוק את השדות שהמתאם מבטיח.
+const wetShifts = [
+  { id: "wet-s1", date: mon, type: "day", startTime: "07:00", endTime: "15:00", assignedGuards: ["g1"] },
+];
+check("UNIF-02 · withEngineTasks עם רשימת משימות ריקה מחזיר בדיוק את המשמרות",
+  JSON.stringify(withEngineTasks(wetShifts, [])) === JSON.stringify(wetShifts));
+
+const wetFrozen = { id: "wf1", category: "מטבח", startDate: mon, dueDate: mon, assignees: ["g1"] };
+const wetSpan = {
+  id: "ws1", category: "מטבח", startDate: mon, dueDate: wed, startTime: "07:00", endTime: "09:00", assignees: ["g1"],
+};
+check("UNIF-02 · withEngineTasks עם משימות קפואות/רב-יומיות בלבד לא מוסיף כלום",
+  JSON.stringify(withEngineTasks(wetShifts, [wetFrozen, wetSpan])) === JSON.stringify(wetShifts));
+
+const wetEligible = {
+  id: "we1", title: "מטבח בוקר", category: "מטבח",
+  startDate: mon, dueDate: mon, startTime: "06:00", endTime: "08:00", assignees: ["g2"],
+};
+const wetMerged = withEngineTasks(wetShifts, [wetEligible]);
+check("UNIF-02 · withEngineTasks עם משימה אחת eligible מוסיף אלמנט אחד בדיוק",
+  wetMerged.length === wetShifts.length + 1, `merged.length=${wetMerged.length}`);
+const wetAdded = wetMerged[wetMerged.length - 1];
+check("UNIF-02 · האלמנט שנוסף נושא date/startTime/endTime/type/assignedGuards כפי שהמתאם מבטיח",
+  wetAdded.date === mon && wetAdded.startTime === "06:00" && wetAdded.endTime === "08:00" &&
+    wetAdded.type === "task" && Array.isArray(wetAdded.assignedGuards) && wetAdded.assignedGuards.includes("g2"),
+  JSON.stringify(wetAdded));
+
+check("UNIF-02 · withEngineTasks עם undefined בשני הצדדים מחזיר מערך שמיש ולא זורק",
+  Array.isArray(withEngineTasks(undefined, undefined)) && withEngineTasks(undefined, undefined).length === 0);
+
+// ============================================================
+console.log("\nloadTable נשאר עקבי אחרי מיזוג משימות (UNIF-02, Phase 2 Plan 02-01 Task 3)\n");
+// ============================================================
+
+// Test T — `byType` נושא דלי לסוג המתאם (`"task"`) ששווה בדיוק למספר
+// שיבוצי המשימה שמוזגו פנימה, ו-`totalAssigned` שווה לסכום כל הדליים.
+// הגודל הצפוי נגזר מהפיקסצ'ר עצמו (סכום מספרי assignees של כל משימה),
+// לא נכתב כמספר קבוע — קבוע מוצמד היה נרקב בשקט בתוספת שורת פיקסצ'ר הבאה.
+const ltMergeGuards = [
+  { id: "lm1", name: "נדב" },
+  { id: "lm2", name: "שיר" },
+];
+const ltMergeShifts = [
+  { id: "lm-s1", date: mon, type: "morning", startTime: "07:00", endTime: "19:00", assignedGuards: ["lm1"] },
+];
+const ltMergeTasks = [
+  {
+    id: "lm-t1", title: "מטבח בוקר", category: "מטבח",
+    startDate: mon, dueDate: mon, startTime: "06:00", endTime: "08:00", assignees: ["lm2"],
+  },
+  {
+    id: "lm-t2", title: "עמדה ערב", category: "שמירות",
+    startDate: wed, dueDate: wed, startTime: "20:00", endTime: "22:00", assignees: ["lm1", "lm2"],
+  },
+];
+const ltMerged = withEngineTasks(ltMergeShifts, ltMergeTasks);
+const ltMergedTable = loadTable(ltMergeGuards, ltMerged);
+const expectedTaskBucket = ltMergeTasks.map((t) => (t.assignees || []).length).reduce((a, b) => a + b, 0);
+check("UNIF-02 · loadTable · byType.task שווה למספר שיבוצי המשימה שמוזגו פנימה, נגזר מהפיקסצ'ר",
+  ltMergedTable.byType.task === expectedTaskBucket,
+  JSON.stringify({ byType: ltMergedTable.byType, expected: expectedTaskBucket }));
+const sumOfBuckets = Object.values(ltMergedTable.byType).reduce((a, b) => a + b, 0);
+check("UNIF-02 · loadTable · totalAssigned שווה לסכום כל הדליים אחרי מיזוג משימות",
+  ltMergedTable.totalAssigned === sumOfBuckets,
+  JSON.stringify({ totalAssigned: ltMergedTable.totalAssigned, sum: sumOfBuckets }));
+
+// ============================================================
+console.log("\nfairnessPlan עדיין מאזן אחרי מיזוג משימות (UNIF-02, Phase 2 Plan 02-01 Task 3)\n");
+// ============================================================
+
+// Test U — עם משימות ממוזגות גם ל-history וגם ל-planned, החובות עדיין
+// מתאפסים בקירוב ו-perShiftLoad נשאר סופי וחיובי — לא הופך ל-NaN רק כי
+// למשימה אין requiredGuards (שדה שרק autoAssign קורא, לא fairnessPlan/tally).
+const fpGuards = [
+  { id: "fp1", name: "גל" },
+  { id: "fp2", name: "הדר" },
+];
+const fpHistoryShifts = [
+  {
+    id: "fp-h1", date: addDays(weekStart, -3), type: "morning",
+    startTime: "07:00", endTime: "19:00", assignedGuards: ["fp1"],
+  },
+];
+const fpHistoryTasks = [
+  {
+    id: "fp-ht1", title: "מטבח", category: "מטבח",
+    startDate: addDays(weekStart, -2), dueDate: addDays(weekStart, -2),
+    startTime: "06:00", endTime: "08:00", assignees: ["fp2"],
+  },
+];
+const fpPlannedTasks = [
+  {
+    id: "fp-pt1", title: "עמדה", category: "שמירות",
+    startDate: weekStart, dueDate: weekStart, startTime: "20:00", endTime: "22:00", assignees: ["fp1"],
+  },
+];
+const fpHistoryMerged = withEngineTasks(fpHistoryShifts, fpHistoryTasks);
+const fpPlannedMerged = withEngineTasks([], fpPlannedTasks);
+const fpPlan = fairnessPlan({ guards: fpGuards, history: fpHistoryMerged, planned: fpPlannedMerged, until: weekStart, days: 14 });
+// הסכום הבלתי-מעוגל מתאפס תמיד (avgLoad נגזר מאותם ערכים); הסבילות כאן
+// רחבה מ-<0.01 של הבדיקה המקבילה למעלה כי כאן רק שני שומרים — שני עיגולים
+// עצמאיים ל-0.1 הקרוב יכולים להצטבר לשארית של עד כ-0.1, לא רק כ-0.01.
+check("UNIF-02 · fairnessPlan · החובות עדיין מתאפסים בקירוב אחרי מיזוג משימות ב-history וב-planned",
+  Math.abs(fpPlan.rows.reduce((a, r) => a + r.deficit, 0)) < 0.15,
+  String(fpPlan.rows.reduce((a, r) => a + r.deficit, 0)));
+check("UNIF-02 · fairnessPlan · perShiftLoad נשאר סופי וחיובי אחרי מיזוג משימות",
+  Number.isFinite(fpPlan.perShiftLoad) && fpPlan.perShiftLoad > 0, String(fpPlan.perShiftLoad));
 
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);

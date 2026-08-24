@@ -849,5 +849,55 @@ const movesReferenceOnlyShifts =
 check("UNIF-02 · רשומת האיזון (אם קיימת) מפנה רק ל-shiftId של משמרות",
   movesReferenceOnlyShifts, JSON.stringify(balanceLogEntryUnif));
 
+// Test Q (determinism, החוט שעובר לכל הפאזה) — שתי הרצות זהות על אותו רוסטר
+// מזורע-משימות, והרצה שלישית עם עותק המשימות בסדר הפוך (עותק, לא מוטציה —
+// detTasks משמש גם בהרצות A/B) מזהה גם היא. סדר משימות אסור לדלוף לתוך
+// הסידור, בדיוק כמו קריאה מ-DB בלי order מפורש.
+const detTasks = [
+  hourTask(dates[0], "g1", "06:00", "08:00"),
+  hourTask(dates[1], "g2", "06:00", "08:00"),
+  hourTask(dates[2], "g3", "06:00", "08:00"),
+];
+const detA = autoAssign({ shifts, guards, availability, tasks: detTasks });
+const detB = autoAssign({ shifts, guards, availability, tasks: detTasks });
+check("UNIF-02 · deterministic across runs — עם משימות מזורעות, אותו byShift ואותו fairnessScore",
+  JSON.stringify(detA.byShift) === JSON.stringify(detB.byShift) &&
+    detA.summary.fairnessScore === detB.summary.fairnessScore,
+  JSON.stringify({ a: detA.byShift, b: detB.byShift }));
+const detTasksReversed = [...detTasks].reverse();
+const detC = autoAssign({ shifts, guards, availability, tasks: detTasksReversed });
+check("UNIF-02 · deterministic across runs — סדר המשימות ההפוך לא מדליף לתוך הסידור",
+  JSON.stringify(detA.byShift) === JSON.stringify(detC.byShift) &&
+    detA.summary.fairnessScore === detC.summary.fairnessScore,
+  JSON.stringify({ a: detA.byShift, c: detC.byShift }));
+
+// Test R (reporting parity, UNIF-02 — FAIR-05 המורחבת למשימות) — עבור רוסטר
+// שבו שומר אחד מחזיק גם משמרת וגם משימה: teamAverages על המערך הממוזג
+// מדווח נטל השווה לסכום shiftLoad עצמאי, ומסכים עם הנטל שמדווח המנוע עצמו
+// בתוך העיגול (idiom FAIR-05, לפי `01-02-SUMMARY.md`).
+const parityGuards = [
+  { id: "pr1", name: "עדי" },
+  { id: "pr2", name: "רון" },
+];
+const parityShift = {
+  id: "unif-parity-shift", date: dates[3], label: "משמרת יום", type: "day",
+  startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: ["pr1"],
+};
+const parityTask = hourTask(unifDate, "pr1", "06:00", "08:00");
+const parityMerged = withEngineTasks([parityShift], [parityTask]);
+const { perGuard: parityPerGuard } = teamAverages(parityGuards, parityMerged);
+const expectedParityLoad = shiftLoad(parityShift) + shiftLoad(taskAsShiftShape(parityTask));
+check("UNIF-02 · teamAverages על מערך ממוזג מדווח נטל השווה לסכום shiftLoad עצמאי (משמרת+משימה)",
+  Math.abs(parityPerGuard.pr1.load - Math.round(expectedParityLoad * 10) / 10) < 1e-9,
+  JSON.stringify({ reported: parityPerGuard.pr1.load, expected: expectedParityLoad }));
+
+const parityEngineResult = autoAssign({
+  shifts: [parityShift], guards: parityGuards, availability: {}, tasks: [parityTask], keepExisting: true,
+});
+const parityEngineRow = parityEngineResult.fairness.perGuard.find((p) => p.guardId === "pr1");
+check("UNIF-02 · הנטל שהמנוע עצמו מדווח לאותו שומר, על אותם נתונים, מסכים עם teamAverages בתוך העיגול (FAIR-05 מורחב)",
+  Math.abs(parityEngineRow.load - parityPerGuard.pr1.load) < 0.05,
+  JSON.stringify({ engine: parityEngineRow.load, participant: parityPerGuard.pr1.load }));
+
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);
