@@ -15,7 +15,14 @@
 //      guards to flatten the workload without breaking any hard constraint.
 // ============================================================
 
-import { shiftInterval, shiftHours, formatDateHe, fromISODate, minutesOfTime } from "./dates.js";
+import {
+  shiftInterval,
+  shiftHours,
+  formatDateHe,
+  fromISODate,
+  minutesOfTime,
+  windowsOverlap,
+} from "./dates.js";
 
 export const DEFAULT_RULES = {
   minRestHours: 8, // minimum gap between two separate shifts
@@ -159,8 +166,12 @@ function smallestRestGap(intervals, candidate) {
   return gap;
 }
 
+// Delegates to the shared windowsOverlap (dates.js) — the single overlap
+// definition for the whole product (UNIF-03). Both arguments here are
+// already millisecond windows, so the normalisation inside windowsOverlap
+// passes them straight through and observable behaviour is unchanged.
 function overlaps(intervals, candidate) {
-  return intervals.some((iv) => iv.start < candidate.end && candidate.start < iv.end);
+  return intervals.some((iv) => windowsOverlap(iv, candidate));
 }
 
 // ---------- hard constraints ----------

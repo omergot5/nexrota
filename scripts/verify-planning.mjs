@@ -5,7 +5,15 @@
 
 import { compatIndex, findConflicts, pairKey, pairRule, taskWindow } from "../src/lib/conflicts.js";
 import { fairnessHint, fairnessPlan, loadShareHint, meanShiftLoad, rollingLoad } from "../src/lib/fairness.js";
-import { addDays, todayISO } from "../src/lib/dates.js";
+import {
+  addDays,
+  todayISO,
+  isSingleDayTask,
+  isTaskEngineEligible,
+  taskInterval,
+  shiftInterval,
+  windowsOverlap,
+} from "../src/lib/dates.js";
 import { shiftLoad, teamAverages } from "../src/lib/autoAssign.js";
 import { loadTable } from "../src/lib/loadTable.js";
 import { chartTheme } from "../src/design/chartTheme.js";
@@ -86,6 +94,96 @@ check("משימה בלי תאריכים לא חוסמת",
 const many = findConflicts({ candidate, assignees: ["g1", "g2", "g3"], tasks: existing, compat: index });
 check("שורה אחת לכל אדם מתנגש, לא ספירה מצטברת",
   many.length === 1 && many[0].personId === "g1", JSON.stringify(many));
+
+// ============================================================
+console.log("\nאיחוד משימה ומשמרת — חלון אחד (UNIF-01/03/04/06)\n");
+// ============================================================
+
+// --- fixtures (D-01) ---
+const engineTask = {
+  id: "et1", title: "מטבח בוקר", category: "מטבח",
+  startDate: mon, dueDate: mon, startTime: "06:00", endTime: "14:00", assignees: ["g1"],
+};
+const frozenTask = {
+  id: "ft1", title: "מטבח ישן", category: "מטבח",
+  startDate: mon, dueDate: mon, assignees: ["g1"],
+};
+const spanTask = {
+  id: "st1", title: "מטבח שבוע", category: "מטבח",
+  startDate: mon, dueDate: wed, startTime: "06:00", endTime: "14:00", assignees: ["g1"],
+};
+
+// Test A (D-01, eligibility) — כל מקרה קצה מקבל assertion משלו, כדי שנסיגה תזהה את עצמה.
+check("UNIF-01 · משימה חד-יומית עם שתי שעות היא engine-eligible",
+  isTaskEngineEligible(engineTask) === true);
+check("UNIF-01 · אותה משימה בלי שעת התחלה אינה eligible",
+  isTaskEngineEligible({ ...engineTask, startTime: undefined }) === false);
+check("UNIF-01 · אותה משימה בלי שעת סיום אינה eligible",
+  isTaskEngineEligible({ ...engineTask, endTime: undefined }) === false);
+check("UNIF-01 · משימה רב-יומית עם שתי שעות אינה eligible (D-01)",
+  isTaskEngineEligible(spanTask) === false && isSingleDayTask(spanTask) === false);
+check("UNIF-01 · משימה בלי תאריכים ובלי שעות אינה eligible",
+  isTaskEngineEligible({}) === false);
+
+// Test B (UNIF-03, resolution branch) — taskWindow עצמו מסתעף לפי eligibility.
+check("UNIF-03 · taskWindow על משימה eligible מחזיר גבולות מיליסניה סופיים",
+  Number.isFinite(taskWindow(engineTask)?.start) && Number.isFinite(taskWindow(engineTask)?.end));
+check("UNIF-03 · taskWindow על משימה קפואה מחזיר זוג from/to כמו היום",
+  taskWindow(frozenTask)?.from === mon && taskWindow(frozenTask)?.to === mon);
+
+// Test C (UNIF-03, semantics preserved) — ארבעת מקרי הגבול שהמחקר הוכיח ביד.
+const touchShiftA = { date: mon, startTime: "07:00", endTime: "15:00" };
+const touchShiftB = { date: mon, startTime: "15:00", endTime: "23:00" };
+check("UNIF-03 · שתי משמרות נוגעות קצה-לקצה לא חופפות",
+  windowsOverlap(shiftInterval(touchShiftA), shiftInterval(touchShiftB)) === false);
+const realOverlapA = { date: mon, startTime: "07:00", endTime: "16:00" };
+const realOverlapB = { date: mon, startTime: "15:00", endTime: "23:00" };
+check("UNIF-03 · שתי משמרות שבאמת חופפות בשעות מזוהות ככאלה",
+  windowsOverlap(shiftInterval(realOverlapA), shiftInterval(realOverlapB)) === true);
+check("UNIF-03 · שני חלונות תאריך-בלבד באותו טווח חופפים",
+  windowsOverlap({ from: mon, to: wed }, { from: mon, to: wed }) === true);
+check("UNIF-03 · שני חלונות תאריך-בלבד ביום בודד וסמוך לא חופפים",
+  windowsOverlap({ from: mon, to: mon }, { from: addDays(mon, 1), to: addDays(mon, 1) }) === false);
+
+// Test D (UNIF-03, mixed resolution — המקרה ששני המנועים לא יכלו לבטא לפני כן)
+const mixedInterval = taskInterval(engineTask); // mon 06:00–14:00
+check("UNIF-03 · משימה עם שעות ביום שני חופפת לחלון תאריך-בלבד שמכיל אותו",
+  windowsOverlap(mixedInterval, { from: mon, to: wed }) === true);
+check("UNIF-03 · משימה עם שעות ביום שני לא חופפת לחלון תאריך-בלבד שלא כולל אותו",
+  windowsOverlap(mixedInterval, { from: addDays(mon, 3), to: addDays(mon, 3) }) === false);
+
+// Test E (UNIF-06, קריטריון ההצלחה השלישי של המפת-דרכים) — אותו זוג חסום,
+// שתי הכרעות שונות לפי שעות, מאותה פונקציה. reuse ה-index שנבנה למעלה.
+const unifGuard = "g-unif";
+const taskMorning = {
+  id: "ue1", title: "מטבח בוקר", category: "מטבח",
+  startDate: mon, dueDate: mon, startTime: "06:00", endTime: "08:00", assignees: [unifGuard],
+};
+const taskEvening = {
+  id: "ue2", title: "עמדה ערב", category: "שמירות",
+  startDate: mon, dueDate: mon, startTime: "20:00", endTime: "22:00", assignees: [unifGuard],
+};
+const noHourOverlap = findConflicts({ candidate: taskMorning, assignees: [unifGuard], tasks: [taskEvening], compat: index });
+check("UNIF-06 · שתי משימות באותו יום, שעות לא-חופפות, זוג חסום — אין התנגשות",
+  noHourOverlap.length === 0, JSON.stringify(noHourOverlap));
+
+const taskMorningMoved = { ...taskMorning, startTime: "20:00", endTime: "22:00" };
+const realHourOverlap = findConflicts({ candidate: taskMorningMoved, assignees: [unifGuard], tasks: [taskEvening], compat: index });
+check("UNIF-06 · אותו זוג בשעות שבאמת חופפות מייצר התנגשות אחת עם ההערה מהמטריצה",
+  realHourOverlap.length === 1 && realHourOverlap[0].note === "עמדה דורשת נוכחות",
+  JSON.stringify(realHourOverlap));
+
+// Test G (degenerate input) — windowsOverlap לעולם לא זורק, ותמיד false על קלט מנוון.
+check("UNIF-03 · windowsOverlap על undefined/undefined לא זורק וקובע אי-חפיפה",
+  windowsOverlap(undefined, undefined) === false);
+check("UNIF-03 · windowsOverlap על null מול חלון תקין לא זורק וקובע אי-חפיפה",
+  windowsOverlap(null, { from: mon, to: mon }) === false);
+check("UNIF-03 · windowsOverlap על שני אובייקטים ריקים לא זורק וקובע אי-חפיפה",
+  windowsOverlap({}, {}) === false);
+check("UNIF-03 · windowsOverlap על משימה עם שעה לא-קריאה לא זורק וקובע אי-חפיפה",
+  windowsOverlap(taskInterval({ dueDate: mon, startTime: "not-a-time", endTime: "14:00" }), { from: mon, to: mon }) === false);
+check("UNIF-03 · windowsOverlap בין חלון תאריך תקין לחלון מיליסניה פגום לא זורק וקובע אי-חפיפה",
+  windowsOverlap({ from: mon, to: mon }, { start: NaN, end: 100 }) === false);
 
 // ============================================================
 console.log("\nמנוע ההוגנות\n");
