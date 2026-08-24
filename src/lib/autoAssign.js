@@ -15,7 +15,15 @@
 //      guards to flatten the workload without breaking any hard constraint.
 // ============================================================
 
-import { shiftInterval, shiftHours, formatDateHe, fromISODate, minutesOfTime } from "./dates.js";
+import {
+  shiftInterval,
+  shiftHours,
+  formatDateHe,
+  fromISODate,
+  minutesOfTime,
+  windowsOverlap,
+  taskAsShiftShape,
+} from "./dates.js";
 
 export const DEFAULT_RULES = {
   minRestHours: 8, // minimum gap between two separate shifts
@@ -159,8 +167,12 @@ function smallestRestGap(intervals, candidate) {
   return gap;
 }
 
+// Delegates to the shared windowsOverlap (dates.js) — the single overlap
+// definition for the whole product (UNIF-03). Both arguments here are
+// already millisecond windows, so the normalisation inside windowsOverlap
+// passes them straight through and observable behaviour is unchanged.
 function overlaps(intervals, candidate) {
-  return intervals.some((iv) => iv.start < candidate.end && candidate.start < iv.end);
+  return intervals.some((iv) => windowsOverlap(iv, candidate));
 }
 
 // ---------- hard constraints ----------
@@ -351,8 +363,15 @@ function scoreCandidate({ guard, shift, load, availability, rules, stats, check 
  * @param {object} input.availability map of `${guardId}-${shiftId}` -> status|{status,comment}
  * @param {object} [input.rules]      overrides for DEFAULT_RULES
  * @param {boolean}[input.keepExisting] keep shift.assignedGuards as locked assignments
+ * @param {Array}  [input.tasks]      hour-bearing tasks (Phase 2, UNIF-02). Only
+ *   engine-eligible tasks contribute — a frozen or multi-day task is ignored by
+ *   construction (D-01, UNIF-04). Contributes to guard load only, never to
+ *   `assignments`/`byShift`: a task is assigned by hand on the tasks screen and
+ *   this engine never auto-fills or auto-moves one.
  */
-export function autoAssign({ shifts, guards, availability = {}, rules: ruleOverrides, keepExisting = false }) {
+export function autoAssign({
+  shifts, guards, availability = {}, rules: ruleOverrides, keepExisting = false, tasks = [],
+}) {
   const rules = { ...DEFAULT_RULES, ...ruleOverrides };
   const log = [];
 
@@ -367,6 +386,27 @@ export function autoAssign({ shifts, guards, availability = {}, rules: ruleOverr
   const load = new Map(activeGuards.map((g) => [g.id, emptyLoad()]));
   const assignments = []; // {shiftId, guardId, score, parts, locked}
   const byShift = new Map(openShifts.map((s) => [s.id, []]));
+
+  // Seed guard load with hour-bearing tasks (UNIF-02) BEFORE any shift is
+  // filled, so rest/consecutive/weekly-cap/load all see the task from the
+  // first candidate check onward — exactly like a shift already assigned.
+  //
+  // Deliberately routed through addToLoad only, never addAssignment: a task
+  // never enters `assignments`/`byShift`, because this engine never
+  // auto-fills or auto-moves a task (it is assigned by hand on the tasks
+  // screen). Letting a task record into `assignments` would hand
+  // `balanceWorkload` an item it could try to trade away, and would double
+  // the item count the balance pass examines — the risk the roadmap names
+  // for this phase. Do not "fix" this by adding it to assignments.
+  for (const task of tasks) {
+    const shaped = taskAsShiftShape(task);
+    if (!shaped) continue;
+    for (const gid of shaped.assignedGuards) {
+      const l = load.get(gid);
+      if (!l) continue; // assigned to a task, then removed from the team
+      addToLoad(l, shaped);
+    }
+  }
 
   const addAssignment = (shift, guard, score, parts, locked = false, raw = null) => {
     const iv = shiftInterval(shift);
@@ -755,9 +795,12 @@ function emptyResult(rules, shifts, guards) {
  * The guard's current load is rebuilt from `shifts`, so the caller passes the
  * roster it already holds rather than any private engine state.
  *
+ * @param {Array} [tasks] hour-bearing tasks (Phase 2, UNIF-02). Only
+ *   engine-eligible tasks contribute — everything else is ignored by
+ *   construction (D-01, UNIF-04).
  * @returns {{ok: boolean, code?: string, reason?: string}}
  */
-export function checkAssignment({ guard, shift, shifts = [], availability = {}, rules: ruleOverrides }) {
+export function checkAssignment({ guard, shift, shifts = [], availability = {}, rules: ruleOverrides, tasks = [] }) {
   if (!guard || !shift) return { ok: false, code: "missing", reason: "חסרים פרטי המשמרת או השומר" };
 
   const rules = { ...DEFAULT_RULES, ...ruleOverrides };
@@ -768,6 +811,12 @@ export function checkAssignment({ guard, shift, shifts = [], availability = {}, 
     // well would double-book the guard against themselves.
     if (!s || s.id === shift.id) continue;
     if ((s.assignedGuards || []).includes(guard.id)) addToLoad(load, s);
+  }
+
+  for (const task of tasks) {
+    const shaped = taskAsShiftShape(task);
+    if (!shaped) continue;
+    if (shaped.assignedGuards.includes(guard.id)) addToLoad(load, shaped);
   }
 
   if ((shift.assignedGuards || []).includes(guard.id)) {
