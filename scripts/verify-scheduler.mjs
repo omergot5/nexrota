@@ -5,7 +5,7 @@
 // the coverage/fairness numbers so regressions are obvious.
 
 import { autoAssign, checkAssignment, DEFAULT_RULES, shiftLoad, teamAverages } from "../src/lib/autoAssign.js";
-import { shiftInterval, weekByOffset } from "../src/lib/dates.js";
+import { shiftInterval, weekByOffset, taskAsShiftShape, withEngineTasks } from "../src/lib/dates.js";
 
 const HOUR = 3600000;
 let failures = 0;
@@ -679,6 +679,175 @@ const { perGuard: participantPerGuardAgain } = teamAverages(reproGuards, reproPu
 check("FAIR-05 · דטרמיניסטי — הרצה חוזרת נותנת בדיוק אותם ערכי load למשתתף",
   reproGuards.every((g) => participantPerGuardAgain[g.id].load === participantPerGuard[g.id].load),
   JSON.stringify({ a: participantPerGuardAgain, b: participantPerGuard }));
+
+// ---------------------------------------------------------------
+// UNIF-02 — משימה עם שעות נכנסת לאותם אילוצים קשיחים שמשמרת נכנסת אליהם
+// (Phase 2, Plan 02-01). Fixture נבחר מאינדקסים 0–4 של weekByOffset(1)
+// בלבד (א'–ה') כדי לא להפעיל בשוגג את מכפיל הסופ"ש — מלבד test M, שבו
+// שבת היא בדיוק הנקודה שנבדקת.
+// ---------------------------------------------------------------
+
+console.log("\n=== UNIF-02 — משימה עם שעות נכנסת לאותם אילוצים ===\n");
+
+// בונה משימה יציבה: אותו תאריך כ-startDate/dueDate (חד-יומית, D-01), שתי
+// שעות, וממונה יחיד. מזהה נגזר מהארגומנטים כדי שהריצה תישאר דטרמיניסטית.
+const hourTask = (date, assignee, start, end) => ({
+  id: `tk-${date}-${assignee}-${start}-${end}`, title: "משימה", category: "מטבח",
+  startDate: date, dueDate: date, startTime: start, endTime: end, assignees: [assignee],
+});
+
+const unifGuard = { id: "u1", name: "רותם" };
+const unifDate = dates[0];
+const morningTask = hourTask(unifDate, unifGuard.id, "06:00", "14:00");
+
+// Test H (rest) — 06:00–14:00 מול משמרת לילה 19:00–07:00 באותו יום: פער
+// מנוחה של 5 שעות, מתחת למינימום (8). ההשוואה בלי tasks כלל מוכיחה שהמשימה
+// היא זו שחסמה, לא הפיקסצ'ר.
+const nightShiftUnif = {
+  id: "unif-night", date: unifDate, label: "משמרת לילה", type: "night",
+  startTime: "19:00", endTime: "07:00", requiredGuards: 1, assignedGuards: [],
+};
+const withTaskRest = checkAssignment({
+  guard: unifGuard, shift: nightShiftUnif, shifts: [], tasks: [morningTask], availability: {},
+});
+const withoutTaskRest = checkAssignment({
+  guard: unifGuard, shift: nightShiftUnif, shifts: [], tasks: [], availability: {},
+});
+check("UNIF-02 · משימה 06:00–14:00 חוסמת משמרת לילה באותו יום מחוסר מנוחה, code=rest",
+  withTaskRest.ok === false && withTaskRest.code === "rest" &&
+    typeof withTaskRest.reason === "string" && withTaskRest.reason.length > 0,
+  JSON.stringify(withTaskRest));
+check("UNIF-02 · אותה קריאה בלי tasks כלל מאושרת — המשימה היא שחסמה, לא הפיקסצ'ר",
+  withoutTaskRest.ok === true, JSON.stringify(withoutTaskRest));
+
+// Test I (overlap) — אותה משימה מול משמרת חופפת בפועל.
+const overlapShiftUnif = {
+  id: "unif-day", date: unifDate, label: "משמרת יום", type: "day",
+  startTime: "07:00", endTime: "19:00", requiredGuards: 1, assignedGuards: [],
+};
+const overlapCheck = checkAssignment({
+  guard: unifGuard, shift: overlapShiftUnif, shifts: [], tasks: [morningTask], availability: {},
+});
+check("UNIF-02 · משימה 06:00–14:00 חוסמת משמרת חופפת עם code=overlap",
+  overlapCheck.ok === false && overlapCheck.code === "overlap", JSON.stringify(overlapCheck));
+
+// Test J (consecutive) — אותה משימה נוגעת קצה-לקצה במשמרת 14:00–22:00:
+// 16 שעות רצף בלתי-שבור, מעל המקסימום (12). נעילת המנוחה-לנוגעות היא מה
+// שמאפשר לכלל הרצף לתפוס במקום כלל המנוחה.
+const touchingShiftUnif = {
+  id: "unif-touch", date: unifDate, label: "משמרת נוגעת", type: "day",
+  startTime: "14:00", endTime: "22:00", requiredGuards: 1, assignedGuards: [],
+};
+const touchCheck = checkAssignment({
+  guard: unifGuard, shift: touchingShiftUnif, shifts: [], tasks: [morningTask], availability: {},
+});
+check("UNIF-02 · משימה שנוגעת קצה-לקצה במשמרת מייצרת חריגת רצף, code=consecutive",
+  touchCheck.ok === false && touchCheck.code === "consecutive", JSON.stringify(touchCheck));
+
+// Test K (weekly-cap) — שישה תאריכים נפרדים, כל אחד עם משימה קצרה (2
+// שעות), ממוקמים כרונולוגית *אחרי* המשמרת המועמדת כדי שאף כלל מנוחה/רצף
+// לא יתפוס קודם — רק ספירת השבוע.
+const capGuard = { id: "u2", name: "טל" };
+const capTasks = dates.slice(1, 7).map((d) => hourTask(d, capGuard.id, "10:00", "12:00"));
+const capShift = {
+  id: "unif-cap-shift", date: dates[0], label: "משמרת יום", type: "day",
+  startTime: "07:00", endTime: "19:00", requiredGuards: 1, assignedGuards: [],
+};
+const capCheck = checkAssignment({
+  guard: capGuard, shift: capShift, shifts: [], tasks: capTasks, availability: {},
+});
+check("UNIF-02 · שישה תאריכי משימה בשבוע חוסמים שיבוץ שביעי, code=weekly-cap",
+  capCheck.ok === false && capCheck.code === "weekly-cap", JSON.stringify(capCheck));
+
+// Test L (load) — הנטל המדווח לשומר שמחזיק גם משימה וגם משמרת שווה לסכום
+// shiftLoad עצמאי, בדיוק בסגנון FAIR-04: לא מושווה נגד קבוע מוצמד.
+// keepExisting נועל את המשמרת ל-lg1 כדי שהתוצאה לא תלויה בהכרעת ההוגנות.
+const loadGuards = [
+  { id: "lg1", name: "לירון" },
+  { id: "lg2", name: "מאור" },
+];
+const loadTask = hourTask(unifDate, "lg1", "06:00", "14:00");
+const loadShiftUnif = {
+  id: "unif-load-shift", date: dates[2], label: "משמרת יום", type: "day",
+  startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: ["lg1"],
+};
+const loadResult = autoAssign({
+  shifts: [loadShiftUnif], guards: loadGuards, availability: {}, tasks: [loadTask], keepExisting: true,
+});
+const lg1Row = loadResult.fairness.perGuard.find((p) => p.guardId === "lg1");
+const expectedLg1Load = shiftLoad(taskAsShiftShape(loadTask)) + shiftLoad(loadShiftUnif);
+check("UNIF-02 · הנטל המדווח לשומר שמחזיק משימה ומשמרת שווה לסכום shiftLoad עצמאי (סגנון FAIR-04)",
+  Math.abs(lg1Row.load - Math.round(expectedLg1Load * 10) / 10) < 1e-9,
+  JSON.stringify({ reported: lg1Row.load, expected: expectedLg1Load }));
+
+// Test M (D-07) — נטל שטוח, לא היקש מכפיל-לילה משעות השעון; מכפיל
+// הסופ"ש עדיין חל אוטומטית כי הוא נגזר מתאריך/שעת-התחלה בלבד.
+const nightTaskUnif = hourTask(unifDate, "mt1", "19:00", "07:00");
+const nightShiftForCompare = { id: "cmp-night", date: unifDate, startTime: "19:00", endTime: "07:00", type: "night" };
+const taskLoadNight = shiftLoad(taskAsShiftShape(nightTaskUnif));
+check("UNIF-02 · משימה 19:00–07:00 ביום חול שוקלת בדיוק 12 נטל — שטוח, בלי מכפיל לילה (D-07)",
+  Math.abs(taskLoadNight - 12) < 1e-9, `${taskLoadNight}`);
+check("UNIF-02 · אותה משימה שוקלת פחות ממשמרת לילה על אותן שעות ותאריך",
+  taskLoadNight < shiftLoad(nightShiftForCompare), `${taskLoadNight} vs ${shiftLoad(nightShiftForCompare)}`);
+
+const satIndexUnif = dates.findIndex((d) => new Date(`${d}T12:00:00`).getDay() === 6);
+const dayTaskWeekday = hourTask(unifDate, "mt2", "07:00", "15:00");
+const dayTaskSat = hourTask(dates[satIndexUnif], "mt2", "07:00", "15:00");
+check("UNIF-02 · משימה בשבת שוקלת יותר מאותה משימה ביום חול (מכפיל הסופ״ש חל אוטומטית, D-07)",
+  shiftLoad(taskAsShiftShape(dayTaskSat)) > shiftLoad(taskAsShiftShape(dayTaskWeekday)),
+  `${shiftLoad(taskAsShiftShape(dayTaskSat))} vs ${shiftLoad(taskAsShiftShape(dayTaskWeekday))}`);
+
+// Test N (UNIF-04, המלוא) — משימות קפואות ורב-יומיות לא משנות דבר: אותה
+// תוצאה בייט-לבייט כמו הרצה בלי tasks כלל. `result` הוא ההרצה המקורית
+// שכבר הוכחה דטרמיניסטית למעלה בקובץ הזה.
+const frozenTaskUnif = {
+  id: "fz-uf1", title: "משימה קפואה", category: "מטבח",
+  startDate: dates[0], dueDate: dates[0], assignees: ["g1"],
+};
+const spanTaskUnif = {
+  id: "sp-uf1", title: "משימה רב-יומית", category: "מטבח",
+  startDate: dates[0], dueDate: dates[2], startTime: "07:00", endTime: "15:00", assignees: ["g1"],
+};
+const withFrozenTasksUnif = autoAssign({
+  shifts, guards, availability, tasks: [frozenTaskUnif, spanTaskUnif],
+});
+check("UNIF-04 · הרצה עם משימות קפואות/רב-יומיות זהה בייט-לבייט להרצה בלי tasks כלל",
+  JSON.stringify(withFrozenTasksUnif) === JSON.stringify(result));
+
+// Test O (D-09) — status: "done" לא משנה eligibility; אותה חסימה, אותו code.
+const doneTask = { ...morningTask, id: "tk-done", status: "done" };
+const doneCheck = checkAssignment({
+  guard: unifGuard, shift: nightShiftUnif, shifts: [], tasks: [doneTask], availability: {},
+});
+check("UNIF-02 · משימה עם status='done' עדיין חוסמת את אותה משמרת עם אותו code (D-09)",
+  doneCheck.ok === false && doneCheck.code === "rest", JSON.stringify(doneCheck));
+
+// Test P (backwards compatibility) — checkAssignment בלי tasks == עם tasks ריק.
+const noTasksArg = checkAssignment({ guard: unifGuard, shift: nightShiftUnif, shifts: [], availability: {} });
+const emptyTasksArg = checkAssignment({
+  guard: unifGuard, shift: nightShiftUnif, shifts: [], tasks: [], availability: {},
+});
+check("UNIF-02 · checkAssignment בלי tasks זהה בדיוק לקריאה עם tasks ריק",
+  JSON.stringify(noTasksArg) === JSON.stringify(emptyTasksArg));
+
+// Step 4 — משמר-האיזון: משימה אף פעם לא הופכת לרשומת assignment, וספירת
+// ה-assignments תמיד שווה ל-filledSlots המדווח (הסיכון שמפת-הדרכים מציינת
+// בשם — הכפלת מספר הפריטים שמעבר האיזון בוחן).
+const balanceGuardTask = hourTask(dates[6], "g1", "08:00", "10:00");
+const balanceCheckResult = autoAssign({ shifts, guards, availability, tasks: [balanceGuardTask] });
+const shiftIdSetUnif = new Set(shifts.map((s) => s.id));
+const taskNeverBecameAssignment = balanceCheckResult.assignments.every((a) => shiftIdSetUnif.has(a.shiftId));
+check("UNIF-02 · אף רשומת משימה לא נכנסת ל-assignments — כל shiftId שם שייך למשמרת אמיתית",
+  taskNeverBecameAssignment,
+  JSON.stringify(balanceCheckResult.assignments.filter((a) => !shiftIdSetUnif.has(a.shiftId))));
+check("UNIF-02 · מספר ה-assignments שווה בדיוק ל-filledSlots המדווח",
+  balanceCheckResult.assignments.length === balanceCheckResult.summary.filledSlots,
+  `assignments=${balanceCheckResult.assignments.length}, filledSlots=${balanceCheckResult.summary.filledSlots}`);
+const balanceLogEntryUnif = balanceCheckResult.log.find((l) => l.step === "balance");
+const movesReferenceOnlyShifts =
+  !balanceLogEntryUnif?.moves?.length || balanceLogEntryUnif.moves.every((m) => shiftIdSetUnif.has(m.shiftId));
+check("UNIF-02 · רשומת האיזון (אם קיימת) מפנה רק ל-shiftId של משמרות",
+  movesReferenceOnlyShifts, JSON.stringify(balanceLogEntryUnif));
 
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);

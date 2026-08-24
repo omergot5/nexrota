@@ -221,3 +221,43 @@ export function taskInterval(task) {
   if (!day || !task?.startTime || !task?.endTime) return null;
   return shiftInterval({ date: day, startTime: task.startTime, endTime: task.endTime });
 }
+
+/**
+ * The only task-to-engine-item adapter (UNIF-02). Returns null unless the
+ * task is engine-eligible.
+ *
+ * `assignedGuards` — not `assignees` — is load-bearing: `addToLoad`,
+ * `teamAverages` and `tally` all read that exact field name, and the whole
+ * point of this adapter is that none of them has to learn a second one.
+ *
+ * `type: "task"` is what makes D-07 true without a special case:
+ * `LOAD_WEIGHTS` has no key for it, so `shiftLoad` falls through to
+ * `default`, while `isWeekendShift` reads `date`/`startTime` and applies
+ * the weekend multiplier on its own — automatically, not by special-casing
+ * tasks.
+ */
+export function taskAsShiftShape(task) {
+  if (!isTaskEngineEligible(task)) return null;
+  return {
+    id: task.id,
+    date: task.dueDate || task.startDate,
+    startTime: task.startTime,
+    endTime: task.endTime,
+    type: "task",
+    label: task.title || "משימה",
+    assignedGuards: task.assignees || [],
+  };
+}
+
+/**
+ * The single merge definition every reporting call site routes through
+ * (plan 02-03), so the number the engine enforces and the number a screen
+ * prints can never come from two different merges. Total over its inputs:
+ * an empty or `undefined` list on either side still returns a usable array,
+ * never throws.
+ */
+export function withEngineTasks(shifts = [], tasks = []) {
+  const safeShifts = Array.isArray(shifts) ? shifts : [];
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
+  return [...safeShifts, ...safeTasks.map(taskAsShiftShape).filter(Boolean)];
+}
