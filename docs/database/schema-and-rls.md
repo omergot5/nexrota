@@ -76,11 +76,16 @@
 ### `gs_tasks` — משימות ותיקיות
 `title`, `description`, `category`, `assignees` (jsonb, ברירת מחדל `[]`),
 `assigned_to` (נשמר לתאימות — מתמלא באיש הראשון), `status`, `priority`,
-`start_date`, `due_date`, `override_note`.
+`start_date`, `due_date`, `override_note`, `start_time`, `end_time`.
 
 **תיקייה היא טקסט חופשי בעמודת `category`, לא טבלה.** בכוונה: תיקייה כאן היא
 תווית שמנהל ממציא תוך כדי עבודה ("שמירות", "מטבח", "סיור"), לא ישות שמישהו
 מתחזק. אינדקס `gs_tasks_team_category_idx` על `(team_code, category)`.
+
+- `start_time` / `end_time` — `time`, שתיהן nullable ובלי ברירת מחדל (Phase 2,
+  UNIF-01). שעות ריקות פירושן שהמשימה נשארת מחוץ למנוע — קפואה — ולעולם לא
+  ממולאות לאחור: כל שורה שקיימת מלפני `0005_task_hours.sql` נשארת עם שתי
+  העמודות ריקות, וזה כל מה ש"קפוא" אומר, בלי דגל נפרד.
 
 ---
 
@@ -104,6 +109,7 @@
 | `0002_task_folders.sql` | הוסיף `category`, `assignees`, `start_date` + backfill + אינדקס |
 | `0003_workspace_mode.sql` | הוסיף `gs_teams.mode` עם check constraint |
 | `0004_task_templates_and_compatibility.sql` | שתי הטבלאות החדשות + RLS + זרעים + `override_note` |
+| `0005_task_hours.sql` | הוסיף `gs_tasks.start_time`/`end_time` (`time`, nullable, בלי ברירת מחדל, בלי backfill — Phase 2, UNIF-01/UNIF-04) |
 
 בנוסף הורצה `brand_shift_color_default` — שינוי ברירת המחדל של `gs_shifts.color`
 מ-`#3B82F6` ל-`#7FC0AE`.
