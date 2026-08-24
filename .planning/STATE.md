@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 current_phase: 02
 current_phase_name: איחוד משימה ומשמרת
 status: planning
-stopped_at: discuss-phase 2 הושלם — 4 תחומים אפורים, 6 הכרעות נעולות, 02-CONTEXT.md נכתב. מוכן ל-/gsd-plan-phase 2.
-last_updated: "2026-08-23T17:05:00.000Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-08-24T06:31:32.823Z"
 last_activity: 2026-08-23
 last_activity_desc: Phase 02 discuss-phase complete, ready for research/planning
-state_head: fb78e53
+state_head: f707a413bfb06cf3c03defbcf3c2e94274341e94
 progress:
   total_phases: 5
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 20
+  completed_phases: 0
+  total_plans: 6
+  completed_plans: 4
+  percent: 0
 ---
 
 # Project State
@@ -32,7 +32,7 @@ Plan: 0 of 0 in current phase
 Status: discuss-phase 2 הושלם — 02-CONTEXT.md קיים, מוכן ל-/gsd-plan-phase 2 (מחקר → תכנון → plan-check → ביצוע)
 Last activity: 2026-08-23 — discuss-phase 2: 4 תחומים אפורים נדונו במלואם (משימה רב-יומית, סימון קפוא, ברירת מחדל שעות, תבניות משימה), כל ההכרעות נעולות ב-02-CONTEXT.md ו-02-DISCUSSION-LOG.md.
 
-Progress: [██░░░░░░░░] 20%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -54,6 +54,11 @@ Progress: [██░░░░░░░░] 20%
 - Trend: —
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 02 P01 | 30min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -67,6 +72,8 @@ Recent decisions affecting current work:
 - [Phase 3]: `category` (סוג עבודה) הוא שדה חדש ונפרד מ-`type` (שעה ביום), על משמרת ועל משימה כאחת.
 - [Phase 2]: משימות שנוצרו לפני המיגרציה קפואות מחוץ למנוע — אין מילוי שעות לאחור, לעולם.
 - [Milestone]: PROJECT_MODE = mvp.
+- [Phase 02]: D-07: task load weight is flat LOAD_WEIGHTS.default, not a night-multiplier inferred from clock hours
+- [Phase 02]: D-09: task engine eligibility never reads task.status — a done task still blocks conflicting shifts
 
 ### Pending Todos
 
@@ -90,6 +97,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-23
-Stopped at: discuss-phase 2 הושלם במלואו — כל 4 התחומים האפורים נדונו, 02-CONTEXT.md ו-02-DISCUSSION-LOG.md נכתבו. הצעד הבא: /gsd-plan-phase 2.
-Resume file: .planning/phases/02-task-shift-unification/02-CONTEXT.md
+Last session: 2026-08-24T06:31:32.783Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: None
