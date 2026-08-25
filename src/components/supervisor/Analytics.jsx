@@ -9,6 +9,7 @@ import { loadTable } from "../../lib/loadTable.js";
 import { chartTheme } from "../../design/chartTheme.js";
 import { loadShareHint } from "../../lib/fairness.js";
 import { t } from "../../lib/terms.js";
+import { withEngineTasks } from "../../lib/dates.js";
 
 // Kept in its own module and loaded lazily — recharts is roughly half the
 // bundle, and reports are never the first screen a supervisor opens.
@@ -27,7 +28,7 @@ const TYPE_LABEL = {
   nights: SHIFT_TYPES.find((d) => d.type === "night").label,
 };
 
-export default function AnalyticsDash({ guards, shifts }) {
+export default function AnalyticsDash({ guards, shifts, tasks = [] }) {
   // Recharts styles its axes and tooltips through JS props, not CSS, so it
   // cannot read our custom properties — it has to be told the theme.
   const { resolved } = useTheme();
@@ -41,15 +42,24 @@ export default function AnalyticsDash({ guards, shifts }) {
 
   // הטבלה היחידה שמזינה את שני התרשימים ואת טבלת הפירוט. אף מספר עומס
   // לא מחושב כאן — כולו מגיע דרך teamAverages() בתוך loadTable (01-03).
-  const table = useMemo(() => loadTable(guards, shifts), [guards, shifts]);
-
-  const typeStats = useMemo(
-    () =>
-      SHIFT_TYPES.map((d) => ({ name: d.label, color: d.color, value: table.byType[d.type] || 0 })).filter(
-        (d) => d.value > 0
-      ),
-    [table]
+  // המשימות עוברות דרך withEngineTasks (Phase 2) לפני loadTable — אותו
+  // מיזוג בדיוק שהכרטיס בלוח הבקרה ושורת ההוגנות של המשתתף עוברים דרכו.
+  const table = useMemo(
+    () => loadTable(guards, withEngineTasks(shifts, tasks)),
+    [guards, shifts, tasks]
   );
+
+  // העוגה סופרת משימות; העמודה המוערמת לא (Phase 2). `SHIFT_TYPES` עצמו
+  // נשאר בלי שינוי — הלגנד של העמודה בהמשך הקובץ קורא ממנו, ולעמודה אין
+  // פלח משימה בכלל. במקום זאת, רשימה נפרדת מזינה רק את העוגה: כותרת
+  // המסך (table.totalAssigned) כבר סופרת משימות דרך withEngineTasks
+  // למעלה, וללא הפלח הזה העוגה והכותרת היו חולקות על אותו מספר.
+  const typeStats = useMemo(() => {
+    const pieTypes = [...SHIFT_TYPES, { type: "task", label: t("nav.tasks"), color: SHIFT_TONES.custom }];
+    return pieTypes
+      .map((d) => ({ name: d.label, color: d.color, value: table.byType[d.type] || 0 }))
+      .filter((d) => d.value > 0);
+  }, [table]);
 
   if (!table.guardCount || table.totalAssigned === 0) {
     return (

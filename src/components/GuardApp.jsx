@@ -7,7 +7,7 @@ import { Icon } from "./icons.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 import {
   addDays, availabilityDeadline, countdownHe, dayName, formatDateHe, fromISODate, rangeLabelHe,
-  shiftInterval, shortDate, toISODate, todayISO, weekByOffset,
+  shiftInterval, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
 } from "../lib/dates.js";
 import { availStatus, checkAssignment, teamAverages } from "../lib/autoAssign.js";
 import { subscribeTerms, t, termProfile } from "../lib/terms.js";
@@ -126,7 +126,7 @@ function FairnessLine({ mine, avg }) {
   );
 }
 
-function MySchedule({ user, guards, shifts }) {
+function MySchedule({ user, guards, shifts, tasks = [] }) {
   const today = todayISO();
   const mine = shifts
     .filter((s) => s.published && s.assignedGuards.includes(user.id))
@@ -138,9 +138,17 @@ function MySchedule({ user, guards, shifts }) {
 
   // התורנות הראשונה יוצאת מהרשימה ועולה לכרטיס הפותח, כדי שלא תופיע פעמיים.
   const [next, ...rest] = upcoming;
+  // משימות לא מסוננות לפי published בכוונה, בניגוד ל-publishedAll שמעל:
+  // למשימה אין דגל כזה בכלל — היא לא טיוטת סידור שממתינה לפרסום, היא
+  // עבודה שקיימת. זה בדיוק המספר ש-FAIR-05 (אבן דרך א') הבטיח למשתתף:
+  // הנטל שהמנוע באמת מחלק לפיו, לא ספירת משמרות עצמאית.
+  const withTasks = useMemo(
+    () => withEngineTasks(publishedAll, tasks),
+    [publishedAll, tasks]
+  );
   const { perGuard, avg } = useMemo(
-    () => teamAverages(guards, publishedAll),
-    [guards, publishedAll]
+    () => teamAverages(guards, withTasks),
+    [guards, withTasks]
   );
   const mine_ = perGuard[user.id];
 

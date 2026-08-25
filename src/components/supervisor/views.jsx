@@ -7,8 +7,8 @@ import {
 } from "../ui.jsx";
 import { Dot, Icon } from "../icons.jsx";
 import {
-  availabilityDeadline, dayName, formatDateHe, fromISODate, isSingleDayTask, rangeLabelHe, shiftHours,
-  shortDate, toISODate, todayISO, weekByOffset,
+  availabilityDeadline, dayName, formatDateHe, fromISODate, isSingleDayTask, isTaskEngineEligible,
+  rangeLabelHe, shiftHours, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
 } from "../../lib/dates.js";
 import { availStatus, checkAssignment } from "../../lib/autoAssign.js";
 import { PROFILES, subscribeTerms, t, termProfile } from "../../lib/terms.js";
@@ -96,8 +96,13 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
   // מסך הדוחות (01-03 Task 1). זו הייתה בדיוק אותה טעות בשני מקומות:
   // הכרטיס הזה חישב ספירת משמרות גולמית בעצמו, בדיוק כמו שהטבלה עשתה
   // לפני שתוקנה. אין כאן שום חשבון עומס נוסף — רק Math.max על שדה
-  // load שכבר הגיע מוכן מ-loadTable.
-  const { rows: loadRows } = useMemo(() => loadTable(guards, shifts), [guards, shifts]);
+  // load שכבר הגיע מוכן מ-loadTable. המשימות עוברות דרך withEngineTasks
+  // (Phase 2) לפני שהן נכנסות ל-loadTable, כדי שהכרטיס הזה ומסך הדוחות
+  // לעולם לא יחלקו על אותו שומר.
+  const { rows: loadRows } = useMemo(
+    () => loadTable(guards, withEngineTasks(shifts, tasks)),
+    [guards, shifts, tasks]
+  );
   const maxLoad = Math.max(1, ...loadRows.map((r) => r.load));
 
   return (
@@ -862,7 +867,9 @@ export function AvailView({ guards, shifts, availability, weekDates, embedded = 
 // MANUAL ASSIGNMENT
 // ============================================================
 
-export function AssignView({ guards, shifts, availability, weekDates, actions, busy, onNavigate, embedded = false }) {
+export function AssignView({
+  guards, shifts, availability, weekDates, actions, busy, onNavigate, tasks = [], embedded = false,
+}) {
   const [date, setDate] = useState(weekDates[0]);
   useEffect(() => {
     if (!weekDates.includes(date)) setDate(weekDates[0]);
@@ -879,10 +886,14 @@ export function AssignView({ guards, shifts, availability, weekDates, actions, b
   const weekStart = weekDates[0];
   const weekEnd = weekDates[weekDates.length - 1];
   const fairness = useMemo(() => {
-    const history = shifts.filter((s) => s.date < weekStart);
-    const planned = shifts.filter((s) => s.date >= weekStart && s.date <= weekEnd);
+    // מיזוג אחד, ואז סינון על התוצאה — לא ההפך — כדי שתישאר הגדרת מיזוג
+    // יחידה בקוד הזה במקום שתיים (אחת ל-history ואחת ל-planned). לכל
+    // פריט משימה יש שדה date בדיוק בשביל שהסינון הזה יעבוד כמו על משמרת.
+    const merged = withEngineTasks(shifts, tasks);
+    const history = merged.filter((s) => s.date < weekStart);
+    const planned = merged.filter((s) => s.date >= weekStart && s.date <= weekEnd);
     return fairnessPlan({ guards, history, planned, until: weekStart, days: 14 });
-  }, [guards, shifts, weekStart, weekEnd]);
+  }, [guards, shifts, tasks, weekStart, weekEnd]);
 
   const hintOf = useMemo(() => {
     const map = new Map(fairness.rows.map((r) => [r.id, fairnessHint(r)]));
