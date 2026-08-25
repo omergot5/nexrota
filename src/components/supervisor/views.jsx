@@ -75,7 +75,14 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
   const today = todayISO();
   const todayShifts = shifts.filter((s) => s.date === today);
   const pendingSwaps = swapRequests.filter((r) => r.status === "pending").length;
-  const openTasks = tasks.filter((t) => t.status !== "done").length;
+  const openTasksList = tasks.filter((t) => t.status !== "done");
+  const openTasks = openTasksList.length;
+  // הפיצול נספר/קפוא נגזר מ-isTaskEngineEligible — אותה פונקציה בדיוק
+  // שהמנוע קורא — כדי שהמספר כאן לעולם לא יסתור את מה שהמנוע באמת עשה
+  // (D-04 בגבולות D-08: אין כרטיס יומן למשימה בודדת, אז זו רמת הפירוט
+  // היחידה שיש ללוח הבקרה).
+  const openTasksCounted = openTasksList.filter(isTaskEngineEligible).length;
+  const openTasksFrozen = openTasks - openTasksCounted;
   const published = shifts.filter((s) => s.published).length;
   const upcoming = shifts
     .filter((s) => s.date >= today)
@@ -179,7 +186,14 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
           tone={pendingSwaps ? "warn" : "brand"}
           onClick={() => onNavigate("swaps")}
         />
-        <StatCard title="משימות פתוחות" value={openTasks} icon="pencil" tone="info" onClick={() => onNavigate("tasks")} />
+        <StatCard
+          title="משימות פתוחות"
+          value={openTasks}
+          subtitle={openTasks > 0 ? `${openTasksCounted} נספרות במנוע · ${openTasksFrozen} קפואות` : undefined}
+          icon="pencil"
+          tone="info"
+          onClick={() => onNavigate("tasks")}
+        />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-5">
@@ -1553,6 +1567,10 @@ export function TaskMgmt({
     const done = task.status === "done";
     const prio = PRIORITY[task.priority] || PRIORITY.medium;
     const range = rangeText(task);
+    // אותה פונקציה בדיוק שהמנוע נשען עליה (isTaskEngineEligible) — כך
+    // שהתג הזה לעולם לא יכול לחלוק על מה שהמנוע באמת עשה עם המשימה
+    // (D-03, D-04).
+    const eligible = isTaskEngineEligible(task);
     return (
       <div
         className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors duration-200
@@ -1589,12 +1607,38 @@ export function TaskMgmt({
               <Dot color={prio.color} size={6} />
               {prio.label}
             </Badge>
+            {/* תג ניטרלי, אייקון מנעול ומילים — לא צבע בלבד (WCAG 1.4.1,
+              * אותו עיקרון שכבר עוקב אחריו מפת הזמינות למעלה בקובץ הזה).
+              * מופיע רק כשהמשימה קפואה (D-03): פעילה היא המקרה הרגיל,
+              * ותג על כל שורה הוא רעש שמפסיקים לקרוא. */}
+            {!eligible && (
+              <span
+                title="המשימה לא נושאת שעות, או פרושה על יותר מיום אחד — ולכן היא לא נכנסת למנוע: היא לא נספרת במנוחה, ברצף, בתקרה השבועית או בנטל."
+              >
+                <Badge tone="neutral" icon="lock">
+                  מחוץ למנוע
+                </Badge>
+              </span>
+            )}
           </div>
           {task.description && <p className="text-xs text-muted mt-0.5">{task.description}</p>}
-          {range && (
-            <span className="flex items-center gap-1 mt-1 text-[11px] text-faint" data-numeric>
-              <Icon name="calendar" size={11} />
-              {range}
+          {(range || eligible) && (
+            <span className="flex items-center gap-3 mt-1 flex-wrap text-[11px] text-faint" data-numeric>
+              {range && (
+                <span className="flex items-center gap-1">
+                  <Icon name="calendar" size={11} />
+                  {range}
+                </span>
+              )}
+              {/* שעות מוצגות רק למשימה נספרת — זה מה שהיא בפועל תופסת
+                * (D-03: שורה מציגה שעות, או תג "מחוץ למנוע", אף פעם לא
+                * שניהם ואף פעם לא כלום). */}
+              {eligible && (
+                <span className="flex items-center gap-1">
+                  <Icon name="clock" size={11} />
+                  {task.startTime}–{task.endTime}
+                </span>
+              )}
             </span>
           )}
         </button>
