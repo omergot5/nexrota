@@ -1226,19 +1226,22 @@ const SWAP_STATUS = {
   rejected: { label: "נדחה",  tone: "danger" },
 };
 
-export function SwapMgmt({ guards, shifts, availability = {}, swapRequests, actions, busy }) {
+export function SwapMgmt({ guards, shifts, availability = {}, swapRequests, actions, busy, tasks = [] }) {
   const gName = (id) => guards.find((g) => g.id === id)?.name || "—";
 
   // A swap the engine would never have produced must not be reachable by
   // approving a request either — so the same hard constraints run here, and
   // the reason is shown before the supervisor commits rather than after.
+  // Not narrowed to a week: a swap check is about one specific shift on one
+  // specific date, and the engine's rest/consecutive rules look at
+  // neighbouring days by design — the full task list is correct here.
   const legality = (r) => {
     const shift = shifts.find((x) => x.id === r.shiftId);
     const guard = guards.find((g) => g.id === r.toGuard);
     if (!shift || !guard) {
       return { ok: false, reason: "המשמרת או המאבטח כבר לא קיימים" };
     }
-    return checkAssignment({ guard, shift, shifts, availability });
+    return checkAssignment({ guard, shift, shifts, availability, tasks });
   };
   const pending = swapRequests.filter((r) => r.status === "pending");
   const resolved = swapRequests.filter((r) => r.status !== "pending");

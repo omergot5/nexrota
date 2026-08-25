@@ -557,13 +557,14 @@ function MyAvailability({ user, team, shifts, availability, actions, busy }) {
 // SWAPS
 // ============================================================
 
-function MySwaps({ user, guards, shifts, availability = {}, swapRequests, actions, busy }) {
+function MySwaps({ user, guards, shifts, availability = {}, swapRequests, actions, busy, tasks = [] }) {
   // Agreeing to cover a shift runs the same hard constraints the engine runs,
   // so a guard cannot accept a shift that would break their own rest rule.
+  // Not narrowed to a week — same reasoning as the supervisor's SwapMgmt.
   const legality = (r) => {
     const shift = shifts.find((x) => x.id === r.shiftId);
     if (!shift) return { ok: false, reason: "המשמרת כבר לא קיימת" };
-    return checkAssignment({ guard: { id: r.toGuard }, shift, shifts, availability });
+    return checkAssignment({ guard: { id: r.toGuard }, shift, shifts, availability, tasks });
   };
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ shiftId: "", toGuard: "", message: "" });
@@ -759,7 +760,7 @@ function MySwaps({ user, guards, shifts, availability = {}, swapRequests, action
 
 export default function GuardApp({ state }) {
   const {
-    user, team, guards, shifts, availability, swapRequests, actions, busy, error, clearError, logout, offline,
+    user, team, guards, shifts, availability, swapRequests, tasks, actions, busy, error, clearError, logout, offline,
   } = state;
   const [view, setView] = useState("schedule");
   const profile = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
@@ -778,7 +779,7 @@ export default function GuardApp({ state }) {
   ).length;
 
   const views = {
-    schedule: <MySchedule user={user} guards={guards} shifts={shifts} />,
+    schedule: <MySchedule user={user} guards={guards} shifts={shifts} tasks={tasks} />,
     availability: (
       <MyAvailability
         user={user}
@@ -798,6 +799,7 @@ export default function GuardApp({ state }) {
         swapRequests={swapRequests}
         actions={actions}
         busy={busy}
+        tasks={tasks}
       />
     ),
   };
