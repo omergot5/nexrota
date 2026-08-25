@@ -2,7 +2,11 @@
 
 **Generated:** 2026-08-24
 **Phase:** 02-task-shift-unification
-**Status:** Incomplete
+**Status:** Complete — applied 2026-08-25 via Supabase MCP (`apply_migration`, project `biauxcgphdhwewszupsq`)
+
+`gs_tasks.start_time`/`end_time` confirmed live: both nullable, no default, and `select count(*) from gs_tasks where start_time is not null or end_time is not null` returned `0` — no pre-existing row was backfilled. `gs_shifts.start_time`/`end_time` confirmed `time without time zone`, matching the new columns exactly (Assumption A1 resolved, no type mismatch).
+
+The two in-app browser checks below (create/reload/widen-date) were not re-verified in this pass — they need a live browser session against the deployed app, not just the database.
 
 Complete this item so `gs_tasks.start_time`/`end_time` exist on the live database. Claude attempted automation first (checked for a Supabase MCP server — none configured in this session; checked for a linked `supabase` CLI — not installed; confirmed the project is network-reachable via a direct HTTPS request, but the anon key cannot run DDL or read `information_schema`). None of the three routes named in the plan's precondition (MCP, CLI) were available, so this is the "operator with SQL-editor access" fallback the plan itself anticipates.
 
