@@ -1,19 +1,19 @@
 ---
 gsd_state_version: 1.0
-current_phase: 02
-current_phase_name: איחוד משימה ומשמרת
-status: executing
-stopped_at: Completed 02-01-PLAN.md (wave 1/3) — windowsOverlap אוחד, UNIF-02/03/04/06 מיושמים ומאומתים ב-npm test
-last_updated: "2026-08-24T06:31:32.823Z"
-last_activity: 2026-08-24
-last_activity_desc: Phase 02 wave 1 (02-01) complete
-state_head: f707a413bfb06cf3c03defbcf3c2e94274341e94
+current_phase: 03
+current_phase_name: מודל כשירויות
+status: planning
+stopped_at: פאזה 2 הושלמה ואומתה בדפדפן בפועל — שלושת הגלים מוזגו, המיגרציה הורצה על ה-DB האמיתי, 02-VERIFICATION.md נכתב. פאזה 3 טרם תוכננה.
+last_updated: "2026-08-26T00:00:00.000Z"
+last_activity: 2026-08-26
+last_activity_desc: Phase 02 complete and verified
+state_head: 996793c
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 4
-  percent: 0
+  completed_plans: 6
+  percent: 40
 ---
 
 # Project State
@@ -23,16 +23,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-21)
 
 **Core value:** אדם שמקבל את האפליקציה לידיו מסיים סידור שבועי מלא בלי שאף אחד יסביר לו כלום — ומה שהמערכת אומרת לו על עצמה הוא נכון.
-**Current focus:** Phase 02 — איחוד משימה ומשמרת
+**Current focus:** Phase 03 — מודל כשירויות
 
 ## Current Position
 
-Phase: 02 (איחוד משימה ומשמרת) — EXECUTING
-Plan: 1 of 3 complete
-Status: Executing Phase 02 — wave 2 (02-02) next
-Last activity: 2026-08-24 — Phase 02 wave 1 (02-01) complete: windowsOverlap unified, tasks feed the engine
+Phase: 02 (איחוד משימה ומשמרת) — COMPLETE
+Plan: 3 of 3 complete
+Status: Phase 02 complete — ready to plan Phase 03
+Last activity: 2026-08-26 — Phase 02 אומתה בדפדפן: תג "מחוץ למנוע" על משימה קפואה בלבד, פיצול נספר/קפוא בדשבורד, נטל משימה (8 שעות) מופיע זהה בדשבורד ובדוחות. המיגרציה רצה על ה-DB האמיתי, 0 שורות מולאו לאחור.
 
-Progress: [███░░░░░░░] 33%
+Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
@@ -97,6 +97,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-24T06:31:32.783Z
-Stopped at: Completed 02-01-PLAN.md
-Resume file: None
+Last session: 2026-08-26
+Stopped at: פאזה 2 הושלמה, אומתה בדפדפן ובמסד הנתונים החי, ו-02-VERIFICATION.md נכתב. פאזה 3 (מודל כשירויות) לא תוכננה עדיין.
+Resume file: .planning/phases/02-task-shift-unification/02-VERIFICATION.md
