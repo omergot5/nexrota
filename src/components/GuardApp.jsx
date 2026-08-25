@@ -7,7 +7,7 @@ import { Icon } from "./icons.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 import {
   addDays, availabilityDeadline, countdownHe, dayName, formatDateHe, fromISODate, rangeLabelHe,
-  shiftInterval, shortDate, toISODate, todayISO, weekByOffset,
+  shiftInterval, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
 } from "../lib/dates.js";
 import { availStatus, checkAssignment, teamAverages } from "../lib/autoAssign.js";
 import { subscribeTerms, t, termProfile } from "../lib/terms.js";
@@ -126,7 +126,7 @@ function FairnessLine({ mine, avg }) {
   );
 }
 
-function MySchedule({ user, guards, shifts }) {
+function MySchedule({ user, guards, shifts, tasks = [] }) {
   const today = todayISO();
   const mine = shifts
     .filter((s) => s.published && s.assignedGuards.includes(user.id))
@@ -138,9 +138,17 @@ function MySchedule({ user, guards, shifts }) {
 
   // התורנות הראשונה יוצאת מהרשימה ועולה לכרטיס הפותח, כדי שלא תופיע פעמיים.
   const [next, ...rest] = upcoming;
+  // משימות לא מסוננות לפי published בכוונה, בניגוד ל-publishedAll שמעל:
+  // למשימה אין דגל כזה בכלל — היא לא טיוטת סידור שממתינה לפרסום, היא
+  // עבודה שקיימת. זה בדיוק המספר ש-FAIR-05 (אבן דרך א') הבטיח למשתתף:
+  // הנטל שהמנוע באמת מחלק לפיו, לא ספירת משמרות עצמאית.
+  const withTasks = useMemo(
+    () => withEngineTasks(publishedAll, tasks),
+    [publishedAll, tasks]
+  );
   const { perGuard, avg } = useMemo(
-    () => teamAverages(guards, publishedAll),
-    [guards, publishedAll]
+    () => teamAverages(guards, withTasks),
+    [guards, withTasks]
   );
   const mine_ = perGuard[user.id];
 
@@ -557,13 +565,14 @@ function MyAvailability({ user, team, shifts, availability, actions, busy }) {
 // SWAPS
 // ============================================================
 
-function MySwaps({ user, guards, shifts, availability = {}, swapRequests, actions, busy }) {
+function MySwaps({ user, guards, shifts, availability = {}, swapRequests, actions, busy, tasks = [] }) {
   // Agreeing to cover a shift runs the same hard constraints the engine runs,
   // so a guard cannot accept a shift that would break their own rest rule.
+  // Not narrowed to a week — same reasoning as the supervisor's SwapMgmt.
   const legality = (r) => {
     const shift = shifts.find((x) => x.id === r.shiftId);
     if (!shift) return { ok: false, reason: "המשמרת כבר לא קיימת" };
-    return checkAssignment({ guard: { id: r.toGuard }, shift, shifts, availability });
+    return checkAssignment({ guard: { id: r.toGuard }, shift, shifts, availability, tasks });
   };
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ shiftId: "", toGuard: "", message: "" });
@@ -759,7 +768,7 @@ function MySwaps({ user, guards, shifts, availability = {}, swapRequests, action
 
 export default function GuardApp({ state }) {
   const {
-    user, team, guards, shifts, availability, swapRequests, actions, busy, error, clearError, logout, offline,
+    user, team, guards, shifts, availability, swapRequests, tasks, actions, busy, error, clearError, logout, offline,
   } = state;
   const [view, setView] = useState("schedule");
   const profile = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
@@ -778,7 +787,7 @@ export default function GuardApp({ state }) {
   ).length;
 
   const views = {
-    schedule: <MySchedule user={user} guards={guards} shifts={shifts} />,
+    schedule: <MySchedule user={user} guards={guards} shifts={shifts} tasks={tasks} />,
     availability: (
       <MyAvailability
         user={user}
@@ -798,6 +807,7 @@ export default function GuardApp({ state }) {
         swapRequests={swapRequests}
         actions={actions}
         busy={busy}
+        tasks={tasks}
       />
     ),
   };

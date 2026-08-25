@@ -36,7 +36,7 @@ export const STEP_OF = {
 };
 
 export default function WeekFlow({
-  step, setStep, guards, shifts, availability, weekDates, actions, busy, onNavigate,
+  step, setStep, guards, shifts, availability, weekDates, actions, busy, onNavigate, tasks = [],
 }) {
   // ברירת המחדל היא השיבוץ האוטומטי. הידני יושב לצידו בתוך אותו שלב — הוא
   // תיקון של התוצאה, לא מסך מתחרה.
@@ -96,7 +96,9 @@ export default function WeekFlow({
   ];
 
   // `embedded` אומר לרכיב שכותרת המסך כבר נאמרה — פס השלבים הוא הכותרת.
-  const common = { guards, shifts, availability, weekDates, actions, busy, onNavigate, embedded: true };
+  const common = {
+    guards, shifts, availability, weekDates, actions, busy, onNavigate, tasks, embedded: true,
+  };
 
   const body = [
     <ShiftMgmt key="shifts" {...common} />,
@@ -116,6 +118,7 @@ export default function WeekFlow({
           shifts={shifts}
           guards={guards}
           availability={availability}
+          tasks={tasks}
           busy={busy}
           embedded
           onApply={(ids, assignments) => actions.applyPlan(ids, assignments)}

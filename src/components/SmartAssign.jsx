@@ -205,7 +205,9 @@ const Kpi = ({ label, value, unit, hint, meter, meterColor, tone = "text-content
   </Card>
 );
 
-export default function SmartAssign({ weekDates, shifts, guards, availability, onApply, busy, embedded = false }) {
+export default function SmartAssign({
+  weekDates, shifts, guards, availability, tasks = [], onApply, busy, embedded = false,
+}) {
   const [rules, setRules] = useState(DEFAULT_RULES);
   const [plan, setPlan] = useState(null);
   const [showRules, setShowRules] = useState(false);
@@ -217,6 +219,16 @@ export default function SmartAssign({ weekDates, shifts, guards, availability, o
   const weekShifts = useMemo(
     () => shifts.filter((s) => weekDates.includes(s.date)),
     [shifts, weekDates]
+  );
+
+  // Narrowed to this week — not cosmetic. Feeding the engine a task from
+  // outside the week being planned would consume a maxShiftsPerWeek slot
+  // for a duty that isn't in this week, silently making a legal roster
+  // unfillable. "The day it resolves to" mirrors taskInterval: dueDate,
+  // falling back to startDate.
+  const weekTasks = useMemo(
+    () => tasks.filter((task) => weekDates.includes(task.dueDate || task.startDate)),
+    [tasks, weekDates]
   );
 
   const guardById = useMemo(() => new Map(guards.map((g) => [g.id, g])), [guards]);
@@ -233,7 +245,9 @@ export default function SmartAssign({ weekDates, shifts, guards, availability, o
 
   const run = () => {
     setPlan(
-      autoAssign({ shifts: weekShifts, guards, availability, rules, keepExisting: keepManual })
+      autoAssign({
+        shifts: weekShifts, guards, availability, rules, keepExisting: keepManual, tasks: weekTasks,
+      })
     );
     setApplied(false);
   };

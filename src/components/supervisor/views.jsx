@@ -7,8 +7,8 @@ import {
 } from "../ui.jsx";
 import { Dot, Icon } from "../icons.jsx";
 import {
-  availabilityDeadline, dayName, formatDateHe, fromISODate, isSingleDayTask, rangeLabelHe, shiftHours,
-  shortDate, toISODate, todayISO, weekByOffset,
+  availabilityDeadline, dayName, formatDateHe, fromISODate, isSingleDayTask, isTaskEngineEligible,
+  rangeLabelHe, shiftHours, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
 } from "../../lib/dates.js";
 import { availStatus, checkAssignment } from "../../lib/autoAssign.js";
 import { PROFILES, subscribeTerms, t, termProfile } from "../../lib/terms.js";
@@ -75,7 +75,14 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
   const today = todayISO();
   const todayShifts = shifts.filter((s) => s.date === today);
   const pendingSwaps = swapRequests.filter((r) => r.status === "pending").length;
-  const openTasks = tasks.filter((t) => t.status !== "done").length;
+  const openTasksList = tasks.filter((t) => t.status !== "done");
+  const openTasks = openTasksList.length;
+  // הפיצול נספר/קפוא נגזר מ-isTaskEngineEligible — אותה פונקציה בדיוק
+  // שהמנוע קורא — כדי שהמספר כאן לעולם לא יסתור את מה שהמנוע באמת עשה
+  // (D-04 בגבולות D-08: אין כרטיס יומן למשימה בודדת, אז זו רמת הפירוט
+  // היחידה שיש ללוח הבקרה).
+  const openTasksCounted = openTasksList.filter(isTaskEngineEligible).length;
+  const openTasksFrozen = openTasks - openTasksCounted;
   const published = shifts.filter((s) => s.published).length;
   const upcoming = shifts
     .filter((s) => s.date >= today)
@@ -96,8 +103,13 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
   // מסך הדוחות (01-03 Task 1). זו הייתה בדיוק אותה טעות בשני מקומות:
   // הכרטיס הזה חישב ספירת משמרות גולמית בעצמו, בדיוק כמו שהטבלה עשתה
   // לפני שתוקנה. אין כאן שום חשבון עומס נוסף — רק Math.max על שדה
-  // load שכבר הגיע מוכן מ-loadTable.
-  const { rows: loadRows } = useMemo(() => loadTable(guards, shifts), [guards, shifts]);
+  // load שכבר הגיע מוכן מ-loadTable. המשימות עוברות דרך withEngineTasks
+  // (Phase 2) לפני שהן נכנסות ל-loadTable, כדי שהכרטיס הזה ומסך הדוחות
+  // לעולם לא יחלקו על אותו שומר.
+  const { rows: loadRows } = useMemo(
+    () => loadTable(guards, withEngineTasks(shifts, tasks)),
+    [guards, shifts, tasks]
+  );
   const maxLoad = Math.max(1, ...loadRows.map((r) => r.load));
 
   return (
@@ -174,7 +186,14 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
           tone={pendingSwaps ? "warn" : "brand"}
           onClick={() => onNavigate("swaps")}
         />
-        <StatCard title="משימות פתוחות" value={openTasks} icon="pencil" tone="info" onClick={() => onNavigate("tasks")} />
+        <StatCard
+          title="משימות פתוחות"
+          value={openTasks}
+          subtitle={openTasks > 0 ? `${openTasksCounted} נספרות במנוע · ${openTasksFrozen} קפואות` : undefined}
+          icon="pencil"
+          tone="info"
+          onClick={() => onNavigate("tasks")}
+        />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-5">
@@ -862,7 +881,9 @@ export function AvailView({ guards, shifts, availability, weekDates, embedded = 
 // MANUAL ASSIGNMENT
 // ============================================================
 
-export function AssignView({ guards, shifts, availability, weekDates, actions, busy, onNavigate, embedded = false }) {
+export function AssignView({
+  guards, shifts, availability, weekDates, actions, busy, onNavigate, tasks = [], embedded = false,
+}) {
   const [date, setDate] = useState(weekDates[0]);
   useEffect(() => {
     if (!weekDates.includes(date)) setDate(weekDates[0]);
@@ -879,10 +900,14 @@ export function AssignView({ guards, shifts, availability, weekDates, actions, b
   const weekStart = weekDates[0];
   const weekEnd = weekDates[weekDates.length - 1];
   const fairness = useMemo(() => {
-    const history = shifts.filter((s) => s.date < weekStart);
-    const planned = shifts.filter((s) => s.date >= weekStart && s.date <= weekEnd);
+    // מיזוג אחד, ואז סינון על התוצאה — לא ההפך — כדי שתישאר הגדרת מיזוג
+    // יחידה בקוד הזה במקום שתיים (אחת ל-history ואחת ל-planned). לכל
+    // פריט משימה יש שדה date בדיוק בשביל שהסינון הזה יעבוד כמו על משמרת.
+    const merged = withEngineTasks(shifts, tasks);
+    const history = merged.filter((s) => s.date < weekStart);
+    const planned = merged.filter((s) => s.date >= weekStart && s.date <= weekEnd);
     return fairnessPlan({ guards, history, planned, until: weekStart, days: 14 });
-  }, [guards, shifts, weekStart, weekEnd]);
+  }, [guards, shifts, tasks, weekStart, weekEnd]);
 
   const hintOf = useMemo(() => {
     const map = new Map(fairness.rows.map((r) => [r.id, fairnessHint(r)]));
@@ -1226,19 +1251,22 @@ const SWAP_STATUS = {
   rejected: { label: "נדחה",  tone: "danger" },
 };
 
-export function SwapMgmt({ guards, shifts, availability = {}, swapRequests, actions, busy }) {
+export function SwapMgmt({ guards, shifts, availability = {}, swapRequests, actions, busy, tasks = [] }) {
   const gName = (id) => guards.find((g) => g.id === id)?.name || "—";
 
   // A swap the engine would never have produced must not be reachable by
   // approving a request either — so the same hard constraints run here, and
   // the reason is shown before the supervisor commits rather than after.
+  // Not narrowed to a week: a swap check is about one specific shift on one
+  // specific date, and the engine's rest/consecutive rules look at
+  // neighbouring days by design — the full task list is correct here.
   const legality = (r) => {
     const shift = shifts.find((x) => x.id === r.shiftId);
     const guard = guards.find((g) => g.id === r.toGuard);
     if (!shift || !guard) {
       return { ok: false, reason: "המשמרת או המאבטח כבר לא קיימים" };
     }
-    return checkAssignment({ guard, shift, shifts, availability });
+    return checkAssignment({ guard, shift, shifts, availability, tasks });
   };
   const pending = swapRequests.filter((r) => r.status === "pending");
   const resolved = swapRequests.filter((r) => r.status !== "pending");
@@ -1539,6 +1567,10 @@ export function TaskMgmt({
     const done = task.status === "done";
     const prio = PRIORITY[task.priority] || PRIORITY.medium;
     const range = rangeText(task);
+    // אותה פונקציה בדיוק שהמנוע נשען עליה (isTaskEngineEligible) — כך
+    // שהתג הזה לעולם לא יכול לחלוק על מה שהמנוע באמת עשה עם המשימה
+    // (D-03, D-04).
+    const eligible = isTaskEngineEligible(task);
     return (
       <div
         className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors duration-200
@@ -1575,12 +1607,38 @@ export function TaskMgmt({
               <Dot color={prio.color} size={6} />
               {prio.label}
             </Badge>
+            {/* תג ניטרלי, אייקון מנעול ומילים — לא צבע בלבד (WCAG 1.4.1,
+              * אותו עיקרון שכבר עוקב אחריו מפת הזמינות למעלה בקובץ הזה).
+              * מופיע רק כשהמשימה קפואה (D-03): פעילה היא המקרה הרגיל,
+              * ותג על כל שורה הוא רעש שמפסיקים לקרוא. */}
+            {!eligible && (
+              <span
+                title="המשימה לא נושאת שעות, או פרושה על יותר מיום אחד — ולכן היא לא נכנסת למנוע: היא לא נספרת במנוחה, ברצף, בתקרה השבועית או בנטל."
+              >
+                <Badge tone="neutral" icon="lock">
+                  מחוץ למנוע
+                </Badge>
+              </span>
+            )}
           </div>
           {task.description && <p className="text-xs text-muted mt-0.5">{task.description}</p>}
-          {range && (
-            <span className="flex items-center gap-1 mt-1 text-[11px] text-faint" data-numeric>
-              <Icon name="calendar" size={11} />
-              {range}
+          {(range || eligible) && (
+            <span className="flex items-center gap-3 mt-1 flex-wrap text-[11px] text-faint" data-numeric>
+              {range && (
+                <span className="flex items-center gap-1">
+                  <Icon name="calendar" size={11} />
+                  {range}
+                </span>
+              )}
+              {/* שעות מוצגות רק למשימה נספרת — זה מה שהיא בפועל תופסת
+                * (D-03: שורה מציגה שעות, או תג "מחוץ למנוע", אף פעם לא
+                * שניהם ואף פעם לא כלום). */}
+              {eligible && (
+                <span className="flex items-center gap-1">
+                  <Icon name="clock" size={11} />
+                  {task.startTime}–{task.endTime}
+                </span>
+              )}
             </span>
           )}
         </button>

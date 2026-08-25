@@ -159,7 +159,7 @@ export default function SupervisorApp({ state }) {
     go("smart");
   };
 
-  const common = { guards, shifts, availability, weekDates, actions, busy, onNavigate: go };
+  const common = { guards, shifts, availability, weekDates, actions, busy, onNavigate: go, tasks };
 
   const views = {
     week: <WeekFlow {...common} step={weekStep} setStep={setWeekStep} />,
@@ -225,6 +225,7 @@ export default function SupervisorApp({ state }) {
         swapRequests={swapRequests}
         actions={actions}
         busy={busy}
+        tasks={tasks}
       />
     ),
     tasks: (
@@ -247,7 +248,7 @@ export default function SupervisorApp({ state }) {
           </div>
         }
       >
-        <AnalyticsDash guards={guards} shifts={shifts} />
+        <AnalyticsDash guards={guards} shifts={shifts} tasks={tasks} />
       </Suspense>
     ),
     team: (
