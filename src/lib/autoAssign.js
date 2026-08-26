@@ -227,6 +227,14 @@ function checkHardConstraints({ guard, shift, load, availability, rules }) {
   const status = availStatus(availability, guard.id, shift.id);
   const candidate = shiftInterval(shift);
 
+  // ראשון מכל הבדיקות, בכוונה (03-CONTEXT.md): מי שלא כשיר/ה לסוג העבודה
+  // הזה בכלל צריך/ה להיחסם על כך, לא על פער מנוחה שנבדק במקרה קודם. אין לה
+  // דלת אחורית (QUAL-05) — אין פרמטר בשום קריאה שהופך את זה לאישור. הכנסה
+  // אחת פה סוגרת בבת אחת את לולאת המילוי האוטומטי, את מעבר האיזון ואת אישור
+  // ההחלפה — שלושתם מגיעים לכאן דרך checkHardConstraints.
+  const qualCheck = checkQualification({ guard, shift });
+  if (!qualCheck.ok) return qualCheck;
+
   if (status === "unavailable") {
     const note = availComment(availability, guard.id, shift.id);
     return {

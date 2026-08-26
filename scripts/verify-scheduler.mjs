@@ -899,5 +899,157 @@ check("UNIF-02 · הנטל שהמנוע עצמו מדווח לאותו שומר,
   Math.abs(parityEngineRow.load - parityPerGuard.pr1.load) < 0.05,
   JSON.stringify({ engine: parityEngineRow.load, participant: parityPerGuard.pr1.load }));
 
+// ---------------------------------------------------------------
+// QUAL-04 — כשירות חוסמת בכל שלושת המסלולים (מילוי אוטומטי, איזון עומסים,
+// אישור החלפה) דרך ההכנסה היחידה ב-checkHardConstraints (Phase 3, Plan
+// 03-01, Task 2). שבוע מוגבל לאינדקסים 0-4 (א'-ה') כדי שמכפיל הסופ"ש לא
+// ייכנס לחישוב. תחיליות מזהים: `ql-` — לא בשימוש באף פיקסצ'ר קודם בקובץ.
+// ---------------------------------------------------------------
+
+console.log("\n=== QUAL-04 — כשירות חוסמת בכל המסלולים ===\n");
+
+const qlGuardNarrow = { id: "ql-narrow", name: "מוגבל/ת למטבח בלבד", qualifiedCategories: ["מטבח"] };
+const qlGuardWide = { id: "ql-wide", name: "בלי הגבלת כשירות" };
+const qlGuards = [qlGuardNarrow, qlGuardWide];
+
+const qlShiftA = {
+  id: "ql-scout-a", date: dates[0], label: "סיור בוקר", type: "day", category: "סיור",
+  startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: [],
+};
+const qlShiftB = {
+  id: "ql-scout-b", date: dates[1], label: "סיור בוקר", type: "day", category: "סיור",
+  startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: [],
+};
+// אף שומר לא זמין למשמרת הזו — נשארת לא מלאה, וזו נקודת התצפית ל-unfilled:
+// שני קודים שונים חוסמים את שני המועמדים היחידים (זמינות ל-wide, כשירות
+// ל-narrow), לא רק כשירות — כדי שהבדיקה תוכיח שהמועמד המצומצם *הגיע* לבדיקה.
+const qlShiftUnfilled = {
+  id: "ql-scout-unfilled", date: dates[3], label: "סיור בוקר", type: "day", category: "סיור",
+  startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: [],
+};
+// בלי קטגוריה כלל — המקום שמוכיח שהחסימה תחומה לקטגוריה, לא לאדם. wide לא
+// זמין כאן בכוונה כדי שהמועמד היחיד שנשאר יהיה narrow, ללא תלות בשובר-שוויון.
+const qlShiftOpen = {
+  id: "ql-open", date: dates[2], label: "משמרת בלי קטגוריה", type: "day",
+  startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: [],
+};
+const qlShifts = [qlShiftA, qlShiftB, qlShiftUnfilled, qlShiftOpen];
+const qlShiftById = new Map(qlShifts.map((s) => [s.id, s]));
+
+const qlAvailability = {};
+for (const g of qlGuards) {
+  for (const s of qlShifts) qlAvailability[`${g.id}-${s.id}`] = { status: "available" };
+}
+qlAvailability[`${qlGuardWide.id}-${qlShiftOpen.id}`] = { status: "unavailable" };
+qlAvailability[`${qlGuardWide.id}-${qlShiftUnfilled.id}`] = { status: "unavailable" };
+
+const qlResult = autoAssign({ shifts: qlShifts, guards: qlGuards, availability: qlAvailability });
+
+// Test 1 — השומר המצומצם לא מופיע באף רשומת שיבוץ של משמרת מהקטגוריה
+// שהוא לא כשיר לה, על פני כל התוצאה (לא רק בדיקה נקודתית).
+const qlNarrowInExcluded = qlResult.assignments.some(
+  (a) => a.guardId === qlGuardNarrow.id && qlShiftById.get(a.shiftId)?.category === "סיור"
+);
+check("QUAL-04 · השומר המצומצם לא מופיע באף רשומת שיבוץ של משמרת מקטגוריית 'סיור'",
+  !qlNarrowInExcluded, JSON.stringify(qlResult.assignments));
+
+// Test 2 — אותו שומר כן משובץ למשמרת בלי קטגוריה — החסימה תחומה לקטגוריה,
+// לא לאדם.
+check("QUAL-04 · אותו שומר מצומצם כן משובץ למשמרת בלי קטגוריה כלל",
+  (qlResult.byShift[qlShiftOpen.id] || []).includes(qlGuardNarrow.id),
+  JSON.stringify(qlResult.byShift[qlShiftOpen.id]));
+
+// Test 3+4 — המשמרת הבלתי-ניתנת-למילוי נושאת חוסם code='unqualified' ששם
+// את השומר המצומצם — מוכיח שהמועמד הגיע לבדיקה ולא סונן לפניה (Pitfall 6).
+const qlUnfilledEntry = qlResult.unfilled.find((u) => u.shiftId === qlShiftUnfilled.id);
+const qlUnqualifiedBlocker = qlUnfilledEntry?.blockers?.find((b) => b.code === "unqualified");
+check("QUAL-04 · המשמרת החסומה-כשירות נשארת unfilled עם חוסם code='unqualified'",
+  Boolean(qlUnqualifiedBlocker) && typeof qlUnqualifiedBlocker.reason === "string" && qlUnqualifiedBlocker.reason.length > 0,
+  JSON.stringify(qlUnfilledEntry));
+check("QUAL-04 · חוסם ה-unqualified נושא את guardId של השומר המצומצם עצמו",
+  qlUnqualifiedBlocker?.guardId === qlGuardNarrow.id, JSON.stringify(qlUnqualifiedBlocker));
+
+// Test 5 — ריצת ביקורת: אותו פיקסצ'ר בדיוק, בלי הרשימה המצמצמת (עותק, לא
+// מוטציה, כדפוס הקובץ בשורות 609-615/867), ממלאת את המשמרת שהייתה ריקה —
+// מוכיח שהכשירות היא שחסמה, לא הזמינות או תקרה כלשהי.
+const qlGuardsUnrestricted = qlGuards.map((g) =>
+  g.id === qlGuardNarrow.id ? { id: g.id, name: g.name } : g
+);
+const qlControlResult = autoAssign({ shifts: qlShifts, guards: qlGuardsUnrestricted, availability: qlAvailability });
+check("QUAL-04 · ריצת ביקורת בלי הרשימה המצמצמת ממלאת את המשמרת שהייתה unfilled",
+  (qlControlResult.byShift[qlShiftUnfilled.id] || []).includes(qlGuardNarrow.id),
+  JSON.stringify(qlControlResult.byShift[qlShiftUnfilled.id]));
+
+// Test 6 — checkAssignment (הכניסה שכל מסכי ההחלפה משתמשים בה) חוסם את
+// אותו זוג עם code='unqualified' ומאשר את הזוג הבלתי-מקוטלג.
+const qlCheckExcluded = checkAssignment({
+  guard: qlGuardNarrow, shift: qlShiftA, shifts: [], availability: {},
+});
+check("QUAL-04 · checkAssignment חוסם את השומר המצומצם למשמרת מקטגוריה שהוא לא כשיר לה, code='unqualified'",
+  qlCheckExcluded.ok === false && qlCheckExcluded.code === "unqualified", JSON.stringify(qlCheckExcluded));
+const qlCheckOpen = checkAssignment({
+  guard: qlGuardNarrow, shift: qlShiftOpen, shifts: [], availability: {},
+});
+check("QUAL-04 · checkAssignment מאשר את אותו שומר למשמרת בלי קטגוריה",
+  qlCheckOpen.ok === true, JSON.stringify(qlCheckOpen));
+
+// Test 7 — מעבר האיזון לא יכול לבטל את החסימה. שומר אחד מחזיק משמרת
+// מהקטגוריה החסומה (דרך המילוי הרגיל — לא נעולה, keepExisting=true כאן לא
+// נוגע לה כי היא לא הגיעה עם assignedGuards מראש), שני מוגבל וריק לגמרי —
+// הכי קל, ולכן מועמד יחיד למעבר. אם מעבר האיזון היה מתעלם מכשירות, השומר
+// המוגבל היה מקבל אותה כי הוא הכי קל.
+const qlBalHeavy = { id: "ql-bal-heavy", name: "כבד" };
+const qlBalLight = { id: "ql-bal-light", name: "קל ומוגבל", qualifiedCategories: ["מטבח"] };
+const qlBalShift = {
+  id: "ql-bal-shift", date: dates[0], label: "משמרת לילה", type: "night", category: "סיור",
+  startTime: "19:00", endTime: "07:00", requiredGuards: 1, assignedGuards: [],
+};
+const qlBalAvailability = {
+  [`${qlBalHeavy.id}-${qlBalShift.id}`]: { status: "available" },
+  [`${qlBalLight.id}-${qlBalShift.id}`]: { status: "available" },
+};
+const qlBalResult = autoAssign({
+  shifts: [qlBalShift], guards: [qlBalHeavy, qlBalLight], availability: qlBalAvailability, keepExisting: true,
+});
+const qlBalLogEntry = qlBalResult.log.find((l) => l.step === "balance");
+const qlBalMovedLightToExcluded = (qlBalLogEntry?.moves || []).some(
+  (m) => m.shiftId === qlBalShift.id && m.to === qlBalLight.name
+);
+check("QUAL-04 · מעבר האיזון לא מזיז את השומר המצומצם למשמרת מהקטגוריה שהוא לא כשיר לה",
+  !(qlBalResult.byShift[qlBalShift.id] || []).includes(qlBalLight.id) && !qlBalMovedLightToExcluded,
+  JSON.stringify({ byShift: qlBalResult.byShift, balanceLog: qlBalLogEntry }));
+
+// Test 8 — הפיקסצ'ר המקורי, בלי שום נתון כשירות (guards ו-shifts בראש
+// הקובץ), לא זז מהתוצאה שכבר הוכחה מעליו — רגרסיה כאן משויכת לכשירות ולא
+// לבדיקה אחרת שלא קשורה.
+check("QUAL-02 · הפיקסצ'ר המקורי (בלי qualifiedCategories/category כלל) עדיין מכסה לפחות 90",
+  result.summary.coverage >= 90, String(result.summary.coverage));
+
+// Test 9 — דטרמיניזם: שתי הרצות של הפיקסצ'ר החדש מייצרות אותו byShift ואותו
+// fairnessScore בייט-לבייט.
+const qlResultAgain = autoAssign({ shifts: qlShifts, guards: qlGuards, availability: qlAvailability });
+check("QUAL-04 · דטרמיניסטי — שתי הרצות של פיקסצ'ר הכשירות מייצרות אותו byShift ואותו fairnessScore",
+  JSON.stringify(qlResult.byShift) === JSON.stringify(qlResultAgain.byShift) &&
+    qlResult.summary.fairnessScore === qlResultAgain.summary.fairnessScore,
+  JSON.stringify({ a: qlResult.byShift, b: qlResultAgain.byShift }));
+
+// Test 10 (D-01) — taskAsShiftShape נושאת category — הגשר מפאזה 2 לא מפיל
+// את השדה שכשירות נשפטת עליו.
+const qlTaskWithCategory = {
+  id: "ql-task-1", title: "משימה", category: "מטבח",
+  startDate: dates[0], dueDate: dates[0], startTime: "08:00", endTime: "10:00", assignees: ["ql-narrow"],
+};
+const qlTaskNoCategory = {
+  id: "ql-task-2", title: "משימה",
+  startDate: dates[0], dueDate: dates[0], startTime: "08:00", endTime: "10:00", assignees: ["ql-narrow"],
+};
+check("D-01 · taskAsShiftShape על משימה עם קטגוריה מחזירה אותה בשדה category",
+  taskAsShiftShape(qlTaskWithCategory)?.category === "מטבח", JSON.stringify(taskAsShiftShape(qlTaskWithCategory)));
+check("D-01 · taskAsShiftShape על משימה בלי קטגוריה מחזירה מחרוזת ריקה, לא undefined/null",
+  taskAsShiftShape(qlTaskNoCategory)?.category === "", JSON.stringify(taskAsShiftShape(qlTaskNoCategory)));
+const qlMerged = withEngineTasks([], [qlTaskWithCategory]);
+check("D-01 · withEngineTasks משמר את category על פני המיזוג",
+  qlMerged[0]?.category === "מטבח", JSON.stringify(qlMerged));
+
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);
