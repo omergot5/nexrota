@@ -10,7 +10,7 @@ import {
   availabilityDeadline, dayName, formatDateHe, fromISODate, isSingleDayTask, isTaskEngineEligible,
   rangeLabelHe, shiftHours, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
 } from "../../lib/dates.js";
-import { availStatus, checkAssignment } from "../../lib/autoAssign.js";
+import { availStatus, checkAssignment, isQualified } from "../../lib/autoAssign.js";
 import { PROFILES, subscribeTerms, t, termProfile } from "../../lib/terms.js";
 import { compatIndex, explainConflict, findConflicts } from "../../lib/conflicts.js";
 import { fairnessHint, fairnessPlan } from "../../lib/fairness.js";
@@ -1034,9 +1034,21 @@ export function AssignView({
                       {shift.startTime}–{shift.endTime}
                     </span>
                   </h3>
-                  <p className="text-sm opacity-90 mt-0.5 flex items-center gap-1">
+                  <p className="text-sm opacity-90 mt-0.5 flex items-center gap-1 flex-wrap">
                     <Icon name="map-pin" size={13} />
                     {shift.location} · נדרשים {shift.requiredGuards}
+                    {/* מוצג רק כשיש קטגוריה — משמרת בלי קטגוריה לא מקבלת
+                      * תג "אין קטגוריה" שמוסיף רעש למקרה הרגיל (D-03).
+                      * שבב ולא Badge: Badge צובע מטון קבוע, ואילו כאן
+                      * הכותרת יושבת על צבע המשמרת עצמו וצריכה לרשת את
+                      * הדיו הקריא שכבר חושב לה — אותו טיפול שהמונה הכהה
+                      * מימין כבר מקבל. */}
+                    {shift.category && (
+                      <span className="inline-flex items-center gap-1 bg-black/20 px-2 py-0.5 rounded-lg text-xs font-bold">
+                        <Icon name="briefcase" size={11} />
+                        {shift.category}
+                      </span>
+                    )}
                   </p>
                 </div>
                 <div className="bg-black/20 px-3 py-1.5 rounded-xl font-bold text-sm" data-numeric>
@@ -1047,72 +1059,135 @@ export function AssignView({
                 {guards.length === 0 ? (
                   <p className="text-muted text-sm text-center py-4">אין שומרים בצוות</p>
                 ) : (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
-                    {guards.map((g) => {
-                      const status = availStatus(availability, g.id, shift.id);
-                      const meta = AVAIL[status];
-                      const assigned = shift.assignedGuards.includes(g.id);
-                      const raw = availability[`${g.id}-${shift.id}`];
-                      const comment = typeof raw === "object" ? raw?.comment : "";
-                      return (
-                        <button
-                          key={g.id}
-                          onClick={() => actions.toggleAssignment(shift.id, g.id)}
-                          disabled={busy}
-                          aria-pressed={assigned}
-                          className={`p-2.5 rounded-xl ring-2 ring-inset text-center cursor-pointer
-                            transition-[background,box-shadow,transform] duration-200 active:scale-[0.97]
-                            disabled:opacity-60 disabled:cursor-wait ${
-                              assigned
-                                ? "ring-brand bg-brand/15"
-                                : status === "available"
-                                ? "ring-accent/30 bg-accent/10 hover:ring-accent/60"
-                                : status === "unavailable"
-                                ? "ring-danger/20 bg-danger/5 opacity-60"
-                                : status === "maybe"
-                                ? "ring-warn/30 bg-warn/10"
-                                : "ring-hairline bg-surface-sunken hover:ring-hairline-strong"
-                            }`}
-                          title={comment ? `הערה: ${comment}` : undefined}
-                        >
-                          <div className="flex justify-center mb-1 relative">
-                            <Avatar id={g.id} name={g.name} size={30} />
-                            {/* התג יושב על התמונה ולא בשורה נפרדת: הרשת
-                              * צפופה, ושורה רביעית הייתה מרסקת אותה. */}
-                            {(() => {
-                              const h = hintOf(g.id);
-                              if (!h) return null;
-                              return (
+                  <>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+                      {guards.map((g) => {
+                        const status = availStatus(availability, g.id, shift.id);
+                        const meta = AVAIL[status];
+                        const assigned = shift.assignedGuards.includes(g.id);
+                        const raw = availability[`${g.id}-${shift.id}`];
+                        const comment = typeof raw === "object" ? raw?.comment : "";
+                        // אותה isQualified בדיוק שהמנוע קורא (checkHardConstraints,
+                        // 03-01) — מה שהכפתור מציג ומה שהקליק עושה לא יכולים
+                        // לחלוק, אחרת המסך משקר (T-03-13).
+                        const qualified = isQualified(g, shift.category);
+                        const ownCategories = Array.isArray(g.qualifiedCategories)
+                          ? g.qualifiedCategories
+                          : null;
+                        // אותו ניסוח בדיוק שפאזה 03-01 נעל ל-checkQualification,
+                        // כדי ששתי הבדיקות (מנוע ומסך) לעולם לא יסתרו זו את זו.
+                        const refusal = !qualified
+                          ? `לא מוגדר/ת כשיר/ה לקטגוריית "${shift.category}"`
+                          : "";
+                        const titleParts = [
+                          comment ? `הערה: ${comment}` : "",
+                          ownCategories && ownCategories.length
+                            ? `כשיר/ה ל: ${ownCategories.join(", ")}`
+                            : "",
+                          refusal,
+                        ].filter(Boolean);
+                        const title = titleParts.length ? titleParts.join(" · ") : undefined;
+                        return (
+                          <button
+                            key={g.id}
+                            onClick={() => actions.toggleAssignment(shift.id, g.id)}
+                            disabled={busy || !qualified}
+                            aria-pressed={assigned}
+                            className={`p-2.5 rounded-xl ring-2 ring-inset text-center cursor-pointer
+                              transition-[background,box-shadow,transform] duration-200 active:scale-[0.97]
+                              disabled:opacity-60 disabled:cursor-not-allowed ${
+                                assigned
+                                  ? "ring-brand bg-brand/15"
+                                  : !qualified
+                                  ? "ring-hairline-strong bg-surface-sunken"
+                                  : status === "available"
+                                  ? "ring-accent/30 bg-accent/10 hover:ring-accent/60"
+                                  : status === "unavailable"
+                                  ? "ring-danger/20 bg-danger/5 opacity-60"
+                                  : status === "maybe"
+                                  ? "ring-warn/30 bg-warn/10"
+                                  : "ring-hairline bg-surface-sunken hover:ring-hairline-strong"
+                              }`}
+                            title={title}
+                          >
+                            <div className="flex justify-center mb-1 relative">
+                              <Avatar id={g.id} name={g.name} size={30} />
+                              {/* התג יושב על התמונה ולא בשורה נפרדת: הרשת
+                                * צפופה, ושורה רביעית הייתה מרסקת אותה. */}
+                              {(() => {
+                                const h = hintOf(g.id);
+                                if (!h) return null;
+                                return (
+                                  <span
+                                    className={`absolute -top-1 -left-1.5 min-w-[18px] h-[18px] px-1
+                                      rounded-full text-[10px] font-bold flex items-center justify-center
+                                      ring-2 ring-surface ${
+                                        h.level === "under"
+                                          ? "bg-brand text-on-brand"
+                                          : "bg-warn text-on-brand"
+                                      }`}
+                                    title={h.text}
+                                    data-numeric
+                                  >
+                                    {/* מספר ולא סימן קריאה: "!" אומר שמשהו לא
+                                      * בסדר, ולא כמה — ומנהל צריך לדעת כמה. */}
+                                    {h.level === "under" ? "+" : "−"}
+                                    {Math.abs(fairness.rows.find((r) => r.id === g.id)?.needs || 0)}
+                                  </span>
+                                );
+                              })()}
+                              {/* מנעול בפינה הנגדית לתג ההוגנות (שם הימנית-
+                                * עליונה) — כך שהשניים לא מתנגשים על אותו
+                                * אווטאר גם בזום 200% (QUAL-07/08). */}
+                              {!qualified && (
                                 <span
-                                  className={`absolute -top-1 -left-1.5 min-w-[18px] h-[18px] px-1
-                                    rounded-full text-[10px] font-bold flex items-center justify-center
-                                    ring-2 ring-surface ${
-                                      h.level === "under"
-                                        ? "bg-brand text-on-brand"
-                                        : "bg-warn text-on-brand"
-                                    }`}
-                                  title={h.text}
-                                  data-numeric
+                                  className="absolute -top-1 -right-1.5 min-w-[18px] h-[18px] px-1
+                                    rounded-full flex items-center justify-center
+                                    ring-2 ring-surface bg-surface text-muted"
                                 >
-                                  {/* מספר ולא סימן קריאה: "!" אומר שמשהו לא
-                                    * בסדר, ולא כמה — ומנהל צריך לדעת כמה. */}
-                                  {h.level === "under" ? "+" : "−"}
-                                  {Math.abs(fairness.rows.find((r) => r.id === g.id)?.needs || 0)}
+                                  <Icon name="lock" size={11} strokeWidth={2.5} />
                                 </span>
-                              );
-                            })()}
-                          </div>
-                          <div className="text-[11px] font-semibold text-content truncate">
-                            {g.name.split(" ")[0]}
-                          </div>
-                          <div className="text-[10px] text-muted flex items-center justify-center gap-0.5">
-                            {assigned && <Icon name="check" size={10} strokeWidth={3} className="text-brand" />}
-                            {assigned ? "משובץ" : meta.label}
-                          </div>
-                        </button>
+                              )}
+                            </div>
+                            <div className="text-[11px] font-semibold text-content truncate">
+                              {g.name.split(" ")[0]}
+                            </div>
+                            <div className="text-[10px] text-muted flex items-center justify-center gap-0.5">
+                              {/* וי או מנעול, לא רק צבע — אותו כלל שכתוב
+                                * במפורש במקומות אחרים בקובץ הזה. הטקסט
+                                * מוחלף בלי תנאי, לא רק הרקע. */}
+                              {!qualified ? (
+                                "לא כשיר/ה"
+                              ) : (
+                                <>
+                                  {assigned && (
+                                    <Icon name="check" size={10} strokeWidth={3} className="text-brand" />
+                                  )}
+                                  {assigned ? "משובץ" : meta.label}
+                                </>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {/* שורת החסימה: עובדה על המשמרת, לא הודעת שגיאה — המנהל
+                      * לא עשה כלום לא בסדר. אותו ניסוח בדיוק ש-explainUnfilled
+                      * נועל ל-code: "unqualified" (03-01), כדי ששתי המסכים
+                      * לא יגידו את אותו דבר בשתי מילים שונות. */}
+                    {(() => {
+                      const blockedCount = guards.filter(
+                        (g) => !isQualified(g, shift.category)
+                      ).length;
+                      if (!blockedCount) return null;
+                      return (
+                        <p className="text-xs text-muted mt-3 flex items-center gap-1.5">
+                          <Icon name="lock" size={13} />
+                          {blockedCount} לא כשירים לתפקיד "{shift.category}"
+                        </p>
                       );
-                    })}
-                  </div>
+                    })()}
+                  </>
                 )}
               </div>
             </Card>
