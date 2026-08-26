@@ -22,7 +22,7 @@ import { chartTheme } from "../src/design/chartTheme.js";
 // api.js imports the Supabase client at module load — that construction is
 // synchronous and makes no network call, so this import stays offline like
 // every other module this script imports (UNIF-01, Phase 2 Plan 02-02 Task 2).
-import { taskColumns, taskFromRow } from "../src/lib/api.js";
+import { taskColumns, taskFromRow, profileFromRow, shiftFromRow, shiftToRow } from "../src/lib/api.js";
 
 let failures = 0;
 const check = (label, cond, extra = "") => {
@@ -816,6 +816,103 @@ check("QUAL-01 · isQualified לא ממוטטת את רשימת הכשירות �
   beforeSerialized === afterSerialized, JSON.stringify({ before: beforeSerialized, after: afterSerialized }));
 check("QUAL-01 · isQualified מחזירה תשובה זהה בקריאה חוזרת על אותו קלט",
   firstAnswer === secondAnswer && firstAnswer === false);
+
+// ============================================================
+console.log("\napi.js — כשירות ותצוגה חוצות את נקודת החנק (QUAL-01, QUAL-03, D-01)\n");
+// ============================================================
+
+// QUAL-01 · profileFromRow, כיוון קריאה — רשימה אמיתית עוברת כמערך עם אותם
+// חברים, באותו סדר. בלי זה מסך העריכה (03-04) לא יכול להראות מה כבר נבחר.
+const profileTwoCategories = profileFromRow({
+  id: "p1", user_id: null, full_name: "בדיקה", role: "guard", team_code: "T1",
+  qualified_categories: ["מטבח", "סיור"],
+});
+check("QUAL-01 · profileFromRow על רשימה אמיתית מחזיר מערך עם אותם שני חברים באותו סדר",
+  Array.isArray(profileTwoCategories.qualifiedCategories) &&
+    profileTwoCategories.qualifiedCategories.length === 2 &&
+    profileTwoCategories.qualifiedCategories[0] === "מטבח" &&
+    profileTwoCategories.qualifiedCategories[1] === "סיור",
+  JSON.stringify(profileTwoCategories.qualifiedCategories));
+
+// QUAL-01 · null ועמודה חסרה לגמרי (שורה שקדמה למיגרציה) שניהם מופים ל-null
+// — היעדר עמודה והיעדר ערך הם אותו מצב, לא שני מצבים שונים.
+const profileNullList = profileFromRow({
+  id: "p2", user_id: null, full_name: "בדיקה", role: "guard", team_code: "T1",
+  qualified_categories: null,
+});
+check("QUAL-01 · profileFromRow על qualified_categories: null מחזיר null",
+  profileNullList.qualifiedCategories === null);
+
+const profilePreMigration = {
+  id: "p3", user_id: null, full_name: "בדיקה", role: "guard", team_code: "T1",
+};
+const profileMappedPreMigration = profileFromRow(profilePreMigration);
+check("QUAL-01 · profileFromRow על שורה שקדמה למיגרציה (העמודה חסרה לגמרי) מחזיר null",
+  profileMappedPreMigration.qualifiedCategories === null);
+
+// QUAL-01 · ערך מעוות בעמודה (מחרוזת בודדת, מספר, אובייקט) — לא מערך אמיתי,
+// אז נופל ל-null במקום להדליף ערך שהמנוע לא יודע לעבוד איתו (`.includes`
+// על מחרוזת בודדת היה עובד "במקרה" אבל על אובייקט/מספר היה זורק).
+for (const malformed of ["מטבח", 42, { a: 1 }]) {
+  const mappedMalformed = profileFromRow({
+    id: "p4", user_id: null, full_name: "בדיקה", role: "guard", team_code: "T1",
+    qualified_categories: malformed,
+  });
+  check(`QUAL-01 · profileFromRow על qualified_categories מעוות (${JSON.stringify(malformed)}) מחזיר null ולא מדליף את הערך`,
+    mappedMalformed.qualifiedCategories === null);
+}
+
+// QUAL-02 · הבדיקה שחוצה שכבה: אדם שמופה משורה בלי רשימה כשיר לקטגוריה
+// שרירותית כשמועבר ישירות ל-isQualified — מוכיחה שהמוסכמה של המפה
+// (`null`) והכלל של המנוע (default-allow) מסכימים זה עם זה, לא רק שכל אחד
+// נכון בנפרד מול ההנחה שלו.
+check("QUAL-02 · פרופיל שמופה משורה בלי רשימה כשיר לקטגוריה שרירותית דרך isQualified (המפה והמנוע מסכימים)",
+  isQualified(profileMappedPreMigration, "קטגוריה כלשהי שהצוות מעולם לא השתמש בה") === true);
+
+// QUAL-03 · shiftFromRow, כיוון קריאה — קטגוריה קיימת עוברת כמחרוזת; קטגוריה
+// חסרה (`null`) נופלת למחרוזת ריקה, בדיוק כמו ש-taskFromRow כבר עושה לאותו
+// שדה על משימה (D-01) — אותה מוסכמת-חוסר לאותה קטגוריה, על שתי ישויות.
+const shiftRowBase = {
+  id: "s1", date: mon, label: "בוקר", start_time: "07:00:00", end_time: "19:00:00", type: "morning",
+};
+const shiftWithCategory = shiftFromRow({ ...shiftRowBase, category: "מטבח" });
+check("QUAL-03 · shiftFromRow על שורה עם קטגוריה מחזיר את אותה מחרוזת",
+  shiftWithCategory.category === "מטבח");
+const shiftNullCategory = shiftFromRow({ ...shiftRowBase, category: null });
+check("QUAL-03 · shiftFromRow על שורה עם category: null מחזיר מחרוזת ריקה (תואם ל-taskFromRow, D-01)",
+  shiftNullCategory.category === "");
+
+// QUAL-01 · המיפוי החדש לא הפיל אף שדה קיים — כל המפתחות שהיו לפני עדיין שם.
+const preExistingShiftKeys = [
+  "id", "date", "label", "startTime", "endTime", "location", "requiredGuards",
+  "type", "color", "published", "assignedGuards", "assignmentMeta",
+];
+const shiftKeysNow = Object.keys(shiftWithCategory);
+check("QUAL-01 · shiftFromRow עדיין מחזיר את כל השדות שהיו לפני שהוספנו category",
+  preExistingShiftKeys.every((k) => shiftKeysNow.includes(k)),
+  JSON.stringify(shiftKeysNow));
+
+// QUAL-03 · shiftToRow, כיוון כתיבה — משמרת בלי קטגוריה מפיקה מפתח נוכח עם
+// ערך null מפורש, לא מפתח מושמט: מפתח מושמט משאיר בשורה ערך ישן שאף מסך
+// לא יראה יותר — ומכאן קטגוריה ש"הוסרה" בעריכה הייתה ממשיכה לחסום אנשים.
+const shiftAppNoCategory = { id: "s1", date: mon, label: "בוקר", startTime: "07:00", endTime: "19:00" };
+const shiftRowNoCategory = shiftToRow(shiftAppNoCategory, "T1");
+check("QUAL-03 · shiftToRow על משמרת בלי קטגוריה מפיק מפתח category נוכח עם ערך null (לא השמטה)",
+  "category" in shiftRowNoCategory && shiftRowNoCategory.category === null,
+  JSON.stringify(shiftRowNoCategory));
+
+// QUAL-03 · אין fallback: בניגוד ל-location (שמקבל "כניסה ראשית" כברירת
+// מחדל), קטגוריה שלא הוקלדה חייבת להישאר null ולא מחרוזת placeholder —
+// fallback כאן היה נותן למשמרת קטגוריה שאף אחד לא בחר, ומגביל אנשים נגדה.
+check("QUAL-03 · shiftToRow לא מספק fallback string לקטגוריה חסרה — הערך הוא null ולא מחרוזת ריקה או placeholder",
+  shiftRowNoCategory.category !== "" && shiftRowNoCategory.category === null);
+
+// QUAL-03 · round trip — מיפוי חזרה של משמרת שמופתה מ-shiftFromRow משחזר
+// בדיוק את ערך עמודת הקטגוריה שממנה היא הגיעה, כך שעריכת משמרת לא יכולה
+// להפיל את הקטגוריה שלה בשקט.
+const shiftRoundTrip = shiftToRow(shiftWithCategory, "T1");
+check("QUAL-03 · shiftToRow על אובייקט שמופה מ-shiftFromRow משחזר את עמודת הקטגוריה בדיוק (round trip)",
+  shiftRoundTrip.category === "מטבח");
 
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);

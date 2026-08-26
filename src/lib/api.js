@@ -25,6 +25,10 @@ export const shiftFromRow = (row) => ({
   type: row.type || "custom",
   color: shiftTone(row.color, row.type),
   published: Boolean(row.published),
+  // סוג העבודה (Phase 3, QUAL-03) — נפרד מ-`type` (שעת היום). `""` ולא
+  // `null` כשחסר, בדיוק כמו ש-`taskFromRow` כבר נוהג באותו שדה על משימה
+  // (D-01): אחת מתאר את אותה קטגוריה בשתי ישויות, ולכן אותה מוסכמת-חוסר.
+  category: row.category || "",
   assignedGuards: (row.gs_assignments || []).map((a) => a.guard_id),
   assignmentMeta: Object.fromEntries(
     (row.gs_assignments || []).map((a) => [a.guard_id, { source: a.source, score: a.score, reason: a.reason }])
@@ -43,6 +47,10 @@ export const shiftToRow = (shift, teamCode) => ({
   type: shift.type || "custom",
   color: shiftTone(shift.color, shift.type),
   published: Boolean(shift.published),
+  // מפתח נוכח עם `null` מפורש, לא הושמט — בדיוק כמו `taskColumns` עושה
+  // לאותו שדה על משימה. בלי נפילה ל-fallback: קטגוריה היא הגבלה, ומשמרת
+  // שאף אחד לא הקליד לה קטגוריה חייבת להישאר בלי הגבלה לכולם (D-03).
+  category: shift.category || null,
 });
 
 export const profileFromRow = (row) => ({
@@ -54,6 +62,12 @@ export const profileFromRow = (row) => ({
   teamCode: row.team_code,
   isSupervisor: row.role === "supervisor",
   deadlineExempt: row.deadline_exempt === true,
+  // רשימת הקטגוריות שהאדם כשיר להן (Phase 3, QUAL-01/QUAL-02). `null`
+  // כברירת מחדל וגם כתוצאה של כל ערך שאינו מערך אמיתי — עמודה חסרה, `null`,
+  // מחרוזת בודדת או אובייקט תועים כולם ל"בלי הגבלה" במקום לזרוק שגיאה עמוק
+  // בתוך המנוע. בדיקת מערך אמיתית (`Array.isArray`) ולא בדיקת אמת-שקר,
+  // כי עמודת jsonb יכולה להכיל כל ערך JSON.
+  qualifiedCategories: Array.isArray(row.qualified_categories) ? row.qualified_categories : null,
 });
 
 export const availKey = (guardId, shiftId) => `${guardId}-${shiftId}`;
@@ -460,6 +474,33 @@ export async function setGuardExempt(profileId, exempt) {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * כותב את רשימת הכשירות של אדם אחד (Phase 3, QUAL-01, D-04).
+ *
+ * מנרמלת קודם: ארגומנט שאינו מערך, או מערך ריק, הופך ל-`null`. זה D-03
+ * נאכף בדלת היחידה לעמודה — מבטיח שבסיס הנתונים לעולם לא יחזיק גם `null`
+ * וגם מערך ריק כשני איות לאותו מצב, מה ששאילתה עתידית או מיגרציה עתידית
+ * היו צריכים לדעת עליו. זה נראה כמו רעש הגנתי והוא בעצם האינווריאנט.
+ *
+ * `.select()` ולא עדכון עיוור: כש-RLS מסננת את כל השורות, Supabase מחזירה
+ * `error: null` ומערך ריק — כלומר "הצלחה" שלא כתבה כלום. בלי הבדיקה הזאת
+ * מנהל שצמצם כשירות היה רואה את הבחירה החדשה, הרענון הבא היה מחזיר את
+ * הישנה, ואף אחד לא היה יודע למה. שורה שחזרה = שורה שנכתבה — אותה מוסכמה
+ * ש-`updateTeamSettings` כבר נוהג בה.
+ */
+export async function setGuardQualifications(profileId, categories) {
+  const normalized = Array.isArray(categories) && categories.length > 0 ? categories : null;
+  const { data, error } = await supabase
+    .from("gs_profiles")
+    .update({ qualified_categories: normalized })
+    .eq("id", profileId)
+    .select("id");
+  if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה לשנות את הכשירות של האדם הזה — התחבר מחדש ונסה שוב");
+  }
+}
+
 export async function removeGuard(profileId) {
   const { error } = await supabase.from("gs_profiles").delete().eq("id", profileId);
   if (error) throw new Error(error.message);
@@ -511,7 +552,7 @@ export async function decideSwap(swap, status) {
  * מפורשות מאשר לשמור בשקט משימה בלי השדה החדש ולתת למשתמש לגלות לבד.
  */
 const MIGRATION_HINT =
-  "בסיס הנתונים לא מעודכן. הרץ את המיגרציות בתיקיית supabase/migrations — האחרונה היא 0005_task_hours.sql — ואז נסה שוב.";
+  "בסיס הנתונים לא מעודכן. הרץ את המיגרציות בתיקיית supabase/migrations — האחרונה היא 0006_qualification.sql — ואז נסה שוב.";
 
 // Exported (like shiftToRow) so the round-trip mappers can be asserted
 // directly from scripts/verify-planning.mjs (UNIF-01 Tests W/X) — the same

@@ -34,11 +34,17 @@
 
 ### `gs_profiles` — אנשים
 `id`, `user_id` (nullable — אדם יכול להתקיים בסידור בלי חשבון), `full_name`,
-`phone`, `role` (`supervisor` \| `guard`), `team_code`, `deadline_exempt`.
+`phone`, `role` (`supervisor` \| `guard`), `team_code`, `deadline_exempt`,
+`qualified_categories`.
+
+- `qualified_categories` — `jsonb`, nullable, בלי ברירת מחדל (Phase 3,
+  `0006_qualification.sql`, QUAL-01/QUAL-02). רשימת הקטגוריות שהאדם כשיר
+  להן. ריק או `null` פירושם כשיר לכול — אף שורה קיימת לפני המיגרציה לא
+  מקבלת ערך בדיעבד.
 
 ### `gs_shifts` — משמרות
 `id`, `team_code`, `date`, `label`, `start_time`, `end_time`, `location`,
-`required_guards`, `type`, `color`, `published`.
+`required_guards`, `type`, `color`, `published`, `category`.
 
 - `type` ∈ `morning` \| `afternoon` \| `evening` \| `night` \| `custom` — מזין את
   משקלי הנטל במנוע ואת סולם הצבעים.
@@ -46,6 +52,9 @@
   ערכי ברירת מחדל ישנים מהתקופה שלפני המיתוג ממופים מחדש **בקריאה**
   (`src/design/shiftPalette.js`), בלי מיגרציה.
 - `published` — משמרת שלא פורסמה אינה נראית למשתתפים.
+- `category` — `text`, nullable, בלי ברירת מחדל (Phase 3, `0006_qualification.sql`,
+  QUAL-03). סוג העבודה, נפרד מ-`type` (שעת היום). משמרת בלי קטגוריה היא
+  בלי הגבלה לכולם.
 
 ### `gs_availability` — הגשות זמינות
 מפתח מורכב `(shift_id, guard_id)`. `status` ∈ `preferred` \| `available` \|
@@ -82,6 +91,10 @@
 תווית שמנהל ממציא תוך כדי עבודה ("שמירות", "מטבח", "סיור"), לא ישות שמישהו
 מתחזק. אינדקס `gs_tasks_team_category_idx` על `(team_code, category)`.
 
+**מ-Phase 3 ואילך, עמודת `category` הזאת היא גם שדה הכשירות של המשימה**
+(D-02) — אין עמודה שנייה על טבלת המשימות לצורך כשירות. אותה עמודה משרתת
+גם את תיקיית התצוגה וגם את הבדיקה שקובעת מי מוסמך לבצע את המשימה.
+
 - `start_time` / `end_time` — `time`, שתיהן nullable ובלי ברירת מחדל (Phase 2,
   UNIF-01). שעות ריקות פירושן שהמשימה נשארת מחוץ למנוע — קפואה — ולעולם לא
   ממולאות לאחור: כל שורה שקיימת מלפני `0005_task_hours.sql` נשארת עם שתי
@@ -110,6 +123,7 @@
 | `0003_workspace_mode.sql` | הוסיף `gs_teams.mode` עם check constraint |
 | `0004_task_templates_and_compatibility.sql` | שתי הטבלאות החדשות + RLS + זרעים + `override_note` |
 | `0005_task_hours.sql` | הוסיף `gs_tasks.start_time`/`end_time` (`time`, nullable, בלי ברירת מחדל, בלי backfill — Phase 2, UNIF-01/UNIF-04) |
+| `0006_qualification.sql` | הוסיף `gs_profiles.qualified_categories` (`jsonb`, nullable) ו-`gs_shifts.category` (`text`, nullable) — שתיהן בלי ברירת מחדל ובלי backfill (Phase 3, QUAL-01/QUAL-02/QUAL-03) |
 
 בנוסף הורצה `brand_shift_color_default` — שינוי ברירת המחדל של `gs_shifts.color`
 מ-`#3B82F6` ל-`#7FC0AE`.

@@ -22,6 +22,10 @@ import { supabase } from "../lib/supabaseClient.js";
 import * as api from "../lib/api.js";
 import { seedDemoTeam } from "../lib/demoData.js";
 import { setTermProfile } from "../lib/terms.js";
+// שכבת ה-state הראשונה שנוגעת במנוע (Phase 3, QUAL-04 מסלול 4): שיבוץ ידני
+// מבצע כתיבה ישירה, ולכן חייב לשאול את אותה שאלה שהמנוע שואל לפני שהוא
+// כותב — בדיוק כמו ששני מסכי ההחלפה כבר עושים לפני אישור.
+import { checkQualification } from "../lib/autoAssign.js";
 
 const EMPTY = {
   team: null,
@@ -517,7 +521,26 @@ export function useGuardian() {
 
       toggleAssignment: (shiftId, guardId) => {
         const shift = dataRef.current.shifts.find((s) => s.id === shiftId);
+        const guard = dataRef.current.guards.find((g) => g.id === guardId);
         const assigned = Boolean(shift?.assignedGuards.includes(guardId));
+
+        // חסימת כשירות בלבד (P-01) — ולא יותר מזה. המסלול הזה לא אכף שום
+        // אילוץ קשיח לפני היום: לא מנוחה, לא רצף שעות, לא תקרה שבועית ואפילו
+        // לא זמינות. זה פער אמיתי ורחב יותר, והוא נשאר פתוח בכוונה — סגירתו
+        // הייתה מתחילה לחסום שיבוצים שאחמ"ש תמיד יכל לעשות ביד (למשל לכסות
+        // חור ב-3 לפנות בוקר שמפר מנוחה כי אין מי שיחליף), וזו שיחת מוצר
+        // בפני עצמה, לא תופעת לוואי של עבודת הכשירות. רק כיוון השיבוץ נבדק:
+        // הסרה אף פעם לא נחסמת, כי מנהל שצמצם כשירות חייב להיות מסוגל להוריד
+        // מהמשמרות שהאדם כבר לא כשיר להן.
+        if (!assigned) {
+          const check = checkQualification({ guard, shift });
+          if (!check.ok) {
+            return run(async () => {
+              throw new Error(check.reason);
+            });
+          }
+        }
+
         return optimistic(
           (d) => ({
             ...d,
@@ -596,6 +619,16 @@ export function useGuardian() {
             members: d.members.map((g) => (g.id === id ? { ...g, deadlineExempt: exempt } : g)),
           }),
           () => api.setGuardExempt(id, exempt)
+        ),
+
+      setGuardQualifications: (id, categories) =>
+        optimistic(
+          (d) => ({
+            ...d,
+            guards: d.guards.map((g) => (g.id === id ? { ...g, qualifiedCategories: categories } : g)),
+            members: d.members.map((g) => (g.id === id ? { ...g, qualifiedCategories: categories } : g)),
+          }),
+          () => api.setGuardQualifications(id, categories)
         ),
 
       createSwap: (payload) =>
