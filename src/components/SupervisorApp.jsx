@@ -238,6 +238,7 @@ export default function SupervisorApp({ state }) {
         templates={taskTemplates}
         compatibility={compatibility}
         mode={team?.mode || "civil"}
+        shifts={shifts}
       />
     ),
     analytics: (

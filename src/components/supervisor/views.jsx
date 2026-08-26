@@ -1552,7 +1552,7 @@ const People = ({ ids, guards, size = 22, max = 4 }) => {
 
 export function TaskMgmt({
   guards, tasks, weekDates, actions, busy,
-  templates = [], compatibility = [], mode = "civil",
+  templates = [], compatibility = [], mode = "civil", shifts = [],
 }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -1616,6 +1616,16 @@ export function TaskMgmt({
   // הופכת את המתג לכפתור "המשך" — וזה בדיוק מה שהוא לא אמור להיות.
   const blocked = conflicts.length > 0 && (!override || !form.overrideNote.trim());
 
+  // שם נפרד מ-`blocked` בכוונה (P-03, D-02): זו לא התנגשות, וכפתור עם
+  // התווית שהתנגשות מייצרת היה מטעה כאן. אין דלת אחורית לחסימה הזאת —
+  // בניגוד ל-`blocked` שלמעלה, שנפתחת עם תיבת "שבץ בכל זאת" ונימוק,
+  // כשירות (QUAL-05) לא ניתנת לעקיפה בשום צורה, לא כאן ולא בשום מקום
+  // אחר במוצר.
+  const unqualifiedAssignees = form.assignees
+    .map((id) => guards.find((g) => g.id === id))
+    .filter((g) => g && !isQualified(g, form.category));
+  const qualBlocked = unqualifiedAssignees.length > 0;
+
   // שדות השעה נראים רק למשימה חד-יומית (D-01) — אותה פונקציה בדיוק שהמנוע
   // עצמו נשען עליה, כדי שלא ייווצר מצב שבו הטופס "רואה" יום אחד והמנוע רואה
   // אחרת. שם נפרד מ-`blocked`: זה לא מתנגשות, וכפתור עם התווית שהתנגשות
@@ -1624,7 +1634,7 @@ export function TaskMgmt({
   const hoursInvalid = showHours && Boolean(form.startTime) !== Boolean(form.endTime);
 
   const save = async () => {
-    if (!form.title.trim() || blocked || hoursInvalid) return;
+    if (!form.title.trim() || blocked || hoursInvalid || qualBlocked) return;
     // חלון הפוך הוא שגיאת הקלדה, לא כוונה — מיישרים אותו במקום לחסום.
     const clean =
       form.startDate && form.dueDate && form.startDate > form.dueDate
@@ -1965,10 +1975,10 @@ export function TaskMgmt({
             <Btn
               onClick={save}
               loading={busy}
-              disabled={!form.title.trim() || blocked || hoursInvalid}
+              disabled={!form.title.trim() || blocked || hoursInvalid || qualBlocked}
               className="flex-1"
             >
-              {blocked ? "יש התנגשות" : "שמור"}
+              {qualBlocked ? "יש חוסר כשירות" : blocked ? "יש התנגשות" : "שמור"}
             </Btn>
             <Btn variant="secondary" onClick={() => setShowForm(false)}>
               ביטול
@@ -2002,13 +2012,14 @@ export function TaskMgmt({
               onChange={field("category")}
               placeholder={UNFILED}
             />
-            {/* datalist ולא select: השמות המוכרים מוצעים, ושם חדש עדיין מותר. */}
+            {/* datalist ולא select: השמות המוכרים מוצעים, ושם חדש עדיין מותר.
+              * `categoryOptions` ולא איחוד מקומי (D-01): קטגוריה שהומצאה
+              * על משמרת חייבת להיות מוצעת כאן, כדי שהטקסונומיה שממנה
+              * מנהל מצמצם כשירות תהיה בדיוק זו שממנה הוא משבץ. */}
             <datalist id="task-folders">
-              {[...new Set([...FOLDERS.map((f) => f.name), ...folders.map((f) => f.name)])].map(
-                (n) => (
-                  <option key={n} value={n} />
-                )
-              )}
+              {categoryOptions(shifts, tasks).map((n) => (
+                <option key={n} value={n} />
+              ))}
             </datalist>
           </Field>
 
@@ -2066,32 +2077,76 @@ export function TaskMgmt({
             <div className="flex flex-wrap gap-2">
               {guards.map((g) => {
                 const on = form.assignees.includes(g.id);
+                // אותה isQualified בדיוק שהמנוע ורשת השיבוץ הידני קוראות
+                // (03-01, 03-03) — כדי שהתמונה כאן והקליק שהיא מתארת לעולם
+                // לא יסתרו זה את זה (D-02, P-03).
+                const qualified = isQualified(g, form.category);
                 return (
                   <button
                     key={g.id}
                     type="button"
                     onClick={() => toggleAssignee(g.id)}
+                    disabled={!qualified}
                     aria-pressed={on}
+                    title={
+                      qualified
+                        ? undefined
+                        : `לא מוגדר/ת כשיר/ה לקטגוריית "${form.category}"`
+                    }
                     className={`flex items-center gap-2 h-11 pr-1.5 pl-3 rounded-xl cursor-pointer
-                      ring-1 ring-inset transition-colors duration-200 ${
+                      ring-1 ring-inset transition-colors duration-200
+                      disabled:opacity-70 disabled:cursor-not-allowed ${
                         on
                           ? "bg-brand/12 ring-brand/45 text-content"
+                          : !qualified
+                          ? "ring-hairline-strong bg-surface-sunken text-muted"
                           : "bg-surface-sunken ring-hairline text-muted hover:text-content"
                       }`}
                   >
                     <Avatar id={g.id} name={g.name} size={26} />
                     <span className="text-sm font-medium">{g.name}</span>
-                    {/* וי ולא רק צבע — אותו כלל שחל על כל שאר המוצר. */}
-                    {on && <Icon name="check" size={14} className="text-brand" strokeWidth={3} />}
+                    {/* מנעול ומילה, לא רק צבע, למי שלא כשיר/ה — אותו טיפול
+                      * בדיוק שרשת השיבוץ הידני נותנת לאותו מצב (03-03), כדי
+                      * ששני המסכים יראו כמו אותו מצב. וי, לא רק צבע, למי
+                      * שכשיר/ה ונבחר/ה. */}
+                    {!qualified ? (
+                      <span className="flex items-center gap-1 text-[11px]">
+                        <Icon name="lock" size={13} strokeWidth={2.5} />
+                        לא כשיר/ה
+                      </span>
+                    ) : (
+                      on && <Icon name="check" size={14} className="text-brand" strokeWidth={3} />
+                    )}
                   </button>
                 );
               })}
             </div>
           </Field>
 
+          {/* ---- כשירות (QUAL-04, QUAL-05, D-02, P-03) ----
+            * חסימה קשיחה, בלי דלת אחורית — לא ניתן לעקוף אותה עם תיבת
+            * סימון או נימוק, בניגוד לאזהרת ההתנגשות הסמוכה למטה. */}
+          {qualBlocked && (
+            <div className="rounded-2xl ring-1 ring-inset ring-danger/40 bg-danger/10 p-3.5">
+              <div className="flex items-start gap-2">
+                <Icon name="lock" size={17} className="text-danger flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-content">
+                  <span className="font-bold">
+                    {unqualifiedAssignees.map((g) => g.name).join(", ")}
+                  </span>{" "}
+                  לא כשירים לקטגוריית "{form.category}" — אי אפשר לשמור את המשימה עד שהם יוסרו
+                  מרשימת המבצעים. אין דרך לעקוף את זה.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* ---- התנגשות ----
             * מופיע מתחת לבוחר האנשים ולא בראש הטופס, כי זה המקום שבו נוצרה
-            * הבעיה — ומנהל שקורא אזהרה רחוק מהסיבה שלה לא יודע מה לשנות. */}
+            * הבעיה — ומנהל שקורא אזהרה רחוק מהסיבה שלה לא יודע מה לשנות.
+            * בכוונה סמוך לאזהרת הכשירות שלמעלה, ובכוונה *לא* אותו כלל: זו
+            * ניתנת לעקיפה עם נימוק, וכשירות לא — אל תאחד את השתיים לניסוח
+            * אחד רק כי הן שכנות על המסך. */}
           {conflicts.length > 0 && (
             <div className="rounded-2xl ring-1 ring-inset ring-warn/40 bg-warn/10 p-3.5 space-y-3">
               <div className="flex items-start gap-2">
