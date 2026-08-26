@@ -87,12 +87,12 @@ Plans:
   4. מנהל שמשבץ ידנית רואה את הכשירויות של האדם באותו מסך, בלי לנווט למקום אחר.
   5. משמרת ומשימה נושאות קטגוריית עבודה שנפרדת משעת היום, ואדם נושא סט שטוח של קטגוריות — בלי היררכיה ובלי דרגות.
 
-**Plans**: 4 plans
+**Plans**: 3/4 plans executed
 Plans:
 
-- [ ] 03-01-PLAN.md — המנוע הטהור: `isQualified`/`checkQualification`, הבדיקה הראשונה ב-`checkHardConstraints`, ותווית "אין כשירים" (QUAL-01, QUAL-02, QUAL-04, QUAL-05, QUAL-06, QUAL-08)
-- [ ] 03-02-PLAN.md — המיגרציה, מיפוי api.js, ושער הכשירות בשיבוץ הידני (QUAL-01, QUAL-02, QUAL-03, QUAL-04, QUAL-05, QUAL-06)
-- [ ] 03-03-PLAN.md — קטגוריה על המשמרת, נעילת המועמד בשיבוץ הידני, ותיקון בדיקת ההחלפה במסך המשתתף (QUAL-03, QUAL-04, QUAL-06, QUAL-07, QUAL-08)
+- [x] 03-01-PLAN.md — המנוע הטהור: `isQualified`/`checkQualification`, הבדיקה הראשונה ב-`checkHardConstraints`, ותווית "אין כשירים" (QUAL-01, QUAL-02, QUAL-04, QUAL-05, QUAL-06, QUAL-08)
+- [x] 03-02-PLAN.md — המיגרציה, מיפוי api.js, ושער הכשירות בשיבוץ הידני (QUAL-01, QUAL-02, QUAL-03, QUAL-04, QUAL-05, QUAL-06)
+- [x] 03-03-PLAN.md — קטגוריה על המשמרת, נעילת המועמד בשיבוץ הידני, ותיקון בדיקת ההחלפה במסך המשתתף (QUAL-03, QUAL-04, QUAL-06, QUAL-07, QUAL-08)
 - [ ] 03-04-PLAN.md — עורך הכשירויות ברוסטר, וחסימת שיוך לא-כשיר בבוחר מבצעי המשימה (QUAL-01, QUAL-02, QUAL-04, QUAL-05, QUAL-07)
 
 **UI hint**: yes
@@ -141,7 +141,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. כיול ההוגנות — נטל בכל מקום | 0/TBD | Not started | - |
 | 2. איחוד משימה ומשמרת | 1/3 | In Progress|  |
-| 3. מודל כשירויות | 0/TBD | Not started | - |
+| 3. מודל כשירויות | 3/4 | In Progress|  |
 | 4. עמדות קבועות | 0/TBD | Not started | - |
 | 5. הלוח המאוחד | 0/TBD | Not started | - |
 

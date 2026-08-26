@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 03
 current_phase_name: מודל כשירויות
 status: executing
-stopped_at: discuss-phase 3 הושלם — 2 תחומים אפורים, 4 הכרעות נעולות, 03-CONTEXT.md נכתב. מוכן ל-/gsd-plan-phase 3.
-last_updated: "2026-08-26T07:52:08.051Z"
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-08-26T10:58:03.825Z"
 last_activity: 2026-08-26
 last_activity_desc: Phase 03 execution started
-state_head: 571fbe46b4be4f0e4cfdd79b178c677cc3bb2c49
+state_head: 219bb0f72475c873e2a5367421b0a17363e37b51
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 10
-  completed_plans: 6
+  completed_plans: 9
   percent: 0
 ---
 
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-08-21)
 ## Current Position
 
 Phase: 03 (מודל כשירויות) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 03
+Plan: 2 of 4
+Status: Ready to execute
 Last activity: 2026-08-26 — Phase 03 execution started
 
-Progress: [████░░░░░░] 40%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: [████░░░░░░] 40%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 02 P01 | 30min | 3 tasks | 5 files |
+| Phase 03 P03 | ~6min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,9 @@ Recent decisions affecting current work:
 - [Milestone]: PROJECT_MODE = mvp.
 - [Phase 02]: D-07: task load weight is flat LOAD_WEIGHTS.default, not a night-multiplier inferred from clock hours
 - [Phase 02]: D-09: task engine eligibility never reads task.status — a done task still blocks conflicting shifts
+- [Phase 03]: [Phase 3]: categoryOptions(shifts, tasks) is the one shared taxonomy the shift form, task form and qualification editor all draw from — shortcut names in declared order, then in-use names sorted, never raw Set order (D-01).
+- [Phase 03]: [Phase 3]: a blocked candidate in AssignView carries three redundant signals (disabled, replaced label, lock glyph) plus a neutral (not danger) ring, so 'unqualified' never collapses visually into 'unavailable' (QUAL-08).
+- [Phase 03]: [Phase 3]: MySwaps (GuardApp.jsx) now resolves the real guard record before calling checkAssignment instead of a synthetic {id} object — closes QUAL-04's fourth route, matching SwapMgmt's refusal shape and wording exactly.
 
 ### Pending Todos
 
@@ -97,6 +101,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-26
-Stopped at: discuss-phase 3 הושלם במלואו — 2 תחומים אפורים נדונו, 03-CONTEXT.md ו-03-DISCUSSION-LOG.md נכתבו. הצעד הבא: /gsd-plan-phase 3.
-Resume file: .planning/phases/03-eligibility-model/03-CONTEXT.md
+Last session: 2026-08-26T10:58:03.733Z
+Stopped at: Completed 03-03-PLAN.md
+Resume file: None
