@@ -569,10 +569,22 @@ function MySwaps({ user, guards, shifts, availability = {}, swapRequests, action
   // Agreeing to cover a shift runs the same hard constraints the engine runs,
   // so a guard cannot accept a shift that would break their own rest rule.
   // Not narrowed to a week — same reasoning as the supervisor's SwapMgmt.
+  //
+  // guard is resolved from the full `guards` prop, not built as a synthetic
+  // {id} object: checkAssignment now reads qualifiedCategories off the guard
+  // (03-01/03-02), and a missing field reads as "unrestricted" by design
+  // (default-allow) — so a bare {id} would have silently approved every
+  // swap regardless of the real person's qualifications, while SwapMgmt
+  // (views.jsx), which already resolves the full record, would correctly
+  // refuse the identical request. Same shape and wording as SwapMgmt's
+  // legality function, so the two screens' refusals are interchangeable.
   const legality = (r) => {
     const shift = shifts.find((x) => x.id === r.shiftId);
-    if (!shift) return { ok: false, reason: "המשמרת כבר לא קיימת" };
-    return checkAssignment({ guard: { id: r.toGuard }, shift, shifts, availability, tasks });
+    const guard = guards.find((g) => g.id === r.toGuard);
+    if (!shift || !guard) {
+      return { ok: false, reason: "המשמרת או המאבטח כבר לא קיימים" };
+    }
+    return checkAssignment({ guard, shift, shifts, availability, tasks });
   };
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ shiftId: "", toGuard: "", message: "" });

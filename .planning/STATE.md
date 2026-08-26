@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 current_phase: 03
 current_phase_name: מודל כשירויות
 status: executing
-stopped_at: פאזה 3 באמצע ביצוע — גל 1 (03-01, מנוע) וגל 2 (03-02, מיגרציה+שער שיבוץ ידני) מוזגו ל-main ואומתו, המיגרציה 0006 רצה על ה-DB האמיתי. גל 3 (03-03, מסך שיבוץ + תיקון MySwaps) נשלח לביצוע ברקע — אם השיחה נקטעה, בדוק worktree עבור agent-a1328d723f6d2fce4 (ייתכן שכבר הסתיים; חפש התראה שלא נקלטה, או git log על worktree-agent-a1328d723f6d2fce4). אחריו: גל 4 (03-04, עורך כשירויות + שער בוחר משימה) עדיין לא נשלח.
-last_updated: "2026-08-26T08:15:00.000Z"
+stopped_at: פאזה 3 באמצע ביצוע — גל 1 (03-01, מנוע), גל 2 (03-02, מיגרציה+שער שיבוץ ידני) וגל 3 (03-03, מסך שיבוץ + תיקון MySwaps) מוזגו ל-main. גל 4 (03-04, עורך כשירויות + שער בוחר משימה) עדיין לא נשלח.
+last_updated: "2026-08-26T10:58:03.825Z"
 last_activity: 2026-08-26
-last_activity_desc: Phase 03 wave 2 (03-02) merged and migration applied; wave 3 (03-03) dispatched
-state_head: 7c6123a
+last_activity_desc: Phase 03 wave 3 (03-03) merged — assign grid qualification display, shift category field, GuardApp MySwaps fix
+state_head: 219bb0f72475c873e2a5367421b0a17363e37b51
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 10
-  completed_plans: 8
-  percent: 40
+  completed_plans: 9
+  percent: 45
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-08-21)
 ## Current Position
 
 Phase: 03 (מודל כשירויות) — EXECUTING
-Plan: 2 of 4 complete, 3rd in progress
-Status: Executing Phase 03 — wave 3 (03-03) running in background, wave 4 (03-04) not yet dispatched
-Last activity: 2026-08-26 — Phase 03 wave 2 (03-02) merged: gs_profiles.qualified_categories + gs_shifts.category live on the real database, manual-assignment gated on qualification alone (P-01). Wave 3 (03-03: shift-category form, AssignView qualification display, GuardApp.jsx MySwaps bug fix) dispatched to a background executor.
+Plan: 3 of 4 complete, 4th not yet dispatched
+Status: Executing Phase 03 — wave 3 (03-03) merged and verified, wave 4 (03-04) not yet dispatched
+Last activity: 2026-08-26 — Phase 03 wave 3 (03-03) merged: shift category field, AssignView qualification display (QUAL-07/QUAL-08), GuardApp.jsx MySwaps bug fix (QUAL-04 route 4).
 
-Progress: [██████░░░░] 60%
+Progress: [█████████░] 75%
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: [██████░░░░] 60%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 02 P01 | 30min | 3 tasks | 5 files |
+| Phase 03 P03 | ~6min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,9 @@ Recent decisions affecting current work:
 - [Milestone]: PROJECT_MODE = mvp.
 - [Phase 02]: D-07: task load weight is flat LOAD_WEIGHTS.default, not a night-multiplier inferred from clock hours
 - [Phase 02]: D-09: task engine eligibility never reads task.status — a done task still blocks conflicting shifts
+- [Phase 03]: categoryOptions(shifts, tasks) is the one shared taxonomy the shift form, task form and qualification editor all draw from — shortcut names in declared order, then in-use names sorted, never raw Set order (D-01).
+- [Phase 03]: a blocked candidate in AssignView carries three redundant signals (disabled, replaced label, lock glyph) plus a neutral (not danger) ring, so 'unqualified' never collapses visually into 'unavailable' (QUAL-08).
+- [Phase 03]: MySwaps (GuardApp.jsx) now resolves the real guard record before calling checkAssignment instead of a synthetic {id} object — closes QUAL-04's fourth route, matching SwapMgmt's refusal shape and wording exactly.
 
 ### Pending Todos
 
@@ -86,6 +90,7 @@ None yet.
 - אין test runner בפרויקט. כל בדיקה חדשה חייבת להיות סקריפט Node עצמאי שמדפיס `ok`/`FAIL` ומחזיר קוד יציאה, מחובר ל-`npm test`.
 - `conflicts.js` נטול כיסוי בדיקות היום (`codebase/CONCERNS.md`); Phase 2 נוגע בו ישירות.
 - שתי טבלאות חדשות נכנסות במחזור הזה (Phase 3, Phase 4). RLS נכתבת באותה מיגרציה שיוצרת את הטבלה, לא אחריה.
+- Wave 3's visual/interactive checks (locked-tile legibility, lock/fairness-badge non-overlap, two-device swap-legality comparison, unconfigured-team no-visible-change) were not live-verified in the browser by the executor — structurally proven only. Needs decisive live-browser verification alongside wave 4's UI before phase close.
 
 ## Deferred Items
 
@@ -98,5 +103,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-08-26
-Stopped at: פאזה 3 באמצע /gsd-execute-phase 3 — 2 מתוך 4 גלים מוזגו (03-01, 03-02), מיגרציית 0006 רצה על ה-DB האמיתי, גל 3 (03-03) נשלח לרקע וייתכן שהסתיים כבר. אחרי שהוא מוזג: הרץ npm test / npm run build, נקה worktree, ואז שלח את גל 4 (03-04, עורך כשירויות ברוסטר + שער בוחר מבצעי משימה) לפני שממשיכים לאימות סופי ולסגירת הפאזה.
-Resume file: .planning/phases/03-eligibility-model/03-03-PLAN.md
+Stopped at: פאזה 3 באמצע /gsd-execute-phase 3 — 3 מתוך 4 גלים מוזגו (03-01, 03-02, 03-03), מיגרציית 0006 רצה על ה-DB האמיתי. הבא: npm test / npm run build על main אחרי המיזוג, ניקוי worktree, שליחת גל 4 (03-04, עורך כשירויות ברוסטר + שער בוחר מבצעי משימה), ואז אימות דפדפן חי לגלים 3+4 יחד (טרם בוצע לפאזה 3), כתיבת 03-VERIFICATION.md, וסגירת הפאזה.
+Resume file: .planning/phases/03-eligibility-model/03-04-PLAN.md
