@@ -109,6 +109,49 @@ const availComment = (availability, guardId, shiftId) => {
   return typeof raw === "object" ? raw?.comment || "" : "";
 };
 
+/**
+ * האם השומר/ת כשיר/ה לקטגוריה הזו. רשימה ריקה או נעדרת פירושה "בלי הגבלה",
+ * לא "מוגבל/ת לכלום" — ההפך מהקריאה הטבעית של "רשימת קטגוריות" (QUAL-02,
+ * D-03). זו אותה מוסכמה שהיעדר-שורה-פירושו-מותר שכבר קיימת ב-
+ * `gs_role_compatibility` ברמת צוות (ראה `pairRule` ב-conflicts.js), כאן
+ * מיושמת ברמת אדם. זה מה שנותן לצוות שנוצר לפני רגע סידור שבועי מלא בהרצה
+ * הראשונה, בלי שאף אחד פתח מסך הגדרות.
+ *
+ * הסדר קבוע ואינו סגנוני: קודם קטגוריה — פריט עבודה בלי קטגוריה הוא בלי
+ * הגבלה לכולם, וזה מה שהופך כל משמרת שקדמה לפאזה הזו (שתקרא `category: null`
+ * כי אין backfill במיגרציה) לבלתי-מוגבלת לתמיד, בלי לגעת בשורה אחת.
+ */
+export function isQualified(guard, category) {
+  if (!category) return true;
+  const list = guard?.qualifiedCategories;
+  if (!Array.isArray(list) || list.length === 0) return true;
+  return list.includes(category);
+}
+
+/**
+ * עוטף את `isQualified` בצורת ה-`{ok, code, reason}` שכל בדיקת אילוץ קשיח
+ * אחרת מחזירה (QUAL-06), כדי ש-`checkHardConstraints` יוכל להשתמש בה כבדיקה
+ * רגילה. מקבל אובייקט יחיד עם שני שדות בדיוק ובלי פרמטר שני — זה האילוץ
+ * היחיד במוצר בלי דלת אחורית (QUAL-05): בניגוד ל-`override_note` שקיים על
+ * assignments/tasks (פאזה 2) ומאפשר לעקוף את מטריצת ההתנגשויות עם נימוק,
+ * כשירות לא ניתנת לעקיפה בשום צורה — לא עם דגל, לא עם נימוק, לא ע"י מנהל.
+ *
+ * הקטגוריה נקראת מפריט העבודה בהגנתיות, כדי שקריאה עם פריט חלקי תקבל את
+ * התשובה הסבלנית ולא תזרוק שגיאה — אותה עמדה ש-`checkAssignment` נוקט כשהוא
+ * מקבל משמרת חסרה.
+ *
+ * @returns {{ok: true} | {ok: false, code: "unqualified", reason: string}}
+ */
+export function checkQualification({ guard, shift }) {
+  const category = shift?.category;
+  if (isQualified(guard, category)) return { ok: true };
+  return {
+    ok: false,
+    code: "unqualified",
+    reason: `לא מוגדר/ת כשיר/ה לקטגוריית "${category}"`,
+  };
+}
+
 /** For quantities that are genuinely fractional: hours, per-guard averages. */
 const round = (n, digits = 1) => {
   const f = 10 ** digits;
