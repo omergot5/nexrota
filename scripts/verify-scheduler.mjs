@@ -4,8 +4,13 @@
 // Asserts the hard constraints actually hold on a generated week, and prints
 // the coverage/fairness numbers so regressions are obvious.
 
-import { autoAssign, checkAssignment, DEFAULT_RULES, shiftLoad, teamAverages } from "../src/lib/autoAssign.js";
+import { autoAssign, checkAssignment, DEFAULT_RULES, explainUnfilled, shiftLoad, teamAverages } from "../src/lib/autoAssign.js";
 import { shiftInterval, weekByOffset, taskAsShiftShape, withEngineTasks } from "../src/lib/dates.js";
+// Node stdlib — used only for the QUAL-06 structural coverage test (task 3),
+// which reads the real source text to make sure the next hard-constraint
+// code added to the engine cannot silently be missing from explainUnfilled's
+// label map the way `unqualified` nearly was.
+import { readFileSync } from "node:fs";
 
 const HOUR = 3600000;
 let failures = 0;
@@ -1050,6 +1055,91 @@ check("D-01 · taskAsShiftShape על משימה בלי קטגוריה מחזיר
 const qlMerged = withEngineTasks([], [qlTaskWithCategory]);
 check("D-01 · withEngineTasks משמר את category על פני המיזוג",
   qlMerged[0]?.category === "מטבח", JSON.stringify(qlMerged));
+
+// ---------------------------------------------------------------
+// QUAL-08 — משבצת ריקה מסיבת כשירות אומרת את זה, לא "אין זמינים" (Phase 3,
+// Plan 03-01, Task 3). ממשיך את הפיקסצ'ר של סעיף QUAL-04 שמעל, בלי לבנות
+// שלישי.
+// ---------------------------------------------------------------
+
+console.log("\n=== QUAL-08 — הבחנה בין 'אין כשירים' ל'אין זמינים' ===\n");
+
+const qlAllUnqualifiedEntry = {
+  blockers: [
+    { guardId: "ql-narrow", code: "unqualified", reason: 'לא מוגדר/ת כשיר/ה לקטגוריית "סיור"' },
+    { guardId: "ql-wide", code: "unqualified", reason: 'לא מוגדר/ת כשיר/ה לקטגוריית "סיור"' },
+  ],
+};
+const qlAllUnavailableEntry = {
+  blockers: [
+    { guardId: "ql-narrow", code: "unavailable", reason: 'סימן/ה "לא זמין" למשמרת זו' },
+    { guardId: "ql-wide", code: "unavailable", reason: 'סימן/ה "לא זמין" למשמרת זו' },
+  ],
+};
+const qlUnqualifiedSentence = explainUnfilled(qlAllUnqualifiedEntry);
+const qlUnavailableSentence = explainUnfilled(qlAllUnavailableEntry);
+
+check("QUAL-08 · הסבר משבצת שכל חוסמיה unqualified לא מכיל אף אות לטינית",
+  !/[A-Za-z]/.test(qlUnqualifiedSentence), qlUnqualifiedSentence);
+check("QUAL-08 · הסבר משבצת unqualified שונה מהסבר משבצת unavailable ולא כלול בתוכו",
+  qlUnqualifiedSentence !== qlUnavailableSentence && !qlUnqualifiedSentence.includes(qlUnavailableSentence),
+  JSON.stringify({ qlUnqualifiedSentence, qlUnavailableSentence }));
+check("QUAL-08 · שני המשפטים מתחילים במספר החוסמים, כמו כל שאר הקודים",
+  qlUnqualifiedSentence.startsWith("2 ") && qlUnavailableSentence.startsWith("2 "),
+  JSON.stringify({ qlUnqualifiedSentence, qlUnavailableSentence }));
+
+// משבצת מעורבת: שני חוסמי unqualified וחוסם unavailable אחד — הצורה
+// המחוברת היא מה שמשבצת אמיתית מייצרת, וחייבת להישאר קריאה.
+const qlMixedEntry = {
+  blockers: [
+    { guardId: "ql-a", code: "unqualified", reason: "x" },
+    { guardId: "ql-b", code: "unqualified", reason: "x" },
+    { guardId: "ql-c", code: "unavailable", reason: "x" },
+  ],
+};
+const qlMixedSentence = explainUnfilled(qlMixedEntry);
+check("QUAL-08 · משבצת מעורבת (unqualified + unavailable) מציגה את שתי התוויות עם הספירות הנכונות",
+  qlMixedSentence.includes("2 לא כשירים לתפקיד") && qlMixedSentence.includes("1 סימנו לא זמינים") &&
+    qlMixedSentence.includes(" · "),
+  qlMixedSentence);
+
+check("QUAL-08 · משבצת בלי חוסמים כלל עדיין מחזירה את המשפט הכלל-צוותי המקורי, בלי שינוי",
+  explainUnfilled({ blockers: [] }) === "אין שומרים זמינים בצוות");
+
+// QUAL-06 — בדיקה מבנית: כל code שכ-checkHardConstraints יכול להחזיר קיים
+// כמפתח במפת labels. נקרא את קוד המקור עצמו (לא רשימה שמישהו יתחזק ביד),
+// חתוכים לגוף checkHardConstraints ולגוף checkQualification שהוא מאציל
+// אליו כבדיקה הראשונה — לא כל הקובץ, כדי שלא ייכנסו code-ים ממקומות לא
+// קשורים (למשל 'missing' של checkAssignment).
+const qlAutoAssignSource = readFileSync(
+  new URL("../src/lib/autoAssign.js", import.meta.url),
+  "utf8"
+);
+const qlExtractFnBody = (fnDeclaration) => {
+  const start = qlAutoAssignSource.indexOf(fnDeclaration);
+  if (start === -1) return "";
+  const closeMatch = qlAutoAssignSource.slice(start).match(/\r?\n\}\r?\n/);
+  return closeMatch ? qlAutoAssignSource.slice(start, start + closeMatch.index) : "";
+};
+const qlHardConstraintsBody = qlExtractFnBody("function checkHardConstraints(");
+const qlQualificationBody = qlExtractFnBody("export function checkQualification(");
+check("QUAL-06 · חילוץ גוף checkHardConstraints וגוף checkQualification מקוד המקור לא ריק ובאורך סביר",
+  qlHardConstraintsBody.length > 500 && qlQualificationBody.length > 50,
+  JSON.stringify({ hardConstraints: qlHardConstraintsBody.length, qualification: qlQualificationBody.length }));
+
+const qlEmittedCodes = [
+  ...[...qlHardConstraintsBody.matchAll(/code:\s*"([^"]+)"/g)].map((m) => m[1]),
+  ...[...qlQualificationBody.matchAll(/code:\s*"([^"]+)"/g)].map((m) => m[1]),
+];
+check("QUAL-06 · לפחות עשרה קודים נחלצו (תשעה קיימים מ-checkHardConstraints + unqualified מ-checkQualification)",
+  qlEmittedCodes.length >= 10, JSON.stringify(qlEmittedCodes));
+
+const qlCodesMissingLabel = qlEmittedCodes.filter((code) => {
+  const sentence = explainUnfilled({ blockers: [{ guardId: "x", code, reason: "x" }] });
+  return /[A-Za-z]/.test(sentence);
+});
+check("QUAL-06 · לכל code שהמנוע יכול להחזיר יש מפתח תואם ב-labels של explainUnfilled",
+  qlCodesMissingLabel.length === 0, JSON.stringify({ qlEmittedCodes, qlCodesMissingLabel }));
 
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);
