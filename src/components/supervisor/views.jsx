@@ -269,7 +269,7 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
 // SHIFT MANAGEMENT
 // ============================================================
 
-export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, embedded = false }) {
+export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = [], embedded = false }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [spreadFrom, setSpreadFrom] = useState(null); // date whose layout is being copied
@@ -278,6 +278,9 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, embedded =
   const blank = {
     date: weekDates[0], startTime: "07:00", endTime: "19:00", label: "משמרת יום",
     location: "כניסה ראשית", requiredGuards: 1, type: "morning", color: SHIFT_TONES.morning,
+    // ריק בכוונה, לא ניחוש (D-03): משמרת בלי קטגוריה פתוחה לכולם, וברירת
+    // מחדל מנוחשת הייתה מגבילה אנשים מול קטגוריה שאף מנהל לא בחר.
+    category: "",
   };
   const [form, setForm] = useState(blank);
 
@@ -374,6 +377,10 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, embedded =
           color: s.color,
           location: s.location,
           requiredGuards: s.requiredGuards,
+          // הקטגוריה חלק מהגדרת המשמרת בדיוק כמו שעות ומיקום — היא נעה
+          // עם היום המועתק, בניגוד ל"מלא שבוע" ולתבניות שלא ממציאות קטגוריה
+          // שאף מנהל לא בחר.
+          category: s.category,
         });
       }
     }
@@ -762,6 +769,33 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, embedded =
               />
             </Field>
           </div>
+
+          <Field
+            label="סוג עבודה"
+            hint='זה מה שכשירות נבדקת מולו. משמרת בלי סוג עבודה פתוחה לכולם — לא צריך למלא "כדי להיות בטוח".'
+            htmlFor="shift-category"
+          >
+            <Input
+              id="shift-category"
+              list="shift-categories"
+              value={form.category || ""}
+              onChange={field("category")}
+              placeholder="לא הוגדר — פתוח לכולם"
+            />
+            {/* datalist ולא select: קטגוריה מוכרת מוצעת, ושם חדש עדיין
+              * מותר — אותו דפוס הקלט של תיקיית המשימה. קריאה יחידה:
+              * `categoryOptions(shifts, tasks)`, הטקסונומיה המשותפת. */}
+            <datalist id="shift-categories">
+              {categoryOptions(shifts, tasks).map((n) => (
+                <option key={n} value={n} />
+              ))}
+            </datalist>
+          </Field>
+          {/* הקטגוריה מזינה שני מנגנונים נפרדים שחולקים אוצר מילים ותו לא:
+            * כשירות (isQualified — מי מותר לו/ה בכלל) ומטריצת ההתנגשויות
+            * (compatIndex/pairRule/findConflicts — מה אסור לחפוף אצל אותו
+            * אדם). השדה הזה לא מוזן לשום פונקציה מהמטריצה. */}
+
           <p className="text-xs text-muted">
             אורך המשמרת:{" "}
             {shiftHours({ date: form.date, startTime: form.startTime, endTime: form.endTime })} שעות
@@ -1377,6 +1411,42 @@ const FOLDERS = [
 
 const UNFILED = "כללי";
 const folderIcon = (name) => FOLDERS.find((f) => f.name === name)?.icon || "clipboard";
+
+/**
+ * טקסונומיית הקטגוריות המשותפת (D-01).
+ *
+ * טופס המשמרת (כאן), טופס המשימה ועורך הכשירות (פאזה זו וזו הבאה) כולם
+ * שואבים את רשימת ההצעה שלהם מכאן ובלבד — כדי שמנהל שממציא קטגוריה על
+ * משמרת יראה אותה מוצעת כשהוא מצמצם כשירות למישהו, ושתי המסכים לא ייסחפו
+ * לשתי טקסונומיות ששתיהן רק *נראות* דומות.
+ *
+ * קריאה: `categoryOptions(shifts, tasks)` — שני הארגומנטים ברירת מחדל
+ * למערך ריק, והפונקציה שורדת גם ערך לא-מערך (`null`/`undefined`) בכל אחד
+ * מהם, כי היא נקראת מארבעה רכיבים עם ארבע זמינויות פרופס שונות.
+ *
+ * הסדר קבוע ואינו מסדר איטרציה גולמי של Set: קודם התיקיות המוצעות לפי
+ * סדרן המוצהר, ואחריהן כל שם שנמצא בפועל במשמרות/משימות ואינו אחת מהן,
+ * לפי א"ב. שני נתיבי קוד שבונים את אותה רשימה לוגית בשני סדרים שונים
+ * מייצרים מערכים ששווי-ערך JSON שלהם שונה — וזה בדיוק מה שהופך בדיקת
+ * דטרמיניזם עתידית (עורך הכשירות) לפעימית (03-RESEARCH.md, Pitfall 8).
+ *
+ * הרשימה מחזירה את שמות התיקיות המוצעות **במלואן**, גם אם עדיין לא נעשה
+ * בהן שימוש בפועל — זו רשימת הצעה לקלט, לא קיבוץ של שורות אמיתיות, ולכן
+ * היא לא מסננת לפי שימוש כמו החישוב `folders` של `TaskMgmt` למטה (שכן
+ * מקבץ שורות אמיתיות ולכן חייב לסנן).
+ */
+const categoryOptions = (shifts = [], tasks = []) => {
+  const used = new Set();
+  for (const item of shifts || []) {
+    if (item?.category) used.add(item.category);
+  }
+  for (const item of tasks || []) {
+    if (item?.category) used.add(item.category);
+  }
+  const known = FOLDERS.map((f) => f.name);
+  const custom = [...used].filter((n) => !known.includes(n)).sort();
+  return [...known, ...custom];
+};
 
 /** חלון הזמן של משימה, כמשפט אחד. */
 const rangeText = (task) => {
