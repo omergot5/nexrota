@@ -2,16 +2,11 @@
 
 **Generated:** 2026-08-26
 **Phase:** 03-eligibility-model
-**Status:** Incomplete
+**Status:** Complete — applied 2026-08-26 via Supabase MCP (`apply_migration`, project `biauxcgphdhwewszupsq`)
 
-Complete this item so `gs_profiles.qualified_categories` and `gs_shifts.category`
-exist on the live database. Claude attempted automation first: no Supabase MCP
-server is configured in this worktree session, and no linked `supabase` CLI is
-installed (`command -v supabase` → not found). Neither of the two automated
-routes the plan names is reachable from here, so this is the "operator with
-SQL-editor access" fallback the plan itself anticipates — the orchestrator
-(which has Supabase MCP access) should apply this after merge, the same way
-Phase 2's `0005_task_hours.sql` migration was applied post-merge.
+`gs_profiles.qualified_categories` (jsonb) and `gs_shifts.category` (text) confirmed live: both nullable, no default, and `select count(*) from gs_profiles where qualified_categories is not null` / the equivalent on `gs_shifts.category` both returned `0` — no pre-existing row was backfilled.
+
+The two app-level checks below (manual-assignment refusal once 03-04 ships the editor) were not re-verified in this pass — they need the qualification editor UI, which lands in wave 4.
 
 ## Dashboard Configuration
 
