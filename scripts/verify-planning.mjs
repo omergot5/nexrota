@@ -16,7 +16,7 @@ import {
   taskAsShiftShape,
   withEngineTasks,
 } from "../src/lib/dates.js";
-import { shiftLoad, teamAverages } from "../src/lib/autoAssign.js";
+import { shiftLoad, teamAverages, isQualified, checkQualification } from "../src/lib/autoAssign.js";
 import { loadTable } from "../src/lib/loadTable.js";
 import { chartTheme } from "../src/design/chartTheme.js";
 // api.js imports the Supabase client at module load — that construction is
@@ -731,6 +731,91 @@ check("UNIF-01 · isTaskEngineEligible דוחה משימה שמופתה משור
   isTaskEngineEligible(taskMappedPreMigration) === false);
 check("UNIF-01 · isTaskEngineEligible מקבל משימה שמופתה משורה עם שתי השעות באותו יום",
   isTaskEngineEligible(taskMappedWithHours) === true);
+
+// ============================================================
+console.log("\nכשירות — isQualified/checkQualification (QUAL-01, QUAL-02, QUAL-05, QUAL-06)\n");
+// ============================================================
+
+// QUAL-02 · שומר בלי שדה כשירות בכלל — בדיוק הצורה של הפיקסצ'ר g1-g5
+// ב-verify-scheduler.mjs — כשיר לקטגוריה שהצוות מעולם לא השתמש בה. זו
+// הבדיקה שנכשלת בקול רם אם מישהו יהפוך את הכלל לרשימת-היתר.
+const bareGuard = { id: "qg1", name: "בלי שדה כשירות" };
+check("QUAL-02 · שומר בלי שדה qualifiedCategories כשיר לקטגוריה חדשה לגמרי לצוות",
+  isQualified(bareGuard, "קטגוריה-חדשה") === true);
+
+// QUAL-02 · null ו-[] מתנהגים בדיוק כמו היעדר השדה, לאותה קטגוריה.
+const nullGuard = { ...bareGuard, qualifiedCategories: null };
+const emptyGuard = { ...bareGuard, qualifiedCategories: [] };
+check("QUAL-02 · qualifiedCategories: null זהה להיעדר השדה — כשיר לכל קטגוריה",
+  isQualified(nullGuard, "קטגוריה-חדשה") === true);
+check("QUAL-02 · qualifiedCategories: [] זהה להיעדר השדה — כשיר לכל קטגוריה",
+  isQualified(emptyGuard, "קטגוריה-חדשה") === true);
+
+// QUAL-01 · רשימה מפורשת של שני חברים: כשיר לכל אחד מהם, לא כשיר לשלישי.
+const narrowGuard = { id: "qg2", name: "מצומצם", qualifiedCategories: ["מטבח", "סיור"] };
+check("QUAL-01 · שומר עם רשימה מצומצמת כשיר לחבר הראשון ברשימה",
+  isQualified(narrowGuard, "מטבח") === true);
+check("QUAL-01 · שומר עם רשימה מצומצמת כשיר לחבר השני ברשימה",
+  isQualified(narrowGuard, "סיור") === true);
+check("QUAL-01 · שומר עם רשימה מצומצמת אינו כשיר לקטגוריה שלישית שאינה ברשימה",
+  isQualified(narrowGuard, "שער") === false);
+
+// QUAL-02 · פריט עבודה בלי קטגוריה הוא בלי הגבלה לכולם — גם למי שיש לו
+// רשימה מצמצמת (Pitfall 5). שלוש בדיקות נפרדות: מחרוזת ריקה, null, undefined.
+check("QUAL-02 · שומר עם רשימה מצמצמת כשיר כשהקטגוריה היא מחרוזת ריקה",
+  isQualified(narrowGuard, "") === true);
+check("QUAL-02 · שומר עם רשימה מצמצמת כשיר כשהקטגוריה היא null",
+  isQualified(narrowGuard, null) === true);
+check("QUAL-02 · שומר עם רשימה מצמצמת כשיר כשהקטגוריה היא undefined",
+  isQualified(narrowGuard, undefined) === true);
+
+// QUAL-06 · צורת ההחזרה תואמת בדיוק לכל בדיקת אילוץ קשיח אחרת.
+const passingResult = checkQualification({ guard: bareGuard, shift: { id: "s1", category: "מטבח" } });
+check("QUAL-06 · checkQualification על זוג תקין מחזיר ok===true בלי code ובלי reason",
+  passingResult.ok === true && !("code" in passingResult) && !("reason" in passingResult),
+  JSON.stringify(passingResult));
+
+const failingShift = { id: "s2", category: "שער" };
+const failingResult = checkQualification({ guard: narrowGuard, shift: failingShift });
+check("QUAL-06 · checkQualification על זוג חוסם מחזיר ok===false, code==='unqualified', reason לא-ריק שמכיל את שם הקטגוריה",
+  failingResult.ok === false && failingResult.code === "unqualified" &&
+    typeof failingResult.reason === "string" && failingResult.reason.length > 0 &&
+    failingResult.reason.includes(failingShift.category),
+  JSON.stringify(failingResult));
+
+// QUAL-06 · אין אות לטינית אחת בתוך ה-reason — כל הממשק עברית, וקוד שמדלוף
+// לתוך משפט למשתמש הוא בדיוק הכשל ש-Pitfall 7 מתאר בקצה השני של אותו צינור.
+check("QUAL-06 · reason של checkQualification חוסם לא מכיל אף אות לטינית",
+  !/[A-Za-z]/.test(failingResult.reason), failingResult.reason);
+
+// QUAL-05 · שום ארגומנט לא הופך חסימה לאישור — לא override, לא force, לא
+// overrideNote. שלוש קריאות נפרדות, כל אחת מושווית מול הבסיס.
+const baseRefusal = JSON.stringify(checkQualification({ guard: narrowGuard, shift: failingShift }));
+const withOverride = JSON.stringify(checkQualification({ guard: narrowGuard, shift: failingShift, override: true }));
+const withForce = JSON.stringify(checkQualification({ guard: narrowGuard, shift: failingShift, force: true }));
+const withOverrideNote = JSON.stringify(
+  checkQualification({ guard: narrowGuard, shift: failingShift, overrideNote: "כי אמרתי" })
+);
+check("QUAL-05 · תוספת override לא משנה את החסימה",
+  withOverride === baseRefusal, JSON.stringify({ baseRefusal, withOverride }));
+check("QUAL-05 · תוספת force לא משנה את החסימה",
+  withForce === baseRefusal, JSON.stringify({ baseRefusal, withForce }));
+check("QUAL-05 · תוספת overrideNote לא משנה את החסימה — בניגוד ל-override_note הקיים על assignments/tasks",
+  withOverrideNote === baseRefusal, JSON.stringify({ baseRefusal, withOverrideNote }));
+check("QUAL-05 · checkQualification מקבל פרמטר יחיד — אין ארגומנט שני שדרכו אפשר להעביר rules או דלת אחורית",
+  checkQualification.length === 1, String(checkQualification.length));
+
+// QUAL-01 · isQualified לא ממוטט את הארגומנטים שלה — הרשימה של השומר זהה
+// לפני ואחרי (השוואה סדרתית), וקריאה חוזרת מחזירה את אותה תשובה.
+const mutationGuard = { id: "qg3", name: "בדיקת מוטציה", qualifiedCategories: ["מטבח"] };
+const beforeSerialized = JSON.stringify(mutationGuard);
+const firstAnswer = isQualified(mutationGuard, "שער");
+const afterSerialized = JSON.stringify(mutationGuard);
+const secondAnswer = isQualified(mutationGuard, "שער");
+check("QUAL-01 · isQualified לא ממוטטת את רשימת הכשירות של השומר",
+  beforeSerialized === afterSerialized, JSON.stringify({ before: beforeSerialized, after: afterSerialized }));
+check("QUAL-01 · isQualified מחזירה תשובה זהה בקריאה חוזרת על אותו קלט",
+  firstAnswer === secondAnswer && firstAnswer === false);
 
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);
