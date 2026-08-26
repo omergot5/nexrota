@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 current_phase: 03
 current_phase_name: מודל כשירויות
 status: executing
-stopped_at: Completed 03-04-PLAN.md
-last_updated: "2026-08-26T11:16:37.873Z"
+stopped_at: פאזה 3 — כל 4 הגלים (03-01..03-04) מוזגו ל-main ואומתו (npm test + npm run build עוברים). נותר אימות דפדפן חי לגלים 3+4 (טרם בוצע), כתיבת 03-VERIFICATION.md, וסגירת הפאזה.
+last_updated: "2026-08-26T11:30:00.000Z"
 last_activity: 2026-08-26
-last_activity_desc: Phase 03 wave 3 (03-03) merged and verified; wave 4 (03-04) dispatched to background executor
-state_head: b9dac84105c0dab2cb588ab404397c6492700c9b
+last_activity_desc: Phase 03 wave 4 (03-04) merged and verified — qualification editor + task-assignee gate. All 4 waves of phase 3 now merged; live-browser verification pending before phase close.
+state_head: d5eb553
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 2
   total_plans: 10
   completed_plans: 10
-  percent: 0
+  percent: 50
 ---
 
 # Project State
@@ -27,12 +27,12 @@ See: .planning/PROJECT.md (updated 2026-08-21)
 
 ## Current Position
 
-Phase: 03 (מודל כשירויות) — EXECUTING
-Plan: 4 of 4 complete, 4th not yet dispatched
-Status: Ready to execute
-Last activity: 2026-08-26 — Phase 03 wave 3 (03-03) merged: shift category field, AssignView qualification display (QUAL-07/QUAL-08), GuardApp.jsx MySwaps bug fix (QUAL-04 route 4).
+Phase: 03 (מודל כשירויות) — EXECUTING (all plans merged, live verification pending)
+Plan: 4 of 4 complete and merged
+Status: All code merged and passing npm test/npm run build. Live-browser verification of waves 3+4's UI not yet performed — required before phase close per CLAUDE.md principle 6.
+Last activity: 2026-08-26 — Phase 03 wave 4 (03-04) merged: per-person qualification editor on roster (TeamView), task-assignee picker qualification gate (TaskMgmt), closing P-03's fifth enforcement route.
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████████] 100% (code) / verification pending
 
 ## Performance Metrics
 
@@ -81,6 +81,7 @@ Recent decisions affecting current work:
 - [Phase 03]: MySwaps (GuardApp.jsx) now resolves the real guard record before calling checkAssignment instead of a synthetic {id} object — closes QUAL-04's fourth route, matching SwapMgmt's refusal shape and wording exactly.
 - [Phase 03]: D-03 implemented at the UI edge: qualification editor normalises a complete or unchanged selection to null (unrestricted), never a materialised full list
 - [Phase 03]: P-03 closed: the task assignee picker is now a hard, non-overridable qualification gate (qualBlocked), structurally separate from the existing overridable conflict boolean (blocked)
+- [Phase 03]: deliberate accepted consequence — a pre-existing task whose assignees were selected before anyone was narrowed can become un-savable once a supervisor narrows one of those assignees away from the task's category; no override, by design (flagged in 03-04-SUMMARY.md for verification to judge)
 
 ### Pending Todos
 
@@ -105,6 +106,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-26T11:16:37.837Z
-Stopped at: Completed 03-04-PLAN.md
-Resume file: None
+Last session: 2026-08-26
+Stopped at: כל 4 גלי פאזה 3 מוזגו ל-main, npm test + npm run build עוברים. הבא: אימות דפדפן חי לתכונות הכשירות (מסך שיבוץ ידני, עורך כשירויות ברוסטר, שער בוחר מבצעי משימה, MySwaps) — עדיין לא בוצע. אחריו: כתיבת 03-VERIFICATION.md, סימון הפאזה כהושלמה ב-ROADMAP.md/STATE.md, ומעבר לדיון פאזה 4.
+Resume file: .planning/phases/03-eligibility-model/03-VERIFICATION.md (טרם נוצר)
