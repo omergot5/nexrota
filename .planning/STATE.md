@@ -10,10 +10,10 @@ last_activity_desc: Phase 03 closed — verified live in browser against real ba
 state_head: bf84e6a6b7ce9468f23cfcc3d6afd7a95d124814
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 3
   total_plans: 10
   completed_plans: 10
-  percent: 0
+  percent: 60
 ---
 
 # Project State
@@ -27,12 +27,11 @@ See: .planning/PROJECT.md (updated 2026-08-21)
 
 ## Current Position
 
-Phase: 03 (מודל כשירויות) — COMPLETE, verified 2026-08-26
-Next: Phase 04 (עמדות קבועות) — not yet discussed
-Status: Phase 3 fully closed: code merged, automated tests pass, live-browser verification performed against the real Supabase backend. Ready to start `/gsd-discuss-phase 4`.
-Last activity: 2026-08-26 — Phase 03 live verification: qualification editor (D-03 both directions, reload-persisted), manual-assignment grid (disabled chip + "לא כשיר/ה" label + per-shift blocked-count line), task assignee picker (hard block, no override, live re-evaluation on category change), shift-form category field. 03-VERIFICATION.md written.
+Phase: 04 (עמדות קבועות) — CONTEXT READY
+Status: discuss-phase complete — 04-CONTEXT.md and 04-DISCUSSION-LOG.md written and committed. Ready for `/gsd-plan-phase 4`.
+Last activity: 2026-08-26 — Discussed Phase 4: two position shapes (fixed-schedule "template" vs whole-week "no-hours"), both filled fully automatically by the engine (template via auto-assign-style constraint solving, no-hours via load-based rotation), qualification reuses Phase 3's qualifiedCategories unchanged, minimal dedicated screen here with the polished forward-looking board deferred to Phase 5.
 
-Progress: [████████████░░░░░░░░] 60%
+Progress: [████████████░░░░░░░░] 60% (Phase 3 done, Phase 4 context ready)
 
 ## Performance Metrics
 
@@ -83,6 +82,10 @@ Recent decisions affecting current work:
 - [Phase 03]: P-03 closed: the task assignee picker is now a hard, non-overridable qualification gate (qualBlocked), structurally separate from the existing overridable conflict boolean (blocked) — confirmed live.
 - [Phase 03]: deliberate accepted consequence — a pre-existing task whose assignees were selected before anyone was narrowed can become un-savable once a supervisor narrows one of those assignees away from the task's category; no override, by design.
 - [Phase 03]: Phase closed 2026-08-26 with 3 honestly-flagged gaps left to unit-test-only coverage (fresh-team zero-config first run; auto-assign/balance/swap-approval routes' live refusal; engine-level explainUnfilled label) — see 03-VERIFICATION.md "Outstanding, honestly unverified". None block phase closure.
+- [Phase 04]: D-01: a standing position is one of two shapes chosen per-position at definition time — fixed day/hour ("template") or whole-week no-hours ("weekly") — not a single global model.
+- [Phase 04]: D-02/D-03: both position shapes are filled fully automatically by the engine every week, no manager selection step — template positions via the same constraint-first fill autoAssign already uses, weekly positions via a fixed load-based rotation (whoever carried it least).
+- [Phase 04]: D-04: position qualification reuses Phase 3's qualifiedCategories unchanged — not a separate qualification concept.
+- [Phase 04]: D-05: Phase 4 builds only a minimal dedicated screen for POS-05 (who's qualified vs who's working this week); the polished forward-looking board view is explicitly Phase 5's BOARD-02.
 
 ### Pending Todos
 
