@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 current_phase: 03
 current_phase_name: מודל כשירויות
 status: planning
-stopped_at: פאזה 2 הושלמה ואומתה בדפדפן בפועל — שלושת הגלים מוזגו, המיגרציה הורצה על ה-DB האמיתי, 02-VERIFICATION.md נכתב. פאזה 3 טרם תוכננה.
-last_updated: "2026-08-26T00:00:00.000Z"
+stopped_at: discuss-phase 3 הושלם — 2 תחומים אפורים, 4 הכרעות נעולות, 03-CONTEXT.md נכתב. מוכן ל-/gsd-plan-phase 3.
+last_updated: "2026-08-26T00:30:00.000Z"
 last_activity: 2026-08-26
-last_activity_desc: Phase 02 complete and verified
-state_head: 996793c
+last_activity_desc: Phase 03 discuss-phase complete, ready for research/planning
+state_head: c446015
 progress:
   total_phases: 5
   completed_phases: 2
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-08-21)
 
 ## Current Position
 
-Phase: 02 (איחוד משימה ומשמרת) — COMPLETE
-Plan: 3 of 3 complete
-Status: Phase 02 complete — ready to plan Phase 03
-Last activity: 2026-08-26 — Phase 02 אומתה בדפדפן: תג "מחוץ למנוע" על משימה קפואה בלבד, פיצול נספר/קפוא בדשבורד, נטל משימה (8 שעות) מופיע זהה בדשבורד ובדוחות. המיגרציה רצה על ה-DB האמיתי, 0 שורות מולאו לאחור.
+Phase: 03 (מודל כשירויות) — CONTEXT READY
+Plan: 0 of 0 in current phase
+Status: discuss-phase 3 הושלם — 03-CONTEXT.md קיים, מוכן ל-/gsd-plan-phase 3 (מחקר → תכנון → plan-check → ביצוע)
+Last activity: 2026-08-26 — discuss-phase 3: טקסונומיה משותפת אחת למשמרות ולמשימות (gs_tasks.category משרתת גם ככשירות), ברירת מחדל כשיר-לכל (null/ריק), עריכת שומר בנפרד. שני פערים גלויים הועברו למחקר: אכיפת מסלול השיבוץ הידני (לא בודק שום אילוץ קשיח היום) ותצוגת QUAL-07.
 
 Progress: [████░░░░░░] 40%
 
@@ -98,5 +98,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-08-26
-Stopped at: פאזה 2 הושלמה, אומתה בדפדפן ובמסד הנתונים החי, ו-02-VERIFICATION.md נכתב. פאזה 3 (מודל כשירויות) לא תוכננה עדיין.
-Resume file: .planning/phases/02-task-shift-unification/02-VERIFICATION.md
+Stopped at: discuss-phase 3 הושלם במלואו — 2 תחומים אפורים נדונו, 03-CONTEXT.md ו-03-DISCUSSION-LOG.md נכתבו. הצעד הבא: /gsd-plan-phase 3.
+Resume file: .planning/phases/03-eligibility-model/03-CONTEXT.md
