@@ -2277,10 +2277,43 @@ function ProfilePicker({ team, actions, busy }) {
   );
 }
 
-export function TeamView({ user, team, guards, actions, busy, onSeedDemo }) {
+export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts = [], tasks = [] }) {
   const [copied, setCopied] = useState(null); // 'code' | 'message' | null
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+
+  // ---- עורך כשירות (QUAL-01, QUAL-02, D-03, D-04) ----
+  // אותה טקסונומיה בדיוק שטופס המשמרת וטופס המשימה קוראים ממנה (D-01),
+  // כדי שמנהל שמצמצם כאן יראה בדיוק את מה שהוא הציע במקום אחר.
+  const categories = categoryOptions(shifts, tasks);
+  const [qualEditing, setQualEditing] = useState(null); // guard object, or null
+  const [qualSelection, setQualSelection] = useState([]);
+
+  const openQualEditor = (g) => {
+    // אדם שלא נגעו בו הוא כשיר לכול — וזו העובדה על מה שהמסך חייב להראות,
+    // לא ברירת מחדל של טופס ריק (D-03: "המודל חייב להציג את המצב האמיתי").
+    const list = Array.isArray(g.qualifiedCategories) ? g.qualifiedCategories : categories;
+    setQualSelection(list);
+    setQualEditing(g);
+  };
+
+  const toggleQualCategory = (c) =>
+    setQualSelection((sel) => (sel.includes(c) ? sel.filter((x) => x !== c) : [...sel, c]));
+
+  const qualEmptySelection = qualSelection.length === 0;
+
+  const saveQualifications = async () => {
+    if (!qualEditing || qualEmptySelection) return;
+    // בונים לפי סדר הרשימה הקנונית (סינון, לא צבירה לפי סדר קליק) — כדי
+    // ששתי שמירות של אותה בחירה לוגית יפיקו תמיד את אותו מערך (Pitfall 8).
+    const ordered = categories.filter((c) => qualSelection.includes(c));
+    // הלב של D-03: בחירה מלאה נשמרת כ"ללא הגבלה" (null), לא כרשימה
+    // ממומשת — אחרת קטגוריה שתומצא מחר תצמצם בשקט מישהו שאיש לא בחר
+    // לצמצם. `setGuardQualifications` עצמו מנרמל רשימה ריקה לאותו null
+    // בקצה הכתיבה, כך ששני הקצוות מסכימים במבנה ולא במקרה.
+    await actions.setGuardQualifications(qualEditing.id, ordered.length === categories.length ? null : ordered);
+    setQualEditing(null);
+  };
 
   const code = user.teamCode;
   const shareMsg = `שלום! מזמין אותך להצטרף למערכת NexRota של הצוות.
@@ -2427,14 +2460,32 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo }) {
                       )}
                     </p>
                     <p className="text-xs text-faint">{g.phone || "—"}</p>
-                    {g.deadlineExempt && (
-                      <Badge tone="info" icon="bell">
-                        פטור ממועד ההגשה
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                      {g.deadlineExempt && (
+                        <Badge tone="info" icon="bell">
+                          פטור ממועד ההגשה
+                        </Badge>
+                      )}
+                      {/* מילים וספרה, לא רק צבע — אותו כלל שכתוב במפורש
+                        * למעלה בשורה הזאת עצמה. מופיע רק למי שצומצם בפועל
+                        * (D-03): אדם שלא נגעו בו לא נושא תג שרומז שהוא
+                        * "אמור" להיות מוגדר. */}
+                      {Array.isArray(g.qualifiedCategories) && g.qualifiedCategories.length > 0 && (
+                        <Badge tone="warn" icon="lock">
+                          {`כשיר/ה ל-${g.qualifiedCategories.length} קטגוריות בלבד`}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
+                  {/* עורך הכשירות, אדם אחד בכל פעם (D-04). */}
+                  <IconBtn
+                    icon="sliders"
+                    size="sm"
+                    label={`ערוך כשירות של ${g.name}`}
+                    onClick={() => openQualEditor(g)}
+                  />
                   {/* Per-guard exception. A deadline with no way to grant one
                       is a deadline that generates phone calls — reservists,
                       illness, a guard who joined mid-week. */}
@@ -2462,6 +2513,70 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo }) {
           </ul>
         )}
       </Card>
+
+      <Modal
+        open={Boolean(qualEditing)}
+        onClose={() => setQualEditing(null)}
+        title={qualEditing ? `כשירות של ${qualEditing.name}` : ""}
+        footer={
+          <>
+            <Btn
+              onClick={saveQualifications}
+              loading={busy}
+              disabled={qualEmptySelection}
+              className="flex-1"
+            >
+              {qualEmptySelection ? "צריך לפחות קטגוריה אחת" : "שמור"}
+            </Btn>
+            <Btn variant="secondary" onClick={() => setQualEditing(null)}>
+              ביטול
+            </Btn>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-xs text-muted">
+            הקטגוריות שנבחרות כאן הן היחידות שהאדם הזה יוכל להשתבץ אליהן — במשמרת ובמשימה כאחד.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {categories.map((c) => {
+              const on = qualSelection.includes(c);
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => toggleQualCategory(c)}
+                  aria-pressed={on}
+                  className={`flex items-center gap-2 h-11 pr-1.5 pl-3 rounded-xl cursor-pointer
+                    ring-1 ring-inset transition-colors duration-200 ${
+                      on
+                        ? "bg-brand/12 ring-brand/45 text-content"
+                        : "bg-surface-sunken ring-hairline text-muted hover:text-content"
+                    }`}
+                >
+                  <Icon name={folderIcon(c)} size={16} />
+                  <span className="text-sm font-medium">{c}</span>
+                  {/* וי ולא רק צבע — אותו כלל שחל על כל שאר המוצר. */}
+                  {on && <Icon name="check" size={14} className="text-brand" strokeWidth={3} />}
+                </button>
+              );
+            })}
+          </div>
+          {/* התוצאה הלא-מובנת מאליה של D-03, נאמרת כאן במפורש: בחירה
+            * מלאה לא נשמרת כרשימה — היא נשמרת כ"ללא הגבלה", כדי שקטגוריה
+            * שתומצא מחר לא תצמצם בשקט מישהו שאיש לא בחר לצמצם. */}
+          <p className="text-xs text-faint">
+            בחירה של כל הקטגוריות נשמרת כ״ללא הגבלה״ — האדם יהיה כשיר אוטומטית גם לקטגוריות שייווצרו בעתיד.
+          </p>
+          {qualEmptySelection && (
+            <p className="text-xs text-danger flex items-center gap-1">
+              <Icon name="alert" size={12} strokeWidth={2.25} />
+              כל אדם חייב להיות כשיר/ה לפחות לקטגוריה אחת — אם הכוונה להוציא את{" "}
+              {qualEditing?.name || "האדם"} מהצוות, זו הפעולה המתאימה, לא איפוס הכשירות.
+            </p>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }

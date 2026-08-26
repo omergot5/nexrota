@@ -259,6 +259,8 @@ export default function SupervisorApp({ state }) {
         actions={actions}
         busy={busy}
         onSeedDemo={startDemo}
+        shifts={shifts}
+        tasks={tasks}
       />
     ),
   };
