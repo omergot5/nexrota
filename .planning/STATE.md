@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 current_phase: 03
 current_phase_name: מודל כשירויות
 status: executing
-stopped_at: discuss-phase 3 הושלם — 2 תחומים אפורים, 4 הכרעות נעולות, 03-CONTEXT.md נכתב. מוכן ל-/gsd-plan-phase 3.
-last_updated: "2026-08-26T07:52:08.051Z"
+stopped_at: פאזה 3 באמצע ביצוע — גל 1 (03-01, מנוע) וגל 2 (03-02, מיגרציה+שער שיבוץ ידני) מוזגו ל-main ואומתו, המיגרציה 0006 רצה על ה-DB האמיתי. גל 3 (03-03, מסך שיבוץ + תיקון MySwaps) נשלח לביצוע ברקע — אם השיחה נקטעה, בדוק worktree עבור agent-a1328d723f6d2fce4 (ייתכן שכבר הסתיים; חפש התראה שלא נקלטה, או git log על worktree-agent-a1328d723f6d2fce4). אחריו: גל 4 (03-04, עורך כשירויות + שער בוחר משימה) עדיין לא נשלח.
+last_updated: "2026-08-26T08:15:00.000Z"
 last_activity: 2026-08-26
-last_activity_desc: Phase 03 execution started
-state_head: 571fbe46b4be4f0e4cfdd79b178c677cc3bb2c49
+last_activity_desc: Phase 03 wave 2 (03-02) merged and migration applied; wave 3 (03-03) dispatched
+state_head: 7c6123a
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 2
   total_plans: 10
-  completed_plans: 6
-  percent: 0
+  completed_plans: 8
+  percent: 40
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-08-21)
 ## Current Position
 
 Phase: 03 (מודל כשירויות) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 03
-Last activity: 2026-08-26 — Phase 03 execution started
+Plan: 2 of 4 complete, 3rd in progress
+Status: Executing Phase 03 — wave 3 (03-03) running in background, wave 4 (03-04) not yet dispatched
+Last activity: 2026-08-26 — Phase 03 wave 2 (03-02) merged: gs_profiles.qualified_categories + gs_shifts.category live on the real database, manual-assignment gated on qualification alone (P-01). Wave 3 (03-03: shift-category form, AssignView qualification display, GuardApp.jsx MySwaps bug fix) dispatched to a background executor.
 
-Progress: [████░░░░░░] 40%
+Progress: [██████░░░░] 60%
 
 ## Performance Metrics
 
@@ -98,5 +98,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-08-26
-Stopped at: discuss-phase 3 הושלם במלואו — 2 תחומים אפורים נדונו, 03-CONTEXT.md ו-03-DISCUSSION-LOG.md נכתבו. הצעד הבא: /gsd-plan-phase 3.
-Resume file: .planning/phases/03-eligibility-model/03-CONTEXT.md
+Stopped at: פאזה 3 באמצע /gsd-execute-phase 3 — 2 מתוך 4 גלים מוזגו (03-01, 03-02), מיגרציית 0006 רצה על ה-DB האמיתי, גל 3 (03-03) נשלח לרקע וייתכן שהסתיים כבר. אחרי שהוא מוזג: הרץ npm test / npm run build, נקה worktree, ואז שלח את גל 4 (03-04, עורך כשירויות ברוסטר + שער בוחר מבצעי משימה) לפני שממשיכים לאימות סופי ולסגירת הפאזה.
+Resume file: .planning/phases/03-eligibility-model/03-03-PLAN.md
