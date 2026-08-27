@@ -595,7 +595,7 @@ export async function decideSwap(swap, status) {
  * מפורשות מאשר לשמור בשקט משימה בלי השדה החדש ולתת למשתמש לגלות לבד.
  */
 const MIGRATION_HINT =
-  "בסיס הנתונים לא מעודכן. הרץ את המיגרציות בתיקיית supabase/migrations — האחרונה היא 0008_positions_index_fix.sql — ואז נסה שוב.";
+  "בסיס הנתונים לא מעודכן. הרץ את המיגרציות בתיקיית supabase/migrations — האחרונה היא 0009_positions_rls_use_helpers.sql — ואז נסה שוב.";
 
 // Exported (like shiftToRow) so the round-trip mappers can be asserted
 // directly from scripts/verify-planning.mjs (UNIF-01 Tests W/X) — the same
