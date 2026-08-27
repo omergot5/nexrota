@@ -26,6 +26,10 @@ import { setTermProfile } from "../lib/terms.js";
 // מבצע כתיבה ישירה, ולכן חייב לשאול את אותה שאלה שהמנוע שואל לפני שהוא
 // כותב — בדיוק כמו ששני מסכי ההחלפה כבר עושים לפני אישור.
 import { checkQualification } from "../lib/autoAssign.js";
+// Phase 4: המרת "עמדה קבועה פעילה" ל"מה חסר לשבוע הזה" היא גזירה טהורה —
+// אותו עיקרון ש-checkQualification כבר נוהג בו כאן: שכבת ה-state קוראת
+// למנוע, לא מדמה אותו.
+import { missingRowsForWeek } from "../lib/positions.js";
 
 const EMPTY = {
   team: null,
@@ -38,6 +42,7 @@ const EMPTY = {
   tasks: [],
   taskTemplates: [],
   compatibility: [],
+  positions: [],
 };
 
 /**
@@ -675,6 +680,45 @@ export function useGuardian() {
           (d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id) }),
           () => api.deleteTask(id)
         ),
+
+      // ---------- positions (Phase 4) ----------
+
+      addPosition: (position) =>
+        run(async () => {
+          await api.createPosition(position, dataRef.current.team?.code);
+          await refresh();
+        }),
+
+      updatePosition: (id, patch) =>
+        run(async () => {
+          await api.updatePosition(id, { ...patch, teamCode: dataRef.current.team?.code });
+          await refresh();
+        }),
+
+      deletePosition: (id) =>
+        deferred(
+          "העמדה נמחקה",
+          (d) => ({ ...d, positions: d.positions.filter((p) => p.id !== id) }),
+          () => api.deletePosition(id)
+        ),
+
+      /**
+       * מממש שורות שבועיות חסרות לכל עמדת template פעילה (POS-01, POS-04).
+       * שער ה-DoS (T-04-05): אם אין חוסרים, חוזר מיד עם {created: 0} בלי שום
+       * כתיבה ובלי refresh() — כי המסך שקורא לזה יכול לקרוא בכל שינוי שבוע,
+       * ו-refresh() ללא תנאי מכאן היה לולאה. עמדות shape==="weekly" מדולגות
+       * במפורש כאן — הרוטציה השבועית היא 04-03.
+       */
+      ensurePositionsForWeek: (sundayISO) =>
+        run(async () => {
+          const { positions, shifts, team } = dataRef.current;
+          const active = (positions || []).filter((p) => p.active && p.shape === "template");
+          const rows = active.flatMap((p) => missingRowsForWeek(p, sundayISO, shifts));
+          if (!rows.length) return { created: 0 };
+          await api.materializeTemplateShifts(rows, team?.code);
+          await refresh();
+          return { created: rows.length };
+        }),
     }),
     [run, optimistic, deferred, refresh]
   );

@@ -33,6 +33,9 @@ export const shiftFromRow = (row) => ({
   assignmentMeta: Object.fromEntries(
     (row.gs_assignments || []).map((a) => [a.guard_id, { source: a.source, score: a.score, reason: a.reason }])
   ),
+  // עמדה קבועה שהמשמרת הזאת מומשה ממנה (Phase 4, POS-01/POS-03). `null`
+  // כברירת מחדל — רוב המשמרות אינן מומשות מעמדה בכלל.
+  positionId: row.position_id || null,
 });
 
 export const shiftToRow = (shift, teamCode) => ({
@@ -51,6 +54,9 @@ export const shiftToRow = (shift, teamCode) => ({
   // לאותו שדה על משימה. בלי נפילה ל-fallback: קטגוריה היא הגבלה, ומשמרת
   // שאף אחד לא הקליד לה קטגוריה חייבת להישאר בלי הגבלה לכולם (D-03).
   category: shift.category || null,
+  // `null` מפורש ולא השמטה: בלי המפתח בכיוון הכתיבה, עריכת משמרת דרך
+  // הטופס הייתה מנתקת אותה בשקט מהעמדה הקבועה שלה (Phase 4).
+  position_id: shift.positionId || null,
 });
 
 export const profileFromRow = (row) => ({
@@ -109,6 +115,36 @@ export const taskFromRow = (row) => ({
   // שונה משדה חסר אחר באותו אובייקט הוא בדיוק איך שהקורא הבא מתבלבל.
   startTime: row.start_time ? hhmm(row.start_time) : null,
   endTime: row.end_time ? hhmm(row.end_time) : null,
+  // עמדה קבועה שהמשימה הזאת מומשה ממנה (Phase 4, POS-01/POS-03).
+  positionId: row.position_id || null,
+});
+
+// ---------- positions ----------
+
+export const positionFromRow = (row) => ({
+  id: row.id,
+  teamCode: row.team_code,
+  shape: row.shape,
+  title: row.title,
+  category: row.category,
+  weekdays: Array.isArray(row.weekdays) ? row.weekdays : [],
+  startTime: row.start_time ? hhmm(row.start_time) : null,
+  endTime: row.end_time ? hhmm(row.end_time) : null,
+  requiredGuards: row.required_guards ?? 1,
+  active: row.active !== false,
+});
+
+export const positionToRow = (position, teamCode) => ({
+  ...(position.id && !String(position.id).startsWith("tmp") ? { id: position.id } : {}),
+  team_code: teamCode,
+  shape: position.shape,
+  title: position.title,
+  category: position.category,
+  weekdays: position.shape === "template" ? position.weekdays || [] : null,
+  start_time: position.shape === "template" ? position.startTime || null : null,
+  end_time: position.shape === "template" ? position.endTime || null : null,
+  required_guards: position.requiredGuards || 1,
+  active: position.active !== false,
 });
 
 // ---------- auth ----------
@@ -258,7 +294,7 @@ export async function loadTeam(teamCode) {
   // התבניות ומטריצת ההתנגשויות נשלפות יחד עם השאר ולא בבקשה נפרדת: שתיהן
   // עשרות שורות לכל היותר, ושתיהן נדרשות ברגע שנפתח מסך המשימות. בקשה
   // שנייה הייתה קונה כלום ומשלמת בהבהוב.
-  const [teamRes, profilesRes, shiftsRes, availRes, swapsRes, tasksRes, tplRes, compatRes] = await Promise.all([
+  const [teamRes, profilesRes, shiftsRes, availRes, swapsRes, tasksRes, tplRes, compatRes, posRes] = await Promise.all([
     supabase.from("gs_teams").select("*").eq("code", teamCode).maybeSingle(),
     supabase.from("gs_profiles").select("*").eq("team_code", teamCode).order("created_at"),
     supabase.from("gs_shifts").select("*, gs_assignments(guard_id, source, score, reason)")
@@ -270,6 +306,9 @@ export async function loadTeam(teamCode) {
       .or(`team_code.is.null,team_code.eq.${teamCode}`).order("sort"),
     supabase.from("gs_role_compatibility").select("*")
       .or(`team_code.is.null,team_code.eq.${teamCode}`),
+    // .order() כאן הוא חובה ולא סגנון: קריאה בלי סדר מפורש היא בדיוק
+    // אי-הדטרמיניזם ש-Pitfall 1 (04-RESEARCH.md) מתאר.
+    supabase.from("gs_positions").select("*").eq("team_code", teamCode).order("created_at"),
   ]);
 
   const firstError = [teamRes, profilesRes, shiftsRes, availRes, swapsRes, tasksRes].find((r) => r.error)?.error;
@@ -303,6 +342,10 @@ export async function loadTeam(teamCode) {
     // צריכה להמשיך לעבוד בלי תבניות — לא ליפול על מסך שגיאה.
     taskTemplates: (tplRes.data || []).map(templateFromRow),
     compatibility: (compatRes.data || []).map(compatFromRow),
+    // גם היא **לא** נכללת ב-firstError, מאותה סיבה בדיוק: בסיס נתונים
+    // שהמיגרציה 0007 טרם רצה עליו חייב להמשיך לטעון בלי עמדות, לא ליפול
+    // על מסך שגיאה (Phase 4).
+    positions: (posRes.data || []).map(positionFromRow),
   };
 }
 
@@ -552,7 +595,7 @@ export async function decideSwap(swap, status) {
  * מפורשות מאשר לשמור בשקט משימה בלי השדה החדש ולתת למשתמש לגלות לבד.
  */
 const MIGRATION_HINT =
-  "בסיס הנתונים לא מעודכן. הרץ את המיגרציות בתיקיית supabase/migrations — האחרונה היא 0006_qualification.sql — ואז נסה שוב.";
+  "בסיס הנתונים לא מעודכן. הרץ את המיגרציות בתיקיית supabase/migrations — האחרונה היא 0008_positions_index_fix.sql — ואז נסה שוב.";
 
 // Exported (like shiftToRow) so the round-trip mappers can be asserted
 // directly from scripts/verify-planning.mjs (UNIF-01 Tests W/X) — the same
@@ -575,12 +618,16 @@ export const taskColumns = (task) => ({
   // בשורה ערך שאף מסך לא יראה יותר.
   start_time: task.startTime || null,
   end_time: task.endTime || null,
+  // `null` מפורש ולא השמטה, מאותה סיבה בדיוק ש-shiftToRow נוהג כך על
+  // position_id (Phase 4): בלי המפתח בכיוון הכתיבה, עריכת משימה הייתה
+  // מנתקת אותה בשקט מהעמדה הקבועה השבועית שלה.
+  position_id: task.positionId || null,
 });
 
 const asTaskError = (error) => {
   const m = String(error.message || "");
   return new Error(
-    /column .*(category|assignees|start_date|start_time|end_time)/i.test(m) || error.code === "PGRST204"
+    /column .*(category|assignees|start_date|start_time|end_time|position_id)/i.test(m) || error.code === "PGRST204"
       ? MIGRATION_HINT
       : m
   );
@@ -632,4 +679,57 @@ export async function updateTask(id, patch) {
 export async function deleteTask(id) {
   const { error } = await supabase.from("gs_tasks").delete().eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+// ---------- positions (Phase 4) ----------
+
+export async function createPosition(position, teamCode) {
+  const { data, error } = await supabase
+    .from("gs_positions")
+    .insert(positionToRow(position, teamCode))
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return positionFromRow(data);
+}
+
+/**
+ * `.select()` ולא עדכון עיוור: כש-RLS מסננת את כל השורות, Supabase מחזירה
+ * `error: null` ומערך ריק — כלומר "הצלחה" שלא כתבה כלום. אותה מוסכמה
+ * ש-`setGuardQualifications`/`updateTeamSettings` כבר נוהגים בה.
+ */
+export async function updatePosition(id, patch) {
+  const row = positionToRow(patch, patch.teamCode);
+  delete row.id;
+  delete row.team_code;
+  const { data, error } = await supabase
+    .from("gs_positions").update(row).eq("id", id).select();
+  if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה לשנות את העמדה הזאת — התחבר מחדש ונסה שוב");
+  }
+}
+
+export async function deletePosition(id) {
+  const { error } = await supabase.from("gs_positions").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * הנתיב היחיד שכותב שורות שבועיות שהתממשו מעמדת תבנית (Pattern 1,
+ * 04-RESEARCH.md). `ignoreDuplicates: true` הופך קריאה שנייה על אותו שבוע
+ * ל-no-op בטוח-לתחרות ברמת ה-DB — האינדקס הייחודי על (position_id, date)
+ * הוא רשת הביטחון, לא הבודק היחיד (POS-04).
+ */
+export async function materializeTemplateShifts(rows, teamCode) {
+  if (!rows.length) return [];
+  const { data, error } = await supabase
+    .from("gs_shifts")
+    .upsert(
+      rows.map((r) => shiftToRow(r, teamCode)),
+      { onConflict: "position_id,date", ignoreDuplicates: true }
+    )
+    .select("*, gs_assignments(guard_id, source, score, reason)");
+  if (error) throw new Error(error.message);
+  return (data || []).map(shiftFromRow);
 }
