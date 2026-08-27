@@ -14,9 +14,11 @@ import { useState } from "react";
 import {
   Badge, Btn, Card, EmptyState, Field, IconBtn, Input, Modal, PageHeader, Segmented, Select,
 } from "../ui.jsx";
+import { Icon } from "../icons.jsx";
 import { DAYS_HE_SHORT } from "../../lib/dates.js";
 import { t } from "../../lib/terms.js";
 import { categoryOptions } from "./views.jsx";
+import { qualifiedGuardsForPosition, workingGuardIdsForWeek } from "../../lib/positions.js";
 
 const emptyForm = (category) => ({
   title: "",
@@ -254,11 +256,49 @@ export default function PositionsScreen({
   );
 }
 
-/** כרטיס עמדה יחיד: הגדרה + תגיות. שתי הרשימות של POS-05 מתווספות ב-Task 2. */
-function PositionCard({ position: p, onEdit, onDelete }) {
+/**
+ * כרטיס עמדה יחיד: הגדרה + שתי הרשימות של POS-05.
+ *
+ * שתי הרשימות למטה נגזרות משתי פונקציות שונות ומשני שדות מקור שונים —
+ * `qualifiedGuardsForPosition` קוראת `guard.qualifiedCategories`,
+ * `workingGuardIdsForWeek` קוראת `assignedGuards`/`assignees` על שורות
+ * שהתממשו. אין נתיב קוד אחד שבו רשימה אחת נגזרת מהשנייה (04-01-SUMMARY,
+ * 04-RESEARCH.md Pitfall 2).
+ */
+function PositionCard({ position: p, guards, shifts, tasks, weekDates, onEdit, onDelete }) {
+  const sundayISO = weekDates[0];
+  const qualified = qualifiedGuardsForPosition(p, guards);
+
+  // `workingGuardIdsForWeek` נותנת את קבוצת ה-ID; תאריך-העבודה של כל שם
+  // נגזר כאן בנפרד, מאותם שדות בדיוק ומאותו `weekDates` שהמסך כבר מחזיק —
+  // זו קיבוץ לתצוגה, לא מקור שני של אמת.
+  const workingIds = new Set(workingGuardIdsForWeek(p, { shifts, tasks }, sundayISO));
+  const weekSet = new Set(weekDates);
+  const datesByGuard = new Map();
+  for (const s of shifts) {
+    if (s.positionId !== p.id || !weekSet.has(s.date)) continue;
+    for (const gid of s.assignedGuards || []) {
+      if (!datesByGuard.has(gid)) datesByGuard.set(gid, new Set());
+      datesByGuard.get(gid).add(s.date);
+    }
+  }
+  for (const task of tasks) {
+    const d = task.dueDate || task.startDate;
+    if (task.positionId !== p.id || !weekSet.has(d)) continue;
+    for (const gid of task.assignees || []) {
+      if (!datesByGuard.has(gid)) datesByGuard.set(gid, new Set());
+      datesByGuard.get(gid).add(d);
+    }
+  }
+  const working = [...workingIds].map((id) => ({
+    id,
+    name: guards.find((g) => g.id === id)?.name || "—",
+    dates: [...(datesByGuard.get(id) || [])].sort(),
+  }));
+
   return (
     <Card className={!p.active ? "opacity-70" : ""}>
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3 mb-4">
         <div className="min-w-0">
           <h3 className="font-bold text-content flex items-center gap-2 flex-wrap">
             {p.title}
@@ -286,6 +326,67 @@ function PositionCard({ position: p, onEdit, onDelete }) {
             className="hover:text-danger"
             onClick={onDelete}
           />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 pt-4 border-t border-hairline">
+        {/* רשימה א' — מי כשיר. קריאה בלבד: אין כפתור, אין תיבת סימון, ואין
+          * שום דבר שנקרא כ"שייך אדם לעמדה" (D-04, POS-02). צ'יפ מתוחם, לא
+          * שורה מלאה — הצורה עצמה, לא רק הצבע, אומרת "זה לא שיבוץ". */}
+        <div>
+          <h4 className="flex items-center gap-1.5 text-xs font-bold text-muted mb-2">
+            <Icon name="key" size={14} />
+            {t("positions.qualified")}
+          </h4>
+          {qualified.length === 0 ? (
+            <p className="text-xs text-warn flex items-center gap-1.5">
+              <Icon name="alert" size={12} strokeWidth={2.25} />
+              אין כשירים לקטגוריה "{p.category}" — העמדה לא יכולה להתמלא
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {qualified.map((g) => (
+                <span
+                  key={g.id}
+                  className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-xs font-medium
+                    text-content ring-1 ring-inset ring-hairline-strong bg-transparent"
+                >
+                  {g.name}
+                  <span className="text-faint">· כשיר/ה</span>
+                </span>
+              ))}
+            </div>
+          )}
+          <p className="text-[11px] text-faint mt-2">
+            שינוי כשירות נעשה בעורך הכשירות במסך "{t("nav.team")}", לא כאן.
+          </p>
+        </div>
+
+        {/* רשימה ב' — מי עובד בפועל השבוע. שורה מלאה עם רקע מלא ותאריך על
+          * כל שם — ההבדל הוא בצורה ובטקסט, לא רק בכותרת (POS-05). */}
+        <div>
+          <h4 className="flex items-center gap-1.5 text-xs font-bold text-muted mb-2">
+            <Icon name="calendar" size={14} />
+            {t("positions.working")}
+          </h4>
+          {working.length === 0 ? (
+            <p className="text-xs text-muted">עוד לא שובץ אף אחד השבוע</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {working.map((w) => (
+                <li
+                  key={w.id}
+                  className="flex items-center justify-between gap-2 h-9 px-2.5 rounded-lg
+                    bg-surface-sunken ring-1 ring-inset ring-hairline"
+                >
+                  <span className="text-sm font-semibold text-content truncate">{w.name}</span>
+                  <span className="text-[11px] text-muted flex-shrink-0" data-numeric>
+                    {w.dates.map((d) => d.slice(5)).join(", ")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </Card>
