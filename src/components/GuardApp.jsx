@@ -10,6 +10,7 @@ import {
   shiftInterval, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
 } from "../lib/dates.js";
 import { availStatus, checkAssignment, teamAverages } from "../lib/autoAssign.js";
+import { qualifiedGuardsForPosition } from "../lib/positions.js";
 import { subscribeTerms, t, termProfile } from "../lib/terms.js";
 
 const navItems = () => [
@@ -126,7 +127,7 @@ function FairnessLine({ mine, avg }) {
   );
 }
 
-function MySchedule({ user, guards, shifts, tasks = [] }) {
+function MySchedule({ user, guards, shifts, tasks = [], positions = [] }) {
   const today = todayISO();
   const mine = shifts
     .filter((s) => s.published && s.assignedGuards.includes(user.id))
@@ -151,6 +152,15 @@ function MySchedule({ user, guards, shifts, tasks = [] }) {
     [guards, withTasks]
   );
   const mine_ = perGuard[user.id];
+
+  // "העמדות שאני כשיר/ה להן" (POS-05, ROADMAP §4.4): גזירה קריאה-בלבד מעל
+  // qualifiedGuardsForPosition, אותה פונקציה טהורה בדיוק שהמסך של המנהל
+  // קורא. זו רשימת היתר, לא רשימת שיבוץ — עמדה שהמשתמש באמת עובד בה השבוע
+  // כבר מופיעה למעלה בין התורנויות כי היא התממשה לשורה רגילה; היא לא
+  // משוכפלת לכאן.
+  const myPositions = positions.filter(
+    (p) => p.active && qualifiedGuardsForPosition(p, [user]).length > 0
+  );
 
   return (
     <div className="space-y-6">
@@ -317,6 +327,36 @@ function MySchedule({ user, guards, shifts, tasks = [] }) {
                     })}
                 </div>
               </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* בלוק כשירות, לא לוח עבודה. שני הכללים שהופכים אותו לבלתי-ניתן
+        * לבלבול עם התורנויות למעלה (POS-05, אותם ארבעה ערוצים):
+        * `<Icon name="key">` ולא "calendar", וצ'יפ מתוחם בלי תאריך —
+        * תאריך על פריט כאן הוא בדיוק הרמז שהופך אותו למשמרת בעיני הקורא. */}
+      {myPositions.length > 0 && (
+        <Card>
+          <h2 className="font-bold text-content mb-1 flex items-center gap-2">
+            <Icon name="key" size={17} className="text-muted" />
+            {t("positions.mine")}
+          </h2>
+          <p className="text-xs text-muted mb-3">
+            זו רשימת מה שמותר לך — לא לוח עבודה. מה שאתה בפועל עובד בו השבוע כבר מופיע למעלה בין
+            התורנויות.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {myPositions.map((p) => (
+              <span
+                key={p.id}
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-sm font-medium
+                  text-content ring-1 ring-inset ring-hairline-strong bg-transparent"
+              >
+                <Icon name="key" size={13} className="text-muted" />
+                {p.title}
+                <span className="text-faint text-xs">· {p.category}</span>
+              </span>
             ))}
           </div>
         </Card>
@@ -780,7 +820,8 @@ function MySwaps({ user, guards, shifts, availability = {}, swapRequests, action
 
 export default function GuardApp({ state }) {
   const {
-    user, team, guards, shifts, availability, swapRequests, tasks, actions, busy, error, clearError, logout, offline,
+    user, team, guards, shifts, availability, swapRequests, tasks, positions, actions, busy, error,
+    clearError, logout, offline,
   } = state;
   const [view, setView] = useState("schedule");
   const profile = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
@@ -799,7 +840,9 @@ export default function GuardApp({ state }) {
   ).length;
 
   const views = {
-    schedule: <MySchedule user={user} guards={guards} shifts={shifts} tasks={tasks} />,
+    schedule: (
+      <MySchedule user={user} guards={guards} shifts={shifts} tasks={tasks} positions={positions} />
+    ),
     availability: (
       <MyAvailability
         user={user}
