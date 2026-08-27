@@ -4,6 +4,7 @@ import { Icon } from "./icons.jsx";
 import { LogoMark } from "./Logo.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 import { SupDashboard, SwapMgmt, TaskMgmt, TeamView } from "./supervisor/views.jsx";
+import PositionsScreen from "./supervisor/PositionsScreen.jsx";
 import WeekFlow, { STEP_OF } from "./supervisor/WeekFlow.jsx";
 import CalendarView from "./supervisor/CalendarView.jsx";
 import WeekCalendar from "./supervisor/WeekCalendar.jsx";
@@ -36,6 +37,7 @@ const moreItems = () => [
   { id: "dashboard", label: t("nav.dashboard"), icon: "chart", hint: "מצב הצוות במבט אחד" },
   { id: "swaps", label: t("nav.swaps"), icon: "swap", hint: "מי ביקש להתחלף ועם מי", badge: true },
   { id: "tasks", label: t("nav.tasks"), icon: "pencil", hint: "משימות שלא קשורות למשמרת" },
+  { id: "positions", label: t("nav.positions"), icon: "shield", hint: "עמדה שחוזרת כל שבוע לבד" },
   { id: "analytics", label: t("nav.analytics"), icon: "trending", hint: "עומסים, לילות והוגנות" },
 ];
 
@@ -71,7 +73,7 @@ const WeekNav = ({ offset, setOffset, dates }) => (
 export default function SupervisorApp({ state }) {
   const {
     user, team, guards, shifts, availability, swapRequests, tasks,
-    taskTemplates, compatibility,
+    taskTemplates, compatibility, positions,
     actions, busy, error, clearError, logout, pending, undo, offline,
   } = state;
 
@@ -93,6 +95,15 @@ export default function SupervisorApp({ state }) {
   const TITLES = useMemo(() => titles(MORE), [MORE]);
 
   const weekDates = useMemo(() => weekByOffset(weekOffset), [weekOffset]);
+
+  // POS-01: "בלי שנגע בכלום" — הטריגר הוא מעבר שבוע, לא כפתור. `actions`
+  // יציב רפרנציאלית ולכן אינו מייצר ריצה מחדש, ו-`ensurePositionsForWeek`
+  // כבר חוזר בלי כתיבה ובלי refresh() כשאין חוסרים (04-01, T-04-05), ולכן
+  // האפקט הזה אינו לולאה.
+  useEffect(() => {
+    actions.ensurePositionsForWeek(weekDates[0]);
+  }, [weekDates[0], actions]);
+
   const pendingSwaps = swapRequests.filter((r) => r.status === "pending").length;
   const current = NAV.find((n) => n.id === view);
   const isWeek = view === "week";
@@ -262,6 +273,17 @@ export default function SupervisorApp({ state }) {
         onSeedDemo={startDemo}
         shifts={shifts}
         tasks={tasks}
+      />
+    ),
+    positions: (
+      <PositionsScreen
+        positions={positions}
+        guards={guards}
+        shifts={shifts}
+        tasks={tasks}
+        weekDates={weekDates}
+        actions={actions}
+        busy={busy}
       />
     ),
   };

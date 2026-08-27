@@ -29,11 +29,19 @@ const BASE = {
   "nav.tasks":       "משימות",
   "nav.analytics":   "דוחות",
   "nav.team":        "הצוות שלי",
+  "nav.positions":   "עמדות קבועות",
 
   // ניווט משתתף
   "guard.nav.schedule":     "התורנויות שלי",
   "guard.nav.availability": "מתי אני יכול",
   "guard.nav.swaps":        "החלפות",
+
+  // עמדות קבועות (Phase 4, POS-01/POS-05)
+  "positions.shape.template": "תבנית משמרת",
+  "positions.shape.weekly":   "שבועית ללא שעות",
+  "positions.qualified":      "מי כשיר לעמדה",
+  "positions.working":        "מי עובד בה השבוע",
+  "positions.mine":           "העמדות שאני כשיר/ה להן",
 
   // פעולות חוזרות
   "action.rerun":   "הרץ מחדש",
@@ -68,11 +76,13 @@ const PROFILE_TERMS = {
     "nav.swaps":        "בקשות חילוף",
     "nav.tasks":        "משימות",
     "nav.team":         "הכפופים לי",
+    "nav.positions":    "עמדות קבע",
     "guard.nav.schedule":     "התורנויות שלי",
     "guard.nav.availability": "דיווח זמינות",
     "guard.nav.swaps":        "חילופים",
     "action.publish":   "הפץ סד\"כ",
     "unit.shifts":      "תורנויות",
+    "positions.working": "מי מחזיק בה השבוע",
   },
 };
 

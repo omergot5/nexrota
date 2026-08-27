@@ -1510,7 +1510,7 @@ const folderIcon = (name) => FOLDERS.find((f) => f.name === name)?.icon || "clip
  * היא לא מסננת לפי שימוש כמו החישוב `folders` של `TaskMgmt` למטה (שכן
  * מקבץ שורות אמיתיות ולכן חייב לסנן).
  */
-const categoryOptions = (shifts = [], tasks = []) => {
+export const categoryOptions = (shifts = [], tasks = []) => {
   const used = new Set();
   for (const item of shifts || []) {
     if (item?.category) used.add(item.category);
