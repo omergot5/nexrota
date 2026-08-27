@@ -252,6 +252,58 @@ const { error: junkErr } = await guardSloppy.from("gs_availability").upsert({
 });
 check("an unknown status is still rejected by the constraint", Boolean(junkErr));
 
+// ---------- 10. standing positions (gs_positions) ----------
+// Phase 4: gs_positions is the first genuinely new RLS surface since Phase 3.
+// Proves live, not just via grep on the migration file (CLAUDE.md "אימות בדפדפן").
+console.log("\n=== standing positions (gs_positions) ===");
+
+const { data: posRows, error: posErr } = await sup.from("gs_positions").insert({
+  team_code: CODE, shape: "template", title: "עמדת קבלה", category: "שמירות",
+  weekdays: [0, 1, 2, 3, 4], start_time: "08:00", end_time: "16:00",
+}).select();
+check("supervisor inserts a position and gets a row back from .select()",
+  !posErr && posRows?.length === 1, posErr?.message);
+const position = posRows?.[0];
+
+const { data: guardPosInsert, error: guardPosErr } = await guardA.from("gs_positions").insert({
+  team_code: CODE, shape: "template", title: "עמדה פיראטית", category: "שמירות",
+}).select();
+check("guard (non-supervisor) cannot create a position",
+  Boolean(guardPosErr) || (guardPosInsert?.length || 0) === 0, "insert unexpectedly allowed");
+
+const { data: guardPosRead, error: guardPosReadErr } = await guardA.from("gs_positions").select("*").eq("id", position?.id);
+check("guard can read their own team's position", guardPosRead?.length === 1,
+  guardPosReadErr?.message || `saw ${guardPosRead?.length}, position.id=${position?.id}`);
+
+// idempotency at the DB layer: the unique index on (position_id, date)
+// is the safety net behind materializeTemplateShifts()'s upsert (POS-04).
+const dupDate = iso(1);
+const { data: firstRow, error: firstErr } = await sup.from("gs_shifts").insert({
+  team_code: CODE, date: dupDate, label: "עמדת קבלה", start_time: "08:00", end_time: "16:00",
+  type: "custom", position_id: position?.id,
+}).select();
+check("first position-tagged shift for (position_id, date) is created",
+  !firstErr && firstRow?.length === 1, firstErr?.message);
+
+const { error: plainDupErr } = await sup.from("gs_shifts").insert({
+  team_code: CODE, date: dupDate, label: "עמדת קבלה כפולה", start_time: "08:00", end_time: "16:00",
+  type: "custom", position_id: position?.id,
+});
+check("a second plain insert for the same (position_id, date) is rejected by the unique index",
+  Boolean(plainDupErr), "duplicate insert unexpectedly allowed");
+
+const { data: dupUpsert, error: dupUpsertErr } = await sup.from("gs_shifts").upsert({
+  team_code: CODE, date: dupDate, label: "עמדת קבלה כפולה", start_time: "08:00", end_time: "16:00",
+  type: "custom", position_id: position?.id,
+}, { onConflict: "position_id,date", ignoreDuplicates: true }).select();
+check("with ignoreDuplicates:true the same conflict is a silent no-op (empty array, no error)",
+  !dupUpsertErr && (dupUpsert?.length || 0) === 0, dupUpsertErr?.message || `returned ${dupUpsert?.length}`);
+
+const { data: positionShifts } = await sup.from("gs_shifts")
+  .select("id").eq("position_id", position?.id).eq("date", dupDate);
+check("exactly one shift row exists for this (position_id, date) after both duplicate attempts",
+  positionShifts?.length === 1, `found ${positionShifts?.length}`);
+
 // ---------- cleanup ----------
 await sup.from("gs_teams").delete().eq("code", CODE);
 const { data: leftovers } = await sup.from("gs_shifts").select("id");
