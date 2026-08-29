@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 current_phase: 04
 current_phase_name: עמדות קבועות
-status: awaiting_discussion
-stopped_at: Phase 04 context gathered
-last_updated: "2026-08-27T06:55:54.372Z"
-last_activity: 2026-08-26
-last_activity_desc: Phase 03 closed — verified live in browser against real backend, ROADMAP/STATE updated, ready for Phase 4 discuss-phase
-state_head: 4c4aac02b7793ed90480fcef186b1463ead3c52f
+status: human_needed
+stopped_at: Phase 04 code complete and live-verified; 2 perceptual/comprehension UAT items pending human check
+last_updated: "2026-08-27T08:30:00.000Z"
+last_activity: 2026-08-27
+last_activity_desc: Phase 04 executed (both plans merged), live browser-verified by orchestrator (found and fixed a real gs_positions RLS regression), gsd-verifier ran — status human_needed pending 2 UAT items in 04-UAT.md
+state_head: 89a9322
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 12
-  completed_plans: 10
-  percent: 0
+  completed_plans: 12
+  percent: 80
 ---
 
 # Project State
@@ -23,15 +23,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-21)
 
 **Core value:** אדם שמקבל את האפליקציה לידיו מסיים סידור שבועי מלא בלי שאף אחד יסביר לו כלום — ומה שהמערכת אומרת לו על עצמה הוא נכון.
-**Current focus:** Phase 04 — עמדות קבועות
+**Current focus:** Phase 04 — עמדות קבועות (human verification pending, see 04-UAT.md)
 
 ## Current Position
 
-Phase: 04 (עמדות קבועות) — READY TO EXECUTE
-Status: discuss-phase complete — 04-CONTEXT.md and 04-DISCUSSION-LOG.md written and committed. Ready for `/gsd-plan-phase 4`.
-Last activity: 2026-08-26 — Discussed Phase 4: two position shapes (fixed-schedule "template" vs whole-week "no-hours"), both filled fully automatically by the engine (template via auto-assign-style constraint solving, no-hours via load-based rotation), qualification reuses Phase 3's qualifiedCategories unchanged, minimal dedicated screen here with the polished forward-looking board deferred to Phase 5.
+Phase: 04 (עמדות קבועות) — HUMAN VERIFICATION PENDING
+Status: Both plans (04-01, 04-02) executed, merged, and code-level verified (npm test, npm run build, live browser regression testing). gsd-verifier report: 8/8 code-and-unit-test truths verified; status `human_needed` on 2 outstanding perceptual/comprehension UAT items (04-UAT.md) plus one test-harness-flakiness item accepted as pre-existing (see deferred-items.md).
+Last activity: 2026-08-27 — Live browser verification found and fixed a real regression: gs_positions RLS policies returned zero rows for the anonymous demo flow (migration 0009_positions_rls_use_helpers.sql), silently breaking POS-01 materialization beyond the first week. Fixed and re-verified live across two fresh demo sessions and 3+ never-visited weeks.
 
-Progress: [████████████░░░░░░░░] 60% (Phase 3 done, Phase 4 context ready)
+Progress: [████████████████░░░░] 80% (Phases 1-3 done, Phase 4 code complete + live-verified, 2 UAT items pending human sign-off)
 
 ## Performance Metrics
 
@@ -86,6 +86,8 @@ Recent decisions affecting current work:
 - [Phase 04]: D-02/D-03: both position shapes are filled fully automatically by the engine every week, no manager selection step — template positions via the same constraint-first fill autoAssign already uses, weekly positions via a fixed load-based rotation (whoever carried it least).
 - [Phase 04]: D-04: position qualification reuses Phase 3's qualifiedCategories unchanged — not a separate qualification concept.
 - [Phase 04]: D-05: Phase 4 builds only a minimal dedicated screen for POS-05 (who's qualified vs who's working this week); the polished forward-looking board view is explicitly Phase 5's BOARD-02.
+- [Phase 04]: gs_positions RLS must use gs_my_team()/gs_is_supervisor() (matching gs_shifts), not a raw auth.uid() subquery — the raw-subquery precedent (gs_task_templates/gs_role_compatibility) silently returns 0 rows for the app's real anonymous-demo auth flow, masked on those two tables only by their `team_code is null or ...` fallback. gs_positions has no such fallback, so this was the first table where the gap became user-visible. Found via live browser regression testing after both plans merged, fixed in supabase/migrations/0009_positions_rls_use_helpers.sql.
+- [Phase 04]: `npm run test:backend`'s "standing positions" section intermittently fails `permission denied for function gs_my_team` due to that section's guard client session going stale over the script's long, un-refreshed run — not a defect in the migration (confirmed via a clean isolated reproduction). Accepted as the same pre-existing test-harness-flakiness class already logged for this script; see deferred-items.md.
 
 ### Pending Todos
 
@@ -109,6 +111,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-26T12:18:20.864Z
-Stopped at: Phase 04 context gathered
-Resume file: C:/Users/omerg/OneDrive - Ariel University/Desktop/claude projects/shd/.planning/phases/04-standing-positions/04-CONTEXT.md
+Last session: 2026-08-27T08:30:00.000Z
+Stopped at: Phase 04 code complete, merged, and live-verified by the orchestrator; gsd-verifier report status human_needed pending 2 perceptual/comprehension UAT items
+Resume file: C:/Users/omerg/OneDrive - Ariel University/Desktop/claude projects/shd/.planning/phases/04-standing-positions/04-UAT.md
