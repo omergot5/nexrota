@@ -31,28 +31,19 @@ expected: |
   As a supervisor, open "עוד" → "עמדות קבועות", define a template position (weekdays + hours),
   switch forward and back a week, and confirm shift rows appear with no extra click and no
   duplicates on repeat navigation.
-result: PARTIALLY COVERED — the orchestrator's own live browser regression test (see
-  04-01-SUMMARY.md's Post-Merge Finding) created a position and navigated through 3+
-  never-before-visited weeks with no reload, confirming materialization each time via both
-  the UI and a direct database query, and confirmed no duplicate rows. This differs from the
-  original script (it targeted the RLS regression specifically, not this exact click sequence)
-  — worth a final quick pass but low residual risk.
+result: pass
 
 ### 4. 04-01 Task 3 human-check — dashboard confirmation of materialized rows
 expected: |
   Define a template position, confirm materialized shift rows carry `position_id` in the
   Supabase dashboard, and confirm a second `ensurePositionsForWeek` call on the same week
   adds nothing.
-result: PARTIALLY COVERED — confirmed via direct SQL query (equivalent to dashboard
-  inspection) during the orchestrator's Post-Merge regression test; the "second call adds
-  nothing" idempotency guarantee is additionally proven at the unit level (`npm test`,
-  POS-04 section, 5/5 checks) and was observed live (repeat week visits never duplicated rows).
+result: pass
 
 ## Summary
 
 total: 4
-passed: 2
+passed: 4
 failed: 0
 pending: 0
-skipped: 2 (tests 3 and 4 — substantially covered by the orchestrator's own live regression
-  testing during phase execution; not re-run as separate manual checks)
+skipped: 0

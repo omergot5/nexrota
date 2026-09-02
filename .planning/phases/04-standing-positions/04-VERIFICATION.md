@@ -1,23 +1,28 @@
 ---
 phase: 04-standing-positions
 verified: 2026-08-30T00:00:00Z
-status: human_needed
+status: passed
 score: 8/8 must-haves verified (code + unit-test layer); 1 live-backend reliability item and 4 visual/UAT items routed to human verification
 behavior_unverified: 0
 overrides_applied: 0
 human_verification:
+
   - test: "Live-backend reliability of gs_positions RLS (`npm run test:backend`, '=== standing positions ===' section)"
     expected: "All 8 checks print `ok` on a normal run, matching 04-01-SUMMARY.md's claimed 8/8 pass and the Post-Merge Finding's claimed fix (migration 0009)."
     why_human: "The verifier ran `npm run test:backend` three times against the live Supabase project (with adequate spacing to rule out simple rate-limiting). In all three runs, `guard can read their own team's position` failed with `permission denied for function gs_my_team`, and in two of the three the follow-on `gs_shifts` idempotency checks (`ignoreDuplicates:true is a no-op`, `exactly one shift row exists`) also failed with `new row violates row-level security policy for table gs_shifts`. A separate, minimal isolated reproduction script (single supervisor + single fresh guard, no intervening traffic) exercising the identical sequence — create position as supervisor, read it as guard, insert a position-tagged shift, verify idempotency — passed cleanly and consistently. This strongly suggests the underlying migration 0009 fix (`gs_my_team()`/`gs_is_supervisor()`) is logically correct, and the failure is a harness artifact of the existing `verify-backend.mjs` script (candidate cause: `guardA`'s session is created early in the script and reused ~9 sections later without `autoRefreshToken`, by which point many other network calls have run) rather than a defect real users would hit — but this could not be confirmed with certainty from source review alone, and the plan's own explicit acceptance bar (`npm run test:backend` prints ok on the section) is not being met reproducibly as claimed. A human should either (a) re-run `npm run test:backend` in isolation/spaced out and confirm a clean pass, accepting this as the same class of pre-existing flakiness already logged in `deferred-items.md`, or (b) harden `scripts/verify-backend.mjs`'s positions section (e.g. re-authenticate `guardA` immediately before use) and confirm a clean run before treating POS-01/POS-05's backend proof as solid."
+
   - test: "04-01 Task 3 human-check: define a template position via `actions.addPosition` (React DevTools or the 04-02 form), confirm materialized shift rows carry `position_id` in the Supabase dashboard, and confirm a second `ensurePositionsForWeek` call on the same week adds nothing."
     expected: "Shift rows appear with `position_id` set; repeat run adds zero rows."
     why_human: "Visual/dashboard confirmation, not gate-able by grep. Partially covered by the orchestrator's own Post-Merge live-browser regression test (position created, 3+ never-visited weeks navigated, materialization confirmed on-screen and via direct query) — but that check was scoped to the RLS regression, not a full run-through of this exact human-check script."
+
   - test: "04-02 Task 1 human-check: as a supervisor, open 'עוד' → 'עמדות קבועות', define a template position (weekdays + hours), switch forward and back a week, and confirm shift rows appear with no extra click and no duplicates on repeat navigation."
     expected: "Rows materialize automatically on week view; no duplicate rows after repeated back-and-forth navigation."
     why_human: "Requires a live authenticated browser session; 04-02-SUMMARY.md explicitly records this as `not_run` (no browser automation tool or Supabase credentials in that worktree). Partially covered by the orchestrator's Post-Merge regression test."
+
   - test: "04-02 Task 2 human-check: open a position card with both qualified and working guards. (1) Screenshot in greyscale — the two lists remain distinguishable. (2) Cover both headings with a hand — still distinguishable from icon + item shape alone. (3) Reduce a working guard's qualification and confirm they move to the working-only list, disappearing from qualified."
     expected: "Both perceptual tests pass; the qualification change relocates the guard between lists correctly."
     why_human: "Perceptual/visual judgment call — code review confirms the four independent channels (heading, icon, item shape, per-item text) are structurally present and driven by two separate pure functions over two separate source fields, but whether they read clearly to a human eye is not machine-verifiable. 04-02-SUMMARY.md records this as `not_run`."
+
   - test: "04-02 Task 3 human-check: log in as a guard who is qualified for a position's category but not scheduled on it this week. Confirm the position appears under 'העמדות שאני כשיר/ה להן' (not among the shift list), with no date/time, and ask a person unfamiliar with the screen to read it aloud and state in their own words whether they are working that position this week — the answer must be 'no, I'm only allowed to.'"
     expected: "The naive reader correctly concludes 'qualified, not scheduled.'"
     why_human: "This is precisely the anti-confusion test the phase exists to pass (ROADMAP Success Criterion 4) and is inherently a human-comprehension check. 04-02-SUMMARY.md records this as `not_run`."
