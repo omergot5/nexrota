@@ -15,10 +15,12 @@ import {
   Badge, Btn, Card, EmptyState, Field, IconBtn, Input, Modal, PageHeader, Segmented, Select,
 } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
-import { DAYS_HE_SHORT } from "../../lib/dates.js";
+import { DAYS_HE_SHORT, addDays, rangeLabelHe, shortDate, weekFrom } from "../../lib/dates.js";
 import { t } from "../../lib/terms.js";
 import { categoryOptions } from "./views.jsx";
-import { qualifiedGuardsForPosition, workingGuardIdsForWeek } from "../../lib/positions.js";
+import {
+  missingRowsForWeek, plannedRowsForWeek, qualifiedGuardsForPosition, workingGuardIdsForWeek,
+} from "../../lib/positions.js";
 
 const emptyForm = (category) => ({
   title: "",
@@ -296,6 +298,24 @@ function PositionCard({ position: p, guards, shifts, tasks, weekDates, onEdit, o
     dates: [...(datesByGuard.get(id) || [])].sort(),
   }));
 
+  // BOARD-02 — תחזית ארבעה שבועות קדימה (D-05), מורכבת מעל
+  // plannedRowsForWeek/missingRowsForWeek בלבד — positions.js לא הורחב
+  // (05-RESEARCH.md <board02_positions>). "ממומש" נגזר, לא מאוחסן: שורה
+  // מתוכננת נחשבת ממומשת כשתאריך הזהות שלה (date || dueDate) נעדר
+  // מתוצאת missingRowsForWeek לאותו שבוע — בדיוק אותו ביטוי ש-
+  // missingRowsForWeek עצמה משתמשת בו, בלי כלל השוואה שני.
+  const realizedRows = [...shifts, ...tasks];
+  const forwardWeeks = Array.from({ length: 4 }, (_, n) => addDays(sundayISO, n * 7)).map((weekSunday) => {
+    const planned = plannedRowsForWeek(p, weekSunday);
+    const missingDates = new Set(
+      missingRowsForWeek(p, weekSunday, realizedRows).map((row) => row.date || row.dueDate)
+    );
+    return {
+      sunday: weekSunday,
+      rows: planned.map((row) => ({ ...row, realized: !missingDates.has(row.date || row.dueDate) })),
+    };
+  });
+
   return (
     <Card className={!p.active ? "opacity-70" : ""}>
       <div className="flex items-start justify-between gap-3 mb-4">
@@ -389,6 +409,96 @@ function PositionCard({ position: p, guards, shifts, tasks, weekDates, onEdit, o
           )}
         </div>
       </div>
+
+      {/* BOARD-02 — תחזית ארבעה שבועות קדימה. אותה גבול-שיער (hairline)
+        * שהרשימות למעלה יושבות תחתיו, ולא קרוסלה או פס אופקי (D-05,
+        * UI-SPEC overflow/E2): ארבע סקציות רצופות, אנכיות, בתוך הכרטיס
+        * הקיים. תצוגה לקריאה בלבד — קריאה בלבד, בלי שיבוץ/השבתה/מחיקה
+        * (D-08). */}
+      <div className="mt-4 pt-4 border-t border-hairline">
+        <h4 className="flex items-center gap-1.5 text-xs font-bold text-muted mb-3">
+          <Icon name="trending" size={14} />
+          {t("positions.forward")}
+        </h4>
+        <div className="space-y-4">
+          {forwardWeeks.map(({ sunday: weekSunday, rows }, n) => (
+            <div key={weekSunday}>
+              <p className="text-[11px] font-semibold text-muted mb-1.5" data-numeric>
+                {forwardWeekLabel(n)} · {rangeLabelHe(weekFrom(weekSunday))}
+              </p>
+              {rows.length === 0 ? (
+                <p className="text-xs text-muted">אין שורות מתוכננות השבוע הזה</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {rows.map((row) => (
+                    <ForecastRow key={row.date || row.dueDate} row={row} onEdit={onEdit} positionTitle={p.title} />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
     </Card>
+  );
+}
+
+/**
+ * "השבוע" / "השבוע הבא" / "בעוד N שבועות" — ההבדל בין השבוע הנוכחי
+ * לשבועות הבאים הוא במילים, לא בצבע לבדו (UI-SPEC Layout Contract,
+ * BOARD-02: "'today' distinguishable by wording rather than by colour alone").
+ */
+const forwardWeekLabel = (n) => (n === 0 ? "השבוע" : n === 1 ? "השבוע הבא" : `בעוד ${n} שבועות`);
+
+/**
+ * שורת תחזית אחת, משותפת לשתי צורות העמדה (D-06): מה שקובע את התצוגה הוא
+ * הנתון של השורה עצמו — `date`+שעות לתבנית, `startDate`/`dueDate` בלי
+ * שעות לשבועית — לא ענף על `position.shape`. שורה ממומשת אינה
+ * אינטראקטיבית בכלל (D-08); שורה שטרם התממשה היא כפתור שפותח אך ורק את
+ * עריכת ההגדרה של העמדה עצמה — אין לה זהות בבסיס הנתונים עדיין, ואין
+ * שום שיבוץ/השבתה/פעולה אחרת בסקציה הזו (D-07).
+ */
+function ForecastRow({ row, onEdit, positionTitle }) {
+  const isDated = Boolean(row.date);
+  const label = isDated ? shortDate(row.date) : rangeLabelHe([row.startDate, row.dueDate]);
+  const rowClass =
+    "flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg ring-1 ring-inset " +
+    "ring-hairline bg-surface-sunken w-full text-right";
+
+  const content = (
+    <>
+      <span className="flex items-center gap-1.5 min-w-0">
+        <Icon name={isDated ? "clock" : "calendar"} size={13} className="text-muted flex-shrink-0" />
+        <span className="text-sm font-semibold text-content truncate">{label}</span>
+        {isDated && row.startTime && row.endTime && (
+          <span className="text-[11px] text-faint flex-shrink-0" data-numeric>
+            {row.startTime}–{row.endTime}
+          </span>
+        )}
+      </span>
+      {/* תג "מתוכנן" מופיע רק על החריג — שורה שכבר התממשה לא נושאת שום
+        * תג נוסף, אותו אינסטינקט "תג מסמן רק את היוצא מן הכלל" שב-TaskRow
+        * (UI-SPEC Copywriting Contract). */}
+      {!row.realized && (
+        <span title="השורה הזו עוד לא נוצרה — היא תיווצר לבד כשהשבוע יגיע, ואין מה להגדיר בה.">
+          <Badge tone="neutral">{t("positions.planned")}</Badge>
+        </span>
+      )}
+    </>
+  );
+
+  if (row.realized) {
+    return <div className={rowClass}>{content}</div>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      aria-label={`שורה מתוכננת של ${positionTitle} — פתח לעריכת ההגדרה`}
+      className={`${rowClass} cursor-pointer hover:bg-surface-hover transition-colors duration-200`}
+    >
+      {content}
+    </button>
   );
 }

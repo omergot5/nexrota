@@ -269,5 +269,152 @@ check(
   JSON.stringify(positionRoundTrip)
 );
 
+// ============================================================
+console.log("\nBOARD-02 · תחזית עמדה קדימה — ארבעה שבועות, שתי הצורות (05-03)\n");
+// ============================================================
+
+// עמדת תבנית עם ימים ושעות אמיתיות — לא templatePos שלמעלה (הוא בלי שעות),
+// כדי שבדיקת "השעות שורדות בכל שבוע" תהיה משמעותית.
+const forwardTemplatePos = {
+  id: "pos-forward-template",
+  shape: "template",
+  category: "שמירות",
+  title: "עמדת קבלה",
+  weekdays: [1, 3],
+  startTime: "08:00",
+  endTime: "16:00",
+  requiredGuards: 1,
+};
+const forwardWeeklyPos = {
+  id: "pos-forward-weekly",
+  shape: "weekly",
+  category: "כוננות",
+  title: "כוננות שבועית",
+};
+
+// ארבעת ימי הראשון, כל אחד addDays(sunday, n*7) מהתאריך הליטרלי הקבוע
+// שכבר הוגדר למעלה — לא נגזר משעון קיר.
+const forwardSundays = Array.from({ length: 4 }, (_, n) => addDays(sunday, n * 7));
+
+const templateWeeks = forwardSundays.map((s) => plannedRowsForWeek(forwardTemplatePos, s));
+const weeklyWeeks = forwardSundays.map((s) => plannedRowsForWeek(forwardWeeklyPos, s));
+
+// ארבע קבוצות שבועות שונות, עמדת תבנית — תאריכי הזהות זרים לחלוטין בין
+// השבועות. זו התכונה שעליה כל התחזית נשענת (05-03-PLAN Task 1).
+const templateIdentityDateSets = templateWeeks.map((rows) => new Set(rows.map((r) => r.date)));
+let templateWeeksDisjoint = true;
+for (let i = 0; i < templateIdentityDateSets.length && templateWeeksDisjoint; i++) {
+  for (let j = i + 1; j < templateIdentityDateSets.length && templateWeeksDisjoint; j++) {
+    for (const d of templateIdentityDateSets[i]) {
+      if (templateIdentityDateSets[j].has(d)) {
+        templateWeeksDisjoint = false;
+        break;
+      }
+    }
+  }
+}
+check(
+  "ארבעה שבועות רצופים של עמדת תבנית — אף תאריך זהות לא חוזר בשני שבועות",
+  templateWeeksDisjoint
+);
+
+// ארבע קבוצות שבועות שונות, עמדה שבועית — כל שבוע שורה אחת, וארבעת
+// ה-dueDate הם ארבעה ימי שבת שונים, כל אחד שישה ימים אחרי יום הראשון שלו.
+check(
+  "כל שבוע של עמדה שבועית מייצר בדיוק שורה אחת",
+  weeklyWeeks.every((w) => w.length === 1),
+  JSON.stringify(weeklyWeeks.map((w) => w.length))
+);
+const weeklyDueDates = weeklyWeeks.map((w) => w[0].dueDate);
+check(
+  "ארבעת ה-dueDate הם ארבעה ימי שבת שונים",
+  new Set(weeklyDueDates).size === 4,
+  JSON.stringify(weeklyDueDates)
+);
+check(
+  "כל dueDate הוא בדיוק שישה ימים אחרי יום הראשון של אותו שבוע",
+  forwardSundays.every((s, i) => weeklyDueDates[i] === addDays(s, 6))
+);
+
+// צורת הנתון שורדת על פני כל הארבעה שבועות — לא רק בשבוע הראשון.
+const allTemplateRows = templateWeeks.flat();
+check(
+  "כל שורת תבנית בכל הארבעה שבועות נושאת את שעות העמדה ותאריך",
+  allTemplateRows.every(
+    (r) => r.startTime === forwardTemplatePos.startTime && r.endTime === forwardTemplatePos.endTime && Boolean(r.date)
+  )
+);
+const allWeeklyRows = weeklyWeeks.flat();
+check(
+  "כל שורה שבועית נושאת startDate/dueDate נכונים לשבוע שלה",
+  allWeeklyRows.every((r, i) => r.startDate === forwardSundays[i] && r.dueDate === addDays(forwardSundays[i], 6))
+);
+check(
+  "אף שורה שבועית לא ממציאה שעה — startTime ו-endTime הם null במפורש בכל הארבעה שבועות",
+  allWeeklyRows.every((r) => r.startTime === null && r.endTime === null)
+);
+
+// דטרמיניזם על פני כל תחזית ארבעת השבועות, לא רק שבוע בודד.
+const buildTemplateProjection = (pos) =>
+  JSON.stringify(forwardSundays.map((s) => plannedRowsForWeek(pos, s)));
+const templateProj1 = buildTemplateProjection(forwardTemplatePos);
+const templateProj2 = buildTemplateProjection(forwardTemplatePos);
+const templateProj3 = buildTemplateProjection(forwardTemplatePos);
+check(
+  "בניית תחזית ארבעת השבועות שלוש פעמים ברצף מייצרת JSON זהה",
+  templateProj1 === templateProj2 && templateProj2 === templateProj3
+);
+const shuffledWeekdaysPos = { ...forwardTemplatePos, weekdays: shuffle(forwardTemplatePos.weekdays, 5) };
+check(
+  "אותה תחזית עם weekdays מעורבבים (סדר קלט מעורבב) מחזירה JSON זהה לבנייה המקורית",
+  templateProj1 === buildTemplateProjection(shuffledWeekdaysPos)
+);
+
+// הפרדת מתוכנן/ממומש על פני ארבעה שבועות — realized מכסה שבוע אחד בלבד.
+const realizedWeekIndex = 2;
+const realizedForOneWeek = templateWeeks[realizedWeekIndex].map((r, i) => ({
+  ...r,
+  id: `board02-realized-${i}`,
+  positionId: forwardTemplatePos.id,
+}));
+const missingAcrossWeeks = forwardSundays.map((s) => missingRowsForWeek(forwardTemplatePos, s, realizedForOneWeek));
+check(
+  "השבוע שכבר התממש מלא מחזיר מערך ריק מ-missingRowsForWeek",
+  missingAcrossWeeks[realizedWeekIndex].length === 0
+);
+check(
+  "שלושת השבועות האחרים מחזירים את מלוא הסט המתוכנן — לא הושפעו מהשבוע שהתממש",
+  forwardSundays.every((_, i) => i === realizedWeekIndex || missingAcrossWeeks[i].length === templateWeeks[i].length)
+);
+
+const otherPositionRealized = templateWeeks[0].map((r) => ({
+  ...r,
+  id: "board02-other-position-row",
+  positionId: "some-other-position",
+}));
+const forwardMissingWithOtherPosition = missingRowsForWeek(forwardTemplatePos, forwardSundays[0], otherPositionRealized);
+check(
+  "שורה של עמדה אחרת על אותו תאריך אינה מדכאת שום שורה בתחזית (POS-04)",
+  forwardMissingWithOtherPosition.length === templateWeeks[0].length,
+  `${forwardMissingWithOtherPosition.length}`
+);
+
+// אין תלות בשעון הקיר — אותה תחזית מ-Sunday בעבר הרחוק ומ-Sunday בעתיד
+// הרחוק מחזירה אותו מספר שורות ואותם היסטים יחסיים.
+const buildOffsetsFrom = (baseSunday) =>
+  Array.from({ length: 4 }, (_, n) => {
+    const weekSunday = addDays(baseSunday, n * 7);
+    return plannedRowsForWeek(forwardTemplatePos, weekSunday).map((r) => diffInDays(r.date, weekSunday));
+  });
+const pastForwardSunday = startOfWeek("2001-03-11");
+const futureForwardSunday = startOfWeek("2099-07-19");
+const pastOffsets = buildOffsetsFrom(pastForwardSunday);
+const futureOffsets = buildOffsetsFrom(futureForwardSunday);
+check(
+  "תחזית ארבעת השבועות מ-Sunday בעבר הרחוק ומ-Sunday בעתיד הרחוק מחזירות אותו מספר שורות ואותם היסטים יחסיים",
+  JSON.stringify(pastOffsets) === JSON.stringify(futureOffsets),
+  `past=${JSON.stringify(pastOffsets)} future=${JSON.stringify(futureOffsets)}`
+);
+
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);
