@@ -19,11 +19,25 @@ import {
   DAYS_HE_SHORT, boardItemsForDates, fromISODate, isToday, rangeTextHe, shortDate,
 } from "../../lib/dates.js";
 import { shiftTone } from "../../design/shiftPalette.js";
+import { isQualified } from "../../lib/autoAssign.js";
 import { People } from "./views.jsx";
 
 // זהה מילה במילה לתג שכבר קיים ב-TaskRow (views.jsx) — לא מנוסח מחדש.
 const OUT_OF_ENGINE_TOOLTIP =
   "המשימה לא נושאת שעות, או פרושה על יותר מיום אחד — ולכן היא לא נכנסת למנוע: היא לא נספרת במנוחה, ברצף, בתקרה השבועית או בנטל.";
+
+// ============================================================
+// חסימת כשירות (BOARD-03, D-09) — הטיפול המדויק של QUAL-08
+// (AssignView/TaskMgmt ב-views.jsx), מוגדר כאן פעם אחת ומועבר כפרופ ל-
+// `People`. לעולם ring-hairline-strong/bg-surface-sunken — לא ring-danger:
+// חוסר כשירות הוא עובדה על האדם, לא שגיאה שהצופה גרם לה.
+// ============================================================
+const QUAL_BLOCK_LABEL = "לא כשיר/ה";
+const QUAL_BLOCK_RING = "ring-hairline-strong bg-surface-sunken";
+
+// אותו ניסוח בדיוק ש-checkQualification (autoAssign.js) ו-AssignView נועלים
+// — כדי שהלוח ומסך השיבוץ הידני לעולם לא יתארו את אותה חסימה במילים שונות.
+const qualRefusal = (category) => `לא מוגדר/ת כשיר/ה לקטגוריית "${category}"`;
 
 /**
  * חוסר האיוש של פריט מתוזמן, בדיוק כמו missingOf ב-WeekCalendar.jsx — אותו
@@ -163,7 +177,22 @@ function BoardRow({ item, guards }) {
           )}
         </span>
       </div>
-      <People ids={item.assignedGuards || []} guards={guards} size={24} max={3} />
+      {/* חסימת כשירות ברמת האדם, לא ברמת הפריט (D-11): People סורק רק את מי
+        * שכבר ב-item.assignedGuards — בדיוק כפי שהתקבל למעלה — ולא את כל
+        * הצוות (D-10). isQualified נקרא כאן, בזמן רינדור, עבור כל אדם בערימה
+        * בנפרד; התוצאה לא נשמרת ולא נגזרת מחדש מהרשימה הגולמית על האדם. אותו
+        * קוד בדיוק רץ בין אם item הוא משמרת ובין אם הוא משימה — אין כאן ענף
+        * לפי סוג הפריט (BOARD-03). */}
+      <People
+        ids={item.assignedGuards || []}
+        guards={guards}
+        size={24}
+        max={3}
+        isBlocked={(g) => !isQualified(g, item.category)}
+        blockedLabel={QUAL_BLOCK_LABEL}
+        blockedClassName={QUAL_BLOCK_RING}
+        blockedTitle={() => qualRefusal(item.category)}
+      />
     </div>
   );
 }

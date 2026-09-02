@@ -1528,16 +1528,57 @@ export const categoryOptions = (shifts = [], tasks = []) => {
  *
  * מיוצא (Phase 5, BOARD-01): `UnifiedBoard.jsx` משתמש באותו רכיב בדיוק
  * להצגת המשויכים לפריט על הלוח, כדי שלא ייבנה ערימת-אווטארים שנייה.
+ *
+ * `isBlocked` (Phase 5, BOARD-03): פרדיקט אופציונלי לכל אדם בערימה. כשהוא
+ * מוחזר truthy עבור אדם מסוים, אותו אווטאר בלבד עובר לטיפול המנעול —
+ * שאר האווטארים בערימה ממשיכים להיראות בדיוק כמו קודם. כשהפרופ נעדר
+ * לגמרי, הרכיב זהה בית-לבית להתנהגות הישנה (משתמשים בו כך `TaskRow` וכל
+ * קורא אחר שלא מכיר חסימת כשירות). המחלקות/הטקסט של טיפול החסימה עצמו
+ * מגיעים כפרופים מהקורא (`UnifiedBoard.jsx`) ולא ננעלים כאן — כך שהטקסט
+ * "לא כשיר/ה" והטבעת הניטרלית (D-09/QUAL-08) נשארים מוגדרים במקום אחד,
+ * לא משוכפלים כברירת מחדל בקובץ הזה.
  */
-export const People = ({ ids, guards, size = 22, max = 4 }) => {
+export const People = ({
+  ids, guards, size = 22, max = 4,
+  isBlocked, blockedLabel, blockedTitle, blockedClassName = "",
+}) => {
   const people = ids.map((id) => guards.find((g) => g.id === id)).filter(Boolean);
   if (!people.length) return <span className="text-[11px] text-faint">אין משויכים</span>;
   return (
     <div className="flex items-center">
       <div className="flex -space-x-1.5 space-x-reverse">
-        {people.slice(0, max).map((g) => (
-          <Avatar key={g.id} id={g.id} name={g.name} size={size} ring label={g.name} />
-        ))}
+        {people.slice(0, max).map((g) => {
+          const blocked = isBlocked ? isBlocked(g) : false;
+          if (!blocked) {
+            return <Avatar key={g.id} id={g.id} name={g.name} size={size} ring label={g.name} />;
+          }
+          // ארבעת האותות (D-09/QUAL-08), על האדם החסום בלבד: לא-אינטראקטיבי,
+          // תווית מוחלפת (לא מצורפת), מנעול צף בפינה, טבעת ניטרלית — לעולם
+          // לא ring-danger, כי חוסר כשירות הוא עובדה על האדם ולא שגיאה.
+          return (
+            <div
+              key={g.id}
+              className="relative flex-shrink-0"
+              title={blockedTitle ? blockedTitle(g) : undefined}
+            >
+              <div
+                aria-disabled="true"
+                className={`rounded-full ring-2 ring-bg flex items-center justify-center text-center
+                  leading-none cursor-not-allowed select-none ${blockedClassName}`}
+                style={{ width: size, height: size, fontSize: Math.round(size * 0.24) }}
+              >
+                <span className="px-0.5 font-semibold text-muted">{blockedLabel}</span>
+              </div>
+              <span
+                className="absolute -top-1 -right-1.5 min-w-[18px] h-[18px] px-1
+                  rounded-full flex items-center justify-center
+                  ring-2 ring-surface bg-surface text-muted"
+              >
+                <Icon name="lock" size={11} strokeWidth={2.5} />
+              </span>
+            </div>
+          );
+        })}
       </div>
       {people.length > max && (
         <span className="text-[11px] text-muted font-semibold mr-2" data-numeric>

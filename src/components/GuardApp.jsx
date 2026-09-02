@@ -1,17 +1,20 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
 import {
-  Alert, Avatar, Badge, Btn, Card, EmptyState, Field, guardColor, Input, Meter, Modal, PageHeader,
+  Alert, Avatar, Badge, Btn, Card, EmptyState, Field, Input, Meter, Modal, PageHeader,
   readableInk, Segmented, Select,
 } from "./ui.jsx";
 import { Icon } from "./icons.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 import {
-  addDays, availabilityDeadline, countdownHe, dayName, formatDateHe, fromISODate, rangeLabelHe,
-  shiftInterval, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
+  addDays, availabilityDeadline, boardItemsForDates, countdownHe, dayName, formatDateHe,
+  fromISODate, rangeLabelHe, shiftInterval, shortDate, toISODate, todayISO, weekByOffset,
+  withEngineTasks,
 } from "../lib/dates.js";
 import { availStatus, checkAssignment, teamAverages } from "../lib/autoAssign.js";
 import { qualifiedGuardsForPosition } from "../lib/positions.js";
+import { shiftTone } from "../design/shiftPalette.js";
 import { subscribeTerms, t, termProfile } from "../lib/terms.js";
+import UnifiedBoard from "./supervisor/UnifiedBoard.jsx";
 
 const navItems = () => [
   { id: "schedule", label: t("guard.nav.schedule"), icon: "calendar" },
@@ -46,13 +49,19 @@ const SWAP_STATUS = {
  * בשעון: "עוד יומיים ו-3 שעות" נקרא בלי חישוב, "13/08 07:00" לא.
  */
 function NextDuty({ shift, mates }) {
-  const ink = readableInk(shift.color);
+  // הכרטיס נשאר "רק זמן" (P-04): הפריט תמיד מגיע מהמאגר המתוזמן, ולכן
+  // תמיד יש לו startTime/endTime — אבל הוא יכול להיות משימה שעברה דרך
+  // taskAsShiftShape, שאין לה color/location. shiftTone נותן גם למשמרת
+  // בלי צבע אישי וגם לפריט-משימה גוון מהסולם הקיים — לא צבע חדש שמבדיל
+  // בין סוגי פריטים (D-12), אותה מוסכמה ש-UnifiedBoard כבר משתמש בה.
+  const color = shiftTone(shift.color, shift.type);
+  const ink = readableInk(color);
   const { start } = shiftInterval(shift);
   const started = start <= Date.now();
   return (
     <div
       className="rounded-3xl p-5 shadow-xl relative overflow-hidden animate-fade-up"
-      style={{ background: shift.color, color: ink }}
+      style={{ background: color, color: ink }}
     >
       <p className="text-[11px] font-bold uppercase tracking-[0.15em] opacity-75">
         התורנות הבאה שלך
@@ -71,10 +80,12 @@ function NextDuty({ shift, mates }) {
           <Icon name="clock" size={15} />
           {shift.startTime}–{shift.endTime}
         </span>
-        <span className="flex items-center gap-1.5">
-          <Icon name="map-pin" size={15} />
-          {shift.location}
-        </span>
+        {shift.location && (
+          <span className="flex items-center gap-1.5">
+            <Icon name="map-pin" size={15} />
+            {shift.location}
+          </span>
+        )}
         <span className="opacity-85">{shift.label}</span>
       </div>
 
@@ -129,20 +140,13 @@ function FairnessLine({ mine, avg }) {
 
 function MySchedule({ user, guards, shifts, tasks = [], positions = [] }) {
   const today = todayISO();
-  const mine = shifts
-    .filter((s) => s.published && s.assignedGuards.includes(user.id))
-    .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
-
-  const upcoming = mine.filter((s) => s.date >= today);
   const publishedAll = shifts.filter((s) => s.published);
-  const nameOf = (id) => guards.find((g) => g.id === id)?.name || "—";
 
-  // התורנות הראשונה יוצאת מהרשימה ועולה לכרטיס הפותח, כדי שלא תופיע פעמיים.
-  const [next, ...rest] = upcoming;
   // משימות לא מסוננות לפי published בכוונה, בניגוד ל-publishedAll שמעל:
   // למשימה אין דגל כזה בכלל — היא לא טיוטת סידור שממתינה לפרסום, היא
   // עבודה שקיימת. זה בדיוק המספר ש-FAIR-05 (אבן דרך א') הבטיח למשתתף:
-  // הנטל שהמנוע באמת מחלק לפיו, לא ספירת משמרות עצמאית.
+  // הנטל שהמנוע באמת מחלק לפיו, לא ספירת משמרות עצמאית. (בלוק ההוגנות הזה
+  // לא זז בפאזה 5 — הוא נשאר בדיוק כמו שהיה.)
   const withTasks = useMemo(
     () => withEngineTasks(publishedAll, tasks),
     [publishedAll, tasks]
@@ -152,6 +156,51 @@ function MySchedule({ user, guards, shifts, tasks = [], positions = [] }) {
     [guards, withTasks]
   );
   const mine_ = perGuard[user.id];
+  const nameOf = (id) => guards.find((g) => g.id === id)?.name || "—";
+
+  // חלון התאריכים של הלוח שלי (P-06): כל תאריך-עוגן ששייך לצוות — לא רק
+  // לי — מהיום קדימה, בלי הגבלה לשבוע אחד כמו שהמסך הזה תמיד נהג. אותו
+  // אידיום dueDate || startDate ש-boardShapeOf עצמו כבר משתמש בו. UnifiedBoard
+  // (scopeGuardId) הוא זה שמצמצם כל יום לפריטים שלי בפועל, לא הרשימה הזו.
+  const myDates = [...new Set([
+    ...publishedAll.map((s) => s.date),
+    ...tasks.map((t) => t.dueDate || t.startDate).filter(Boolean),
+  ])]
+    .filter((d) => d >= today)
+    .sort();
+
+  // הכרטיס הפותח צריך פריט עם זמן אמיתי (P-04) — לא מיון שני של
+  // shifts/tasks כאן, אלא מעבר על הלוח שכבר ממוזג וממוין ע"י
+  // boardItemsForDates עצמה (אותו מסלול מיזוג יחיד ש-UnifiedBoard משתמש
+  // בו), עד לפריט הראשון שמשויך אליי.
+  const myBoard = boardItemsForDates(publishedAll, tasks, myDates);
+  let next = null;
+  for (const day of myBoard.days) {
+    const found = day.timed.find((it) => (it.assignedGuards || []).includes(user.id));
+    if (found) {
+      next = found;
+      break;
+    }
+  }
+
+  // התורנות הראשונה יוצאת מהלוח שמתחתיה כדי שלא תופיע פעמיים — אותה
+  // דה-דופליקציה שה-`[next, ...rest]` הישן ביצע, רק שכאן היא מסננת את
+  // המקור (shifts/tasks) לפני שהלוח ממזג אותם מחדש, לא ממיינת דבר בעצמה.
+  const boardShifts =
+    next && next.type !== "task" ? publishedAll.filter((s) => s.id !== next.id) : publishedAll;
+  const boardTasksForMine =
+    next && next.type === "task" ? tasks.filter((t) => t.id !== next.id) : tasks;
+
+  // מצב ריק (D-15): שני הענפים הישנים — "עדיין לא פורסם" מול "פורסם, אבל
+  // אני לא בו" — נשארים בדיוק, רק הכותרת מתעדכנת כי הרשימה כבר לא רק
+  // משמרות (UI-SPEC Copywriting Contract).
+  const myEmpty = {
+    title: "אין לך כלום השבוע",
+    body:
+      publishedAll.length === 0
+        ? 'האחמ"ש עדיין לא פרסם את הסידור. ברגע שיפרסם — הוא יופיע כאן.'
+        : "לא שובצת למשמרות בסידור שפורסם. אם זו טעות, פנה לאחמ״ש.",
+  };
 
   // "העמדות שאני כשיר/ה להן" (POS-05, ROADMAP §4.4): גזירה קריאה-בלבד מעל
   // qualifiedGuardsForPosition, אותה פונקציה טהורה בדיוק שהמסך של המנהל
@@ -168,94 +217,23 @@ function MySchedule({ user, guards, shifts, tasks = [], positions = [] }) {
         <>
           <NextDuty
             shift={next}
-            mates={next.assignedGuards.filter((id) => id !== user.id).map(nameOf)}
+            mates={(next.assignedGuards || []).filter((id) => id !== user.id).map(nameOf)}
           />
           {mine_ && <FairnessLine mine={mine_} avg={avg} />}
         </>
       )}
 
-      {/* הכותרת מופיעה רק כשיש רשימה תחתיה. כרטיס פותח שיושב מתחת לכותרת
-        * "בהמשך" ריקה קורא כאילו משהו לא נטען. */}
-      {rest.length > 0 && (
-        <PageHeader
-          title="בהמשך"
-          subtitle={rest.length === 1 ? "עוד תורנות אחת" : `עוד ${rest.length} תורנויות`}
-        />
-      )}
-      {next && rest.length === 0 && (
-        <p className="text-sm text-muted text-center">זו התורנות היחידה שלך כרגע.</p>
-      )}
-
-      {upcoming.length === 0 ? (
-        <EmptyState
-          icon="inbox"
-          title="אין לך משמרות מתוכננות"
-          body={
-            publishedAll.length === 0
-              ? 'האחמ"ש עדיין לא פרסם את הסידור. ברגע שיפרסם — הוא יופיע כאן.'
-              : "לא שובצת למשמרות בסידור שפורסם. אם זו טעות, פנה לאחמ״ש."
-          }
-        />
-      ) : (
-        <div className="space-y-3">
-          {rest.map((s) => {
-            const others = s.assignedGuards.filter((id) => id !== user.id);
-            const isToday = s.date === today;
-            const ink = readableInk(s.color);
-            return (
-              <div
-                key={s.id}
-                className="rounded-2xl p-4 shadow-lg relative overflow-hidden"
-                style={{ background: s.color, color: ink }}
-              >
-                {isToday && (
-                  <span
-                    className="absolute top-3 left-3 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                    style={{ background: ink, color: s.color }}
-                  >
-                    היום
-                  </span>
-                )}
-                <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 bg-black/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Icon name="clock" size={24} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-lg leading-tight">{s.label}</h3>
-                    <p className="text-sm opacity-95 mt-0.5">{formatDateHe(s.date)}</p>
-                    <p className="text-sm font-semibold opacity-90 mt-1 flex items-center gap-1.5 flex-wrap">
-                      <span data-numeric>
-                        {s.startTime}–{s.endTime}
-                      </span>
-                      <Icon name="map-pin" size={13} />
-                      {s.location}
-                    </p>
-                    <div className="flex items-center gap-1.5 mt-2.5 flex-wrap text-xs">
-                      <span className="opacity-80">עם:</span>
-                      {others.length === 0 ? (
-                        <span className="opacity-70">לבד במשמרת</span>
-                      ) : (
-                        others.map((gid) => {
-                          const c = guardColor(gid);
-                          return (
-                            <span
-                              key={gid}
-                              className="px-2 py-0.5 rounded-md font-bold"
-                              style={{ backgroundColor: c, color: readableInk(c) }}
-                            >
-                              {nameOf(gid)}
-                            </span>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* הלוח המאוחד (BOARD-01/BOARD-03): אותו רכיב בדיוק שהמנהל רואה, כאן
+        * בהיקף המשתתף (scopeGuardId) — משמרות ומשימות יחד, ממוין לפי זמן,
+        * עם אותו טיפול חסימת-כשירות. לא רשימה שנייה. */}
+      <UnifiedBoard
+        shifts={boardShifts}
+        tasks={boardTasksForMine}
+        guards={guards}
+        dates={myDates}
+        scopeGuardId={user.id}
+        empty={myEmpty}
+      />
 
       {publishedAll.length > 0 && (
         <Card>
@@ -263,72 +241,12 @@ function MySchedule({ user, guards, shifts, tasks = [], positions = [] }) {
             <Icon name="clipboard" size={17} className="text-muted" />
             הסידור המלא של הצוות
           </h2>
-          <div className="space-y-4">
-            {[...new Set(publishedAll.map((s) => s.date))].sort().map((date) => (
-              <div key={date}>
-                <p className="text-[11px] font-bold text-muted mb-2 border-b border-hairline pb-1.5">
-                  {formatDateHe(date)}
-                </p>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                  {publishedAll
-                    .filter((s) => s.date === date)
-                    .map((s) => {
-                      const isMine = s.assignedGuards.includes(user.id);
-                      const ink = readableInk(s.color);
-                      return (
-                        <div
-                          key={s.id}
-                          className={`p-3 rounded-xl shadow-sm ${
-                            isMine ? "ring-2 ring-offset-2 ring-offset-bg ring-brand" : "opacity-80"
-                          }`}
-                          style={{ background: s.color, color: ink }}
-                        >
-                          <div className="flex items-center justify-between mb-1.5 gap-2">
-                            <span className="font-bold text-xs bg-black/15 px-2 py-0.5 rounded-lg">
-                              {s.label}
-                            </span>
-                            {isMine && (
-                              <span
-                                className="text-[9px] px-1.5 py-0.5 rounded-full font-bold"
-                                style={{ background: ink, color: s.color }}
-                              >
-                                שלי
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[11px] opacity-90 mb-2" data-numeric>
-                            {s.startTime}–{s.endTime}
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {s.assignedGuards.length === 0 ? (
-                              <span className="text-[10px] bg-black/25 text-white px-1.5 py-0.5 rounded">
-                                לא משובץ
-                              </span>
-                            ) : (
-                              s.assignedGuards.map((gid) => {
-                                const c = gid === user.id ? ink : guardColor(gid);
-                                return (
-                                  <span
-                                    key={gid}
-                                    className="px-1.5 py-0.5 rounded text-[10px] font-bold"
-                                    style={{
-                                      backgroundColor: c,
-                                      color: gid === user.id ? s.color : readableInk(c),
-                                    }}
-                                  >
-                                    {nameOf(gid)}
-                                  </span>
-                                );
-                              })
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-            ))}
-          </div>
+          <UnifiedBoard
+            shifts={publishedAll}
+            tasks={tasks}
+            guards={guards}
+            dates={[...new Set(publishedAll.map((s) => s.date))].sort()}
+          />
         </Card>
       )}
 
