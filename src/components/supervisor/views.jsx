@@ -1530,8 +1530,13 @@ const rangeText = (task) => {
   return task.dueDate ? formatDateHe(task.dueDate) : "";
 };
 
-/** ערימת פרצופים. מעל ארבעה — השאר נספרים, כי חמישה עיגולים כבר לא נקראים. */
-const People = ({ ids, guards, size = 22, max = 4 }) => {
+/**
+ * ערימת פרצופים. מעל ארבעה — השאר נספרים, כי חמישה עיגולים כבר לא נקראים.
+ *
+ * מיוצא (Phase 5, BOARD-01): `UnifiedBoard.jsx` משתמש באותו רכיב בדיוק
+ * להצגת המשויכים לפריט על הלוח, כדי שלא ייבנה ערימת-אווטארים שנייה.
+ */
+export const People = ({ ids, guards, size = 22, max = 4 }) => {
   const people = ids.map((id) => guards.find((g) => g.id === id)).filter(Boolean);
   if (!people.length) return <span className="text-[11px] text-faint">אין משויכים</span>;
   return (

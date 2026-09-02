@@ -6,33 +6,43 @@
 // למשתמש *מה הצעד הבא*. אדם שנכנס בפעם הראשונה היה צריך שמישהו יסביר לו
 // באיזה סדר ללחוץ — וזה בדיוק הדבר שהמוצר הזה מבטיח שלא יקרה.
 //
-// כאן זה מסך אחד עם ארבעה שלבים. פס השלבים הוא גם הניווט וגם הסטטוס:
-// כל שלב מציג את המספר שלו (כמה משמרות, כמה הגישו, כמה מאוישות, כמה
-// פורסמו), אז המשתמש רואה איפה הוא עומד בלי לפתוח כלום.
+// כאן זה מסך אחד עם חמישה שלבים — הלוח המאוחד (Phase 5, D-04) ואחריו
+// ארבעת השלבים המקוריים. פס השלבים הוא גם הניווט וגם הסטטוס: כל שלב
+// מציג את המספר שלו (כמה פריטים על הלוח, כמה משמרות, כמה הגישו, כמה
+// מאוישות, כמה פורסמו), אז המשתמש רואה איפה הוא עומד בלי לפתוח כלום.
 //
 // עיקרון: השלבים *עוטפים* את הרכיבים הקיימים ולא משכתבים אותם. ShiftMgmt
 // ו-ScheduleMgmt לא יודעים שהם חיים בתוך זרימה. זה גם מה שיאפשר לפרופיל
-// הצבאי באבן דרך ב' להשמיט את שלב 2 — שם המפקד קובע ולא אוספים זמינות —
-// בלי לגעת באף רכיב.
+// הצבאי באבן דרך ב' להשמיט את שלב הזמינות (שלב 3) — שם המפקד קובע ולא
+// אוספים זמינות — בלי לגעת באף רכיב.
 // ============================================================
 
 import { useMemo, useState } from "react";
 import { PrimaryAction, Segmented } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import SmartAssign from "../SmartAssign.jsx";
+import UnifiedBoard from "./UnifiedBoard.jsx";
 import { ShiftMgmt, AvailView, AssignView, ScheduleMgmt } from "./views.jsx";
 import { availStatus } from "../../lib/autoAssign.js";
+import { boardItemsForDates } from "../../lib/dates.js";
 import { t } from "../../lib/terms.js";
 
-/** מזהי הניווט הישנים ממשיכים לעבוד — כל אחד נופל לשלב שלו. */
+/**
+ * מזהי הניווט הישנים ממשיכים לעבוד — כל אחד נופל לשלב שלו.
+ *
+ * שלב 0 הוא הלוח המאוחד (D-04, Phase 5): מה שאחמ"ש רואה ראשון בכניסה
+ * ל"השבוע" הוא הלוח עצמו, לא שלב שצריך לחפש אותו. כל שאר השלבים הוזזו
+ * ב-1 בהתאם.
+ */
 export const STEP_OF = {
-  shifts: 0,
-  availability: 1,
-  smart: 2,
-  assignment: 2,
-  assign: 2,
-  schedule: 3,
-  publish: 3,
+  board: 0,
+  shifts: 1,
+  availability: 2,
+  smart: 3,
+  assignment: 3,
+  assign: 3,
+  schedule: 4,
+  publish: 4,
 };
 
 export default function WeekFlow({
@@ -72,7 +82,20 @@ export default function WeekFlow({
   const published = weekShifts.filter((s) => s.published).length;
   const hasShifts = weekShifts.length > 0;
 
+  // כמה פריטים הלוח המאוחד מציג לשבוע הזה — משמרות ומשימות יחד, ממוזגות
+  // דרך המסלול היחיד (boardItemsForDates), כדי שהמספר על פס השלבים
+  // לעולם לא יוכל לחלוק על מה שהלוח עצמו מציג (D-04).
+  const boardCount = useMemo(() => {
+    const merged = boardItemsForDates(shifts, tasks, weekDates);
+    return merged.days.reduce((sum, d) => sum + d.timeless.length + d.timed.length, 0);
+  }, [shifts, tasks, weekDates]);
+
   const meta = [
+    {
+      label: t("nav.board"),
+      count: boardCount > 0 ? String(boardCount) : null,
+      done: boardCount > 0,
+    },
     {
       label: t("nav.shifts"),
       count: hasShifts ? String(weekShifts.length) : null,
@@ -101,6 +124,7 @@ export default function WeekFlow({
   };
 
   const body = [
+    <UnifiedBoard key="board" shifts={shifts} tasks={tasks} guards={guards} dates={weekDates} />,
     <ShiftMgmt key="shifts" {...common} />,
     <AvailView key="avail" {...common} />,
     <div key="assign" className="space-y-5">
@@ -130,14 +154,21 @@ export default function WeekFlow({
     <ScheduleMgmt key="publish" {...common} />,
   ][step];
 
-  // הפעולה הראשית של כל שלב. בשלושת הראשונים היא "סיימתי כאן, קדימה"; רק
-  // בשלב האחרון היא פעולה אמיתית על הנתונים — וזה מכוון, כי פרסום הוא
-  // הרגע היחיד בזרימה שהצוות מרגיש.
+  // הפעולה הראשית של כל שלב. בכל השלבים חוץ מהאחרון היא "סיימתי כאן,
+  // קדימה"; רק בשלב האחרון היא פעולה אמיתית על הנתונים — וזה מכוון, כי
+  // פרסום הוא הרגע היחיד בזרימה שהצוות מרגיש.
   const action = [
+    {
+      // ניווט בלבד, לא כתיבת נתון — הלוח לקריאה בלבד (D-03, D-08).
+      children: "המשך לבניית השבוע",
+      icon: "left",
+      onClick: () => setStep(1),
+      hint: boardCount > 0 ? `${boardCount} פריטים השבוע` : undefined,
+    },
     {
       children: "בניתי את השבוע — מי הגיש?",
       icon: "left",
-      onClick: () => setStep(1),
+      onClick: () => setStep(2),
       disabled: !hasShifts,
       hint: hasShifts
         ? `${weekShifts.length} משמרות בשבוע הזה`
@@ -148,7 +179,7 @@ export default function WeekFlow({
       icon: "zap",
       onClick: () => {
         setAssignMode("auto");
-        setStep(2);
+        setStep(3);
       },
       disabled: !hasShifts || guards.length === 0,
       hint:
@@ -161,7 +192,7 @@ export default function WeekFlow({
     {
       children: "הסידור מוכן — לשלוח לצוות",
       icon: "left",
-      onClick: () => setStep(3),
+      onClick: () => setStep(4),
       disabled: slots.filled === 0,
       hint:
         slots.filled === 0
