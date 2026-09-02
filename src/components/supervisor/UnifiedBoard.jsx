@@ -40,8 +40,8 @@ const QUAL_BLOCK_RING = "ring-hairline-strong bg-surface-sunken";
 const qualRefusal = (category) => `לא מוגדר/ת כשיר/ה לקטגוריית "${category}"`;
 
 /**
- * חוסר האיוש של פריט מתוזמן, בדיוק כמו missingOf ב-WeekCalendar.jsx — אותו
- * חשבון, מוצג כאן כשורת רשימה במקום כמלבן ברשת. לפריט טיימלס אין מושג
+ * חוסר האיוש של פריט מתוזמן — אותו חשבון שהיה קיים בתצוגת הרשת השבועית
+ * הקודמת, מוצג כאן כשורת רשימה במקום כמלבן ברשת. לפריט טיימלס אין מושג
  * איוש בכלל (D-08 אין פעולה, ואין שדה requiredGuards על שורת עמדה שבועית).
  */
 const missingOfItem = (item) => {

@@ -7,7 +7,7 @@ import { SupDashboard, SwapMgmt, TaskMgmt, TeamView } from "./supervisor/views.j
 import PositionsScreen from "./supervisor/PositionsScreen.jsx";
 import WeekFlow, { STEP_OF } from "./supervisor/WeekFlow.jsx";
 import CalendarView from "./supervisor/CalendarView.jsx";
-import WeekCalendar from "./supervisor/WeekCalendar.jsx";
+import UnifiedBoard from "./supervisor/UnifiedBoard.jsx";
 import { rangeLabelHe, weekByOffset } from "../lib/dates.js";
 import { subscribeTerms, t, termProfile } from "../lib/terms.js";
 
@@ -187,11 +187,11 @@ export default function SupervisorApp({ state }) {
           ]}
         />
         {calMode === "week" ? (
-          <WeekCalendar
-            dates={weekDates}
+          <UnifiedBoard
             shifts={shifts}
+            tasks={tasks}
             guards={guards}
-            onOpenShift={() => go("week")}
+            dates={weekDates}
           />
         ) : (
           <CalendarView shifts={shifts} guards={guards} onNavigate={go} />
