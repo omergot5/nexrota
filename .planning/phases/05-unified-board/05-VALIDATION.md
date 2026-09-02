@@ -40,20 +40,28 @@ created: 2026-09-02
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD-merge | TBD | TBD | BOARD-01 | — | Merge of eligible + timeless items totals `shifts.length + tasks.length` for a fixture week, no silent drop | unit | `node scripts/verify-board.mjs` | ❌ W0 | ⬜ pending |
-| TBD-anchor | TBD | TBD | BOARD-01 | — | Timeless items anchor to `dueDate \|\| startDate`, never fabricate a time | unit | `node scripts/verify-board.mjs` | ❌ W0 | ⬜ pending |
-| TBD-forward | TBD | TBD | BOARD-02 | — | `plannedRowsForWeek` across 4 consecutive `sundayISO` values produces 4 distinct, deterministic row sets for both position shapes | unit | `node scripts/verify-positions.mjs` (extend) | ✅ exists — extend | ⬜ pending |
-| TBD-qual | TBD | TBD | BOARD-03 | — | Per-assignee lock state derivable from existing engine data, no divergence from `checkQualification` | unit | `node scripts/verify-scheduler.mjs` / `node scripts/verify-planning.mjs` | ✅ exists | ⬜ pending |
-| TBD-comprehension | TBD | TBD | BOARD-04 | — | Naive new-manager comprehension test (D-13) | manual | UAT — see Manual-Only Verifications | N/A | ⬜ pending |
+| 05-01-T1 | 05-01 | 1 | BOARD-01 | T-05-03 | Merge of eligible + timeless items plus explicitly-counted outside/undated equals `shifts.length + tasks.length`, no silent drop | unit | `node scripts/verify-board.mjs` | ❌ W0 — created by this task | ⬜ pending |
+| 05-01-T1 | 05-01 | 1 | BOARD-01 | — | Timeless items anchor to `dueDate \|\| startDate` and carry no `startTime`/`endTime` property at all | unit | `node scripts/verify-board.mjs` | ❌ W0 — created by this task | ⬜ pending |
+| 05-01-T1 | 05-01 | 1 | BOARD-01 | T-05-03 | `boardItemsForDates` is order-independent: repeated and shuffled-input calls stringify identically | unit | `node scripts/verify-board.mjs` | ❌ W0 — created by this task | ⬜ pending |
+| 05-01-T1 | 05-01 | 1 | BOARD-01 | T-05-01 | The board holds no write path — read-only surface (D-03, D-08) | source assertion | `npm run build` + source review in acceptance criteria | ✅ n/a | ⬜ pending |
+| 05-01-T2 | 05-01 | 1 | BOARD-04 | — | One date-range sentence, shared by the board and the task list — no second definition | unit + grep | `npm test` | ✅ exists | ⬜ pending |
+| 05-02-T1 | 05-02 | 2 | BOARD-03 | T-05-06 | Per-assignee lock state read from `isQualified` at render time, no divergence from `checkQualification`, no re-derivation | unit + grep | `node scripts/verify-scheduler.mjs` / `node scripts/verify-planning.mjs` | ✅ exists | ⬜ pending |
+| 05-02-T2 | 05-02 | 2 | BOARD-01 | T-05-04 | The participant's board sources shifts through the published filter; tasks pass unfiltered by design | source assertion | `npm test` + source review in acceptance criteria | ✅ exists | ⬜ pending |
+| 05-03-T1 | 05-03 | 2 | BOARD-02 | T-05-08 | `plannedRowsForWeek` across 4 consecutive `sundayISO` values produces 4 pairwise-disjoint, deterministic row sets for both position shapes | unit | `node scripts/verify-positions.mjs` | ✅ exists — extended by this task | ⬜ pending |
+| 05-03-T2 | 05-03 | 2 | BOARD-02 | T-05-07 | The forecast surface exposes no assign/toggle/delete path (D-08) | grep + source assertion | `npm test` | ✅ exists | ⬜ pending |
+| 05-04-T2 | 05-04 | 3 | BOARD-01 | T-05-11 | Exactly one week view survives; `WeekCalendar.jsx` is gone and nothing imports it | grep + build | `npm run build` | ✅ exists | ⬜ pending |
+| 05-04-T2 | 05-04 | 3 | BOARD-04 | — | Naive new-manager comprehension test (D-13) | manual | `<human-check>` on 05-04 Task 2 — harvested into `05-UAT.md` at end of phase | N/A | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
-*Task IDs are placeholders — the planner fills in real plan/task IDs when PLAN.md files are created.*
+*Task IDs filled in by the planner on 2026-09-02 when the four PLAN.md files were created.*
+*`workflow.human_verify_mode` is `end-of-phase`, so every manual observation is carried as a `<verify><human-check>` block on its task and harvested at phase verification — not as a mid-plan halt. The `checkpoint:decision` in 05-04 is unaffected by that mode and does halt, because it gates the work rather than verifying it.*
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] `scripts/verify-board.mjs` — covers BOARD-01's merge-completeness and timeless-anchoring behavior for the new pure merge function
+- [ ] `scripts/verify-board.mjs` — covers BOARD-01's merge-completeness, timeless-anchoring and determinism behaviour for the new pure merge function. **Created inside 05-01 Task 1**, the phase's tracer task, alongside the functions it tests — the tracer carries its own runnable verify rather than deferring it.
+- [ ] `package.json`'s `test` script gains `node scripts/verify-board.mjs` in the same task, so the assertion is part of `npm test` from the moment it exists
 - [ ] No new fixtures/conftest-equivalent needed — this codebase has no shared fixture file; each `verify-*.mjs` script is self-contained with inline literals (confirmed pattern in `verify-positions.mjs`)
 
 ---
