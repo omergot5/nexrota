@@ -468,14 +468,14 @@ const forwardWeeks = Array.from({ length: 4 }, (_, n) =>
 
 **If this table is empty:** N/A — see above; three low/medium-risk display-order and scope-boundary assumptions remain, none touching the data model or the engine's contracts.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Does the "calendar" nav tab keep a week-mode at all after Phase 5?**
+1. **Does the "calendar" nav tab keep a week-mode at all after Phase 5?** — **RESOLVED** by the planner in `05-04-PLAN.md` (Task 1, `checkpoint:decision`): the "calendar" tab's week toggle is repointed to render the same unified-board component (not deleted, not left on the old `WeekCalendar.jsx`), and `WeekCalendar.jsx` itself is retired once the repoint lands. Gated behind an explicit decision checkpoint because D-01 rates this `costly` reversibility.
    - What we know: `SupervisorApp.jsx:180-198` currently offers a `Segmented` toggle between `WeekCalendar.jsx` (week) and `CalendarView.jsx` (month) under the "calendar" nav item, entirely separate from `WeekFlow`. D-01 says the unified board "completely replaces" `WeekCalendar` — CONTEXT.md's Integration Points section says this replacement happens "inside SupervisorApp.jsx's 'building the week' first step," i.e., inside `WeekFlow`, not inside the "calendar" tab.
    - What's unclear: whether the "calendar" tab's week toggle should be deleted (leaving only month view there), or repointed to render the same new unified-board component, or left rendering the old shift-only `WeekCalendar.jsx` untouched (which would contradict D-01's "completely replaces" and BOARD-04's single-source-of-truth spirit).
    - Recommendation: planner should make an explicit, stated choice here rather than leaving it implicit — this is exactly the kind of "two screens that need cross-referencing" BOARD-01 exists to eliminate.
 
-2. **Should `boardShapeOf`'s timeless bucket get its own small pure-function test file (`scripts/verify-board.mjs`)?**
+2. **Should `boardShapeOf`'s timeless bucket get its own small pure-function test file (`scripts/verify-board.mjs`)?** — **RESOLVED** by the planner in `05-01-PLAN.md` (Task 1, the phase's tracer): yes — `scripts/verify-board.mjs` is created in the tracer task alongside the functions it tests, and wired into `npm test` in the same task.
    - What we know: every other pure module introduced by a phase (`fairness.js`/`conflicts.js` Phase 1-2, `positions.js` Phase 4) got a dedicated `scripts/verify-*.mjs` wired into `npm test`.
    - What's unclear: whether the new function is complex enough to warrant its own script versus a few assertions added to an existing one (`verify-planning.mjs` already covers `withEngineTasks`-adjacent logic).
    - Recommendation: given this phase's own gap gets its own named function with nontrivial classification logic (3-way branch: eligible / frozen-single-day / multi-day-or-weekly), it should get its own small test file, consistent with the one-pure-module-one-verify-script precedent.
