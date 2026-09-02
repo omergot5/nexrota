@@ -268,3 +268,115 @@ export function withEngineTasks(shifts = [], tasks = []) {
   const safeTasks = Array.isArray(tasks) ? tasks : [];
   return [...safeShifts, ...safeTasks.map(taskAsShiftShape).filter(Boolean)];
 }
+
+// ============================================================
+// Board display adapter (Phase 5, BOARD-01, UNIF-04).
+//
+// `taskAsShiftShape` deliberately returns `null` for a task with no hours,
+// a task spanning more than one day, and a weekly-shape standing position
+// row (D-01, Phase 2) — that is correct for the engine, which must never
+// see a fabricated hour. A board that renders only what `withEngineTasks`
+// returns reproduces exactly that same silent drop one layer higher, which
+// is the specific bug this phase exists to close. `rangeTextHe`/
+// `boardShapeOf`/`boardItemsForDates` are the *display-only* siblings that
+// cover what the engine adapter deliberately does not: they never feed the
+// engine, never fabricate `startTime`/`endTime`, and are gated on the
+// engine's own `isTaskEngineEligible` predicate, so the board can never
+// disagree with the engine about what counts as "in the engine."
+// ============================================================
+
+/**
+ * The time window of a task, as one sentence. Byte-identical to the private
+ * `rangeText` that used to live in `views.jsx` — moved here so the task
+ * list and the board can never drift into two different sentences for the
+ * same task (P-02).
+ */
+export function rangeTextHe(task) {
+  if (task?.startDate && task?.dueDate && task.startDate !== task.dueDate)
+    return `${formatDateHe(task.startDate)} – ${formatDateHe(task.dueDate)}`;
+  return task?.dueDate ? formatDateHe(task.dueDate) : "";
+}
+
+/**
+ * The display-only sibling of `taskAsShiftShape`. Returns `null` for a task
+ * `taskAsShiftShape` already covers — that item already arrives on the
+ * board through `withEngineTasks` and must not be duplicated — and `null`
+ * for a task with no anchor date at all, since there is no calendar slot to
+ * place it on. Anchors to `task.dueDate || task.startDate`, the same
+ * identity-date idiom already used by `taskInterval` above and by
+ * `workingGuardIdsForWeek`/`PositionsScreen.jsx` (Phase 4) — never a
+ * different anchor, and never one row per date of a multi-day span, since
+ * no existing call site in this codebase expands an item that way. Never
+ * sets `startTime`/`endTime` at all: their absence is the signal, and
+ * fabricating an hour here is explicitly forbidden (REQUIREMENTS.md
+ * Out-of-Scope, "מילוי שעות למשימות ישנות").
+ */
+export function boardShapeOf(task) {
+  if (isTaskEngineEligible(task)) return null;
+  const day = task?.dueDate || task?.startDate;
+  if (!day) return null;
+  return {
+    id: task.id,
+    date: day,
+    timeless: true,
+    label: task.title || "משימה",
+    assignedGuards: task.assignees || [],
+    category: task.category || "",
+    type: "task",
+    startDate: task.startDate || null,
+    dueDate: task.dueDate || null,
+    positionId: task.positionId ?? null,
+  };
+}
+
+/**
+ * The single board merge (BOARD-01). Builds the timed pool through the
+ * existing engine-eligible merge (`withEngineTasks`) and the timeless pool
+ * through `boardShapeOf`, then groups both by the caller's own `dates` list
+ * — never a week offset (P-05), so the identical function serves the
+ * manager's current week and the guard's own sorted upcoming dates without
+ * either one reading the wall clock.
+ *
+ * Returns `{ days, outside, undated }`: `days` has one entry per element of
+ * `dates`, in the given order, shaped `{ date, timeless, timed }`; `outside`
+ * counts pool items whose date falls outside `dates`; `undated` counts
+ * tasks with no anchor date at all. The three numbers plus every `days`
+ * entry always account for exactly `shifts.length + tasks.length` items —
+ * nothing is ever silently dropped (Pitfall 2). Every sort here is
+ * explicit; the array order Postgres happened to return is never a sort
+ * (CLAUDE.md iron rule 1).
+ */
+export function boardItemsForDates(shifts = [], tasks = [], dates = []) {
+  const safeShifts = Array.isArray(shifts) ? shifts : [];
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
+  const safeDates = Array.isArray(dates) ? dates : [];
+
+  const timedPool = withEngineTasks(safeShifts, safeTasks);
+  const timelessPool = safeTasks.map(boardShapeOf).filter(Boolean);
+  const dateSet = new Set(safeDates);
+
+  let undated = 0;
+  for (const task of safeTasks) {
+    if (!(task?.dueDate || task?.startDate)) undated++;
+  }
+
+  let outside = 0;
+  for (const item of timedPool) if (!dateSet.has(item.date)) outside++;
+  for (const item of timelessPool) if (!dateSet.has(item.date)) outside++;
+
+  const days = safeDates.map((date) => {
+    const timed = timedPool
+      .filter((item) => item.date === date)
+      .sort(
+        (a, b) =>
+          String(a.startTime || "").localeCompare(String(b.startTime || "")) ||
+          String(a.id).localeCompare(String(b.id))
+      );
+    const timeless = timelessPool
+      .filter((item) => item.date === date)
+      .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    return { date, timeless, timed };
+  });
+
+  return { days, outside, undated };
+}

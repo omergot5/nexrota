@@ -52,6 +52,11 @@ const BASE = {
   "unit.shifts": "משמרות",
   "unit.nights": "לילות",
   "unit.hours":  "שעות",
+
+  // הלוח המאוחד (Phase 5, BOARD-01/02)
+  "nav.board":        "השבוע במבט אחד",
+  "positions.forward": "4 השבועות הקרובים",
+  "positions.planned": "מתוכנן",
 };
 
 /**
@@ -83,6 +88,7 @@ const PROFILE_TERMS = {
     "action.publish":   "הפץ סד\"כ",
     "unit.shifts":      "תורנויות",
     "positions.working": "מי מחזיק בה השבוע",
+    "nav.board":        "תמונת מצב שבועית",
   },
 };
 
