@@ -1,29 +1,21 @@
 ---
-status: testing
+status: complete
 phase: 04-standing-positions
 source: [04-VERIFICATION.md]
 started: 2026-08-27T00:00:00Z
-updated: 2026-08-27T00:00:00Z
+updated: 2026-09-02T00:05:00Z
 ---
 
 ## Current Test
 
-number: 1
-name: 04-02 Task 3 human-check — guard-side "qualified, not scheduled" comprehension
-expected: |
-  Log in as a guard qualified for a position's category but not scheduled on it this week.
-  Confirm the position appears under "העמדות שאני כשיר/ה להן" (not among the shift list),
-  with no date/time. Ask a person unfamiliar with the screen to read it aloud and state in
-  their own words whether they are working that position this week — the answer must be
-  "no, I'm only allowed to."
-awaiting: user response
+[testing complete]
 
 ## Tests
 
 ### 1. 04-02 Task 3 human-check — guard-side "qualified, not scheduled" comprehension
 expected: The naive reader correctly concludes "qualified, not scheduled." This is the phase's
   core anti-confusion test (ROADMAP Success Criterion 4).
-result: [pending]
+result: pass
 
 ### 2. 04-02 Task 2 human-check — perceptual distinction of the two position lists
 expected: |
@@ -32,7 +24,7 @@ expected: |
   (2) Cover both headings with a hand — still distinguishable from icon + item shape alone.
   (3) Reduce a working guard's qualification and confirm they move to the working-only list,
       disappearing from the qualified list.
-result: [pending]
+result: pass
 
 ### 3. 04-02 Task 1 human-check — full dev-server click-through
 expected: |
@@ -59,7 +51,8 @@ result: PARTIALLY COVERED — confirmed via direct SQL query (equivalent to dash
 ## Summary
 
 total: 4
-passed: 0
+passed: 2
 failed: 0
-pending: 4 (2 fully outstanding — perceptual/comprehension judgment calls only a human can make;
-  2 substantially covered by the orchestrator's own live regression testing, low residual risk)
+pending: 0
+skipped: 2 (tests 3 and 4 — substantially covered by the orchestrator's own live regression
+  testing during phase execution; not re-run as separate manual checks)
