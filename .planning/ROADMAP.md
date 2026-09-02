@@ -130,10 +130,17 @@ Plans:
 
 **Plans:** 4 plans
 Plans:
+**Wave 1**
 
 - [ ] 05-01-PLAN.md — מנוע המיזוג הטהור, בדיקת "שום פריט לא נעלם", והלוח כשלב הראשון במסך "השבוע" (BOARD-01, BOARD-04)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 05-02-PLAN.md — מנעול הכשירות ברמת האדם על הלוח, ומסך המשתתף שעובר לאותו רכיב (BOARD-01, BOARD-03)
 - [ ] 05-03-PLAN.md — תחזית ארבעה שבועות לכל עמדה קבועה, תצוגה אחת לשתי הצורות, לקריאה בלבד (BOARD-02)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 05-04-PLAN.md — פרישת WeekCalendar, הפניית לשונית "יומן" ללוח המאוחד, ומבחן הכניסה (BOARD-01, BOARD-04)
 
 **UI hint**: yes
