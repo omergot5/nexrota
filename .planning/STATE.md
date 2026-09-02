@@ -1,19 +1,19 @@
 ---
 gsd_state_version: 1.0
-current_phase: 04
-current_phase_name: עמדות קבועות
-status: human_needed
-stopped_at: Phase 04 code complete and live-verified; 2 perceptual/comprehension UAT items pending human check
-last_updated: "2026-08-27T08:30:00.000Z"
-last_activity: 2026-08-27
-last_activity_desc: Phase 04 executed (both plans merged), live browser-verified by orchestrator (found and fixed a real gs_positions RLS regression), gsd-verifier ran — status human_needed pending 2 UAT items in 04-UAT.md
-state_head: 89a9322
+current_phase: 05
+current_phase_name: הלוח המאוחד
+status: planning
+stopped_at: Phase 04 complete, ready to plan Phase 05
+last_updated: "2026-09-02T05:51:13.625Z"
+last_activity: 2026-09-02
+last_activity_desc: Phase 04 complete, transitioned to Phase 05
+state_head: f9d230f2b92be2cdf01e21d811c55f6254b0479e
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 1
   total_plans: 12
   completed_plans: 12
-  percent: 80
+  percent: 20
 ---
 
 # Project State
@@ -23,21 +23,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-21)
 
 **Core value:** אדם שמקבל את האפליקציה לידיו מסיים סידור שבועי מלא בלי שאף אחד יסביר לו כלום — ומה שהמערכת אומרת לו על עצמה הוא נכון.
-**Current focus:** Phase 04 — עמדות קבועות (human verification pending, see 04-UAT.md)
+**Current focus:** Phase 05 — הלוח המאוחד
 
 ## Current Position
 
-Phase: 04 (עמדות קבועות) — HUMAN VERIFICATION PENDING
-Status: Both plans (04-01, 04-02) executed, merged, and code-level verified (npm test, npm run build, live browser regression testing). gsd-verifier report: 8/8 code-and-unit-test truths verified; status `human_needed` on 2 outstanding perceptual/comprehension UAT items (04-UAT.md) plus one test-harness-flakiness item accepted as pre-existing (see deferred-items.md).
-Last activity: 2026-08-27 — Live browser verification found and fixed a real regression: gs_positions RLS policies returned zero rows for the anonymous demo flow (migration 0009_positions_rls_use_helpers.sql), silently breaking POS-01 materialization beyond the first week. Fixed and re-verified live across two fresh demo sessions and 3+ never-visited weeks.
+Phase: 05 — הלוח המאוחד
+Status: Ready to plan
+Last activity: 2026-09-02 — Phase 04 complete (all 4 UAT checks passed live, threats_open: 0), transitioned to Phase 05
 
-Progress: [████████████████░░░░] 80% (Phases 1-3 done, Phase 4 code complete + live-verified, 2 UAT items pending human sign-off)
+Progress: [████░░░░░░░░░░░░░░░░] 20% per ROADMAP.md's own progress table (note: phases 1-3's rows in that table were never updated to reflect their actual completion in prior sessions — a pre-existing staleness unrelated to Phase 4, not corrected here to avoid re-auditing phases outside this session's scope)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
+- Total plans completed: 2
 - Average duration: —
 - Total execution time: —
 
@@ -45,7 +45,7 @@ Progress: [████████████████░░░░] 80% (Ph
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 04 | 2 | - | - |
 
 **Recent Trend:**
 
@@ -112,5 +112,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-08-27T08:30:00.000Z
-Stopped at: Phase 04 code complete, merged, and live-verified by the orchestrator; gsd-verifier report status human_needed pending 2 perceptual/comprehension UAT items
+Stopped at: Phase 04 complete, ready to plan Phase 05
 Resume file: C:/Users/omerg/OneDrive - Ariel University/Desktop/claude projects/shd/.planning/phases/04-standing-positions/04-UAT.md
