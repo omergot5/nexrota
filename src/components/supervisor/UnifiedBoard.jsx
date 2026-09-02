@@ -25,6 +25,16 @@ import { People } from "./views.jsx";
 const OUT_OF_ENGINE_TOOLTIP =
   "המשימה לא נושאת שעות, או פרושה על יותר מיום אחד — ולכן היא לא נכנסת למנוע: היא לא נספרת במנוחה, ברצף, בתקרה השבועית או בנטל.";
 
+/**
+ * חוסר האיוש של פריט מתוזמן, בדיוק כמו missingOf ב-WeekCalendar.jsx — אותו
+ * חשבון, מוצג כאן כשורת רשימה במקום כמלבן ברשת. לפריט טיימלס אין מושג
+ * איוש בכלל (D-08 אין פעולה, ואין שדה requiredGuards על שורת עמדה שבועית).
+ */
+const missingOfItem = (item) => {
+  if (item.requiredGuards == null) return 0;
+  return Math.max(0, Math.max(1, item.requiredGuards || 1) - (item.assignedGuards?.length || 0));
+};
+
 export default function UnifiedBoard({
   shifts = [], tasks = [], guards = [], dates = [], scopeGuardId = null, empty,
 }) {
@@ -53,8 +63,20 @@ export default function UnifiedBoard({
     );
   }
 
+  // חוסר איוש ברמת השבוע כולו, פעם אחת מעל קבוצות הימים — לא באנר, לא
+  // Alert, ולא חוזר על עצמו בכל יום. שורה מטושטשת (text-muted), לא אזהרה.
+  const totalMissing = days.reduce(
+    (sum, day) => sum + day.timed.reduce((s, item) => s + missingOfItem(item), 0),
+    0
+  );
+
   return (
     <div className="space-y-6">
+      {totalMissing > 0 && (
+        <p className="text-xs text-muted px-1" data-numeric>
+          {totalMissing} מקומות לא מאוישים
+        </p>
+      )}
       {days.map((day) => (
         <DayGroup key={day.date} day={day} guards={guards} />
       ))}
@@ -93,8 +115,15 @@ function DayGroup({ day, guards }) {
 
 function BoardRow({ item, guards }) {
   const timeless = Boolean(item.timeless);
+  // חוסר איוש הוא מושג שקיים רק לפריט מתוזמן (D-08 — שורת עמדה עתידית אין
+  // לה עוד ניצול; פריט timeless אין לו requiredGuards בכלל).
+  const missing = timeless ? 0 : missingOfItem(item);
   return (
-    <div className="flex items-center gap-3 rounded-xl p-2.5 ring-1 ring-inset ring-hairline bg-surface-sunken">
+    <div
+      className={`flex items-center gap-3 rounded-xl p-2.5 ring-1 ring-inset bg-surface-sunken ${
+        missing > 0 ? "ring-warn" : "ring-hairline"
+      }`}
+    >
       <Dot color={shiftTone(item.color, item.type)} size={10} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-content truncate">{item.label}</p>
@@ -120,6 +149,16 @@ function BoardRow({ item, guards }) {
             <span className="flex items-center gap-1">
               <Icon name="clock" size={11} />
               {item.startTime}–{item.endTime}
+            </span>
+          )}
+          {/* שלושה ערוצים — אייקון, מילים, וטבעת אזהרה על השורה כולה —
+            * לעולם לא צבע לבדו (WCAG 1.4.1). שורה מאוישת במלואה לא מקבלת
+            * שום תג — תג "תקין" על כל שורה הוא בדיוק הרעש ש-TaskRow כבר
+            * נמנע ממנו. */}
+          {missing > 0 && (
+            <span className="flex items-center gap-1 font-bold text-warn">
+              <Icon name="alert" size={11} />
+              חסרים {missing}
             </span>
           )}
         </span>

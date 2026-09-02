@@ -8,7 +8,7 @@ import {
 import { Dot, Icon } from "../icons.jsx";
 import {
   availabilityDeadline, dayName, formatDateHe, fromISODate, isSingleDayTask, isTaskEngineEligible,
-  rangeLabelHe, shiftHours, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
+  rangeLabelHe, rangeTextHe, shiftHours, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
 } from "../../lib/dates.js";
 import { availStatus, checkAssignment, isQualified } from "../../lib/autoAssign.js";
 import { PROFILES, subscribeTerms, t, termProfile } from "../../lib/terms.js";
@@ -1523,13 +1523,6 @@ export const categoryOptions = (shifts = [], tasks = []) => {
   return [...known, ...custom];
 };
 
-/** חלון הזמן של משימה, כמשפט אחד. */
-const rangeText = (task) => {
-  if (task.startDate && task.dueDate && task.startDate !== task.dueDate)
-    return `${formatDateHe(task.startDate)} – ${formatDateHe(task.dueDate)}`;
-  return task.dueDate ? formatDateHe(task.dueDate) : "";
-};
-
 /**
  * ערימת פרצופים. מעל ארבעה — השאר נספרים, כי חמישה עיגולים כבר לא נקראים.
  *
@@ -1726,7 +1719,7 @@ export function TaskMgmt({
   const TaskRow = ({ task }) => {
     const done = task.status === "done";
     const prio = PRIORITY[task.priority] || PRIORITY.medium;
-    const range = rangeText(task);
+    const range = rangeTextHe(task);
     // אותה פונקציה בדיוק שהמנוע נשען עליה (isTaskEngineEligible) — כך
     // שהתג הזה לעולם לא יכול לחלוק על מה שהמנוע באמת עשה עם המשימה
     // (D-03, D-04).
