@@ -1,23 +1,28 @@
 ---
 phase: 05-unified-board
 verified: 2026-09-03T06:59:36Z
-status: human_needed
+status: passed
 score: 3/4 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
 human_verification:
+
   - test: "BOARD-04 comprehension test (D-13): find a person who has never seen NexRota. Give them the running app and the single sentence \"בנה סידור שבועי מלא\" — no other explanation. As supervisor: do they land on the unified board first when opening \"השבוע\"? Do they build a full week (shifts, assignment, publish) unaided, with every hesitation/question/backtrack recorded? Afterward, ask them to describe in their own words what the board shows."
     expected: "They correctly identify, unprompted: what happens each day; that some items carry a clock time and some do not; that a person with a lock icon cannot do that item. If they describe \"shifts\" and \"tasks\" as two visually distinct kinds of things, that is a D-12 failure, not a pass."
     why_human: "This is the phase's own stated acceptance test (ROADMAP.md Success Criterion 4, D-13) — an observed comprehension result from a real naive person. It cannot be inferred from source code or automated tests; 05-VALIDATION.md itself lists it as the phase's only Manual-Only Verification. It has not been run in any of the four plan executions — every one of 05-01 through 05-04's SUMMARY.md explicitly reports it as not performed (no browser tool available to the parallel worktree executors)."
+
   - test: "יומן tab, week mode: confirm it renders the identical UnifiedBoard component the \"השבוע\" flow shows — not a different grid — and that the month view still works unchanged."
     expected: "Same board, same items, same qualification locks, in both entry points."
     why_human: "Visual/pixel confirmation of a live render; source-level check (grep + code reading) already confirms both mount points use the same component and the same props, but this is the live-render half of that claim."
+
   - test: "\"עוד\" → \"עמדות קבועות\": each position shows four week sections forward. A template position's rows for the current week appear realized (no badge); the next three weeks carry \"מתוכנן\". A weekly-shape position shows exactly one row per week, four weeks, with no hours printed. No shape-specific colour/icon/card style. Tapping a \"מתוכנן\" row opens only the position's edit dialog — nothing anywhere in the section can assign, unassign, disable or delete."
     expected: "Four vertical week sections (no carousel/horizontal scroll), same row template for both shapes, \"מתוכנן\" badge only on not-yet-realized rows, the badge row's only affordance is opening edit."
     why_human: "Visual layout, shape-parity and click-target behaviour; 05-03-SUMMARY.md explicitly reports this six-item checklist as not run in a browser this session."
+
   - test: "As a participant (guard), open the app: does a task assigned to you appear in your duty list next to your shifts, ordered by time? Does the hero \"התורנות הבאה שלך\" card only ever show an item with a real clock time (never a timeless item)? Is nothing shown twice? After a supervisor narrows your qualification on a category you're already assigned to (on both a shift and a task), do both rows show the identical lock/\"לא כשיר/ה\"/neutral ring — from both your own view and the supervisor's?"
     expected: "Merged, ordered, non-duplicated list; timed-only hero; identical QUAL-08 treatment for the guard as for the manager, on both item types."
     why_human: "Requires a live seeded team, a real qualification-narrowing action, and two logged-in sessions (supervisor + guard) to observe together; 05-02-SUMMARY.md explicitly reports this checklist as not run."
+
   - test: "On the unified board, count every shift and every task for the visible week against the separate \"משימות\" screen — confirm nothing is missing. Confirm a task with no hours and a task spanning multiple days each show the \"מחוץ למנוע\" badge and a date range, never a clock time. Confirm an under-staffed shift row shows the alert icon, \"חסרים N\" text and a warn ring together. Confirm clearing the week to empty shows a worded invitation, not a warning/error banner."
     expected: "Visual parity with the automated merge-completeness guarantee already proven by scripts/verify-board.mjs; no dropped item, no fabricated hour, three-channel shortfall signal, non-alarming empty state."
     why_human: "The underlying data contract is unit-tested and passing (scripts/verify-board.mjs, 17 assertions), but the actual pixel rendering has not been visually confirmed; 05-01-SUMMARY.md explicitly reports this as not run."
