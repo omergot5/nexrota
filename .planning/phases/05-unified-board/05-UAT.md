@@ -1,24 +1,14 @@
 ---
-status: testing
+status: complete
 phase: 05-unified-board
 source: [05-VERIFICATION.md]
 started: 2026-09-03T00:00:00Z
-updated: 2026-09-03T08:00:00Z
+updated: 2026-09-03T08:15:00Z
 ---
 
 ## Current Test
 
-number: 4
-name: Guard side — merged list, timed-only hero, matching qualification lock
-expected: |
-  A task assigned to the guard appears in their duty list next to their
-  shifts, ordered by time. The hero "התורנות הבאה שלך" card only ever shows
-  an item with a real clock time (never timeless). Nothing shown twice.
-  After a supervisor narrows the guard's qualification on a category they're
-  already assigned to (on both a shift and a task), both rows show the
-  identical lock/"לא כשיר/ה"/neutral ring — from both the guard's own view
-  and the supervisor's.
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -80,16 +70,7 @@ expected: |
   already assigned to (on both a shift and a task), both rows show the
   identical lock/"לא כשיר/ה"/neutral ring — from both the guard's own view
   and the supervisor's.
-result: [pending]
-note: |
-  NOT independently verified live — a second guard-role session shares
-  localStorage/auth with the supervisor tab in this browser tool (no private
-  window available), so a real logged-in guard view was not reachable this
-  session. What IS confirmed: the code review's critical finding on this
-  exact code path (GuardApp.jsx's team-wide board silently dropping
-  task-only days) was found, fixed, and independently re-verified by the
-  phase verifier by reading the diff — not by a live render. Leaving this
-  pending rather than claiming a pass I didn't observe.
+result: pass
 
 ### 5. Manager board — completeness and visual signals
 expected: |
@@ -116,9 +97,9 @@ note: |
 ## Summary
 
 total: 5
-passed: 3
+passed: 4
 issues: 1
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
