@@ -103,6 +103,22 @@ export default {
           "0%, 100%": { opacity: "0.35", transform: "scale(1)" },
           "50%": { opacity: "0.6", transform: "scale(1.08)" },
         },
+        // שני כתמי הרקע במסך הכניסה נעים לאט בכיוונים מנוגדים, כדי
+        // שהרקע ירגיש חי בלי למשוך תשומת לב מהתוכן שמעליו.
+        float1: {
+          "0%, 100%": { transform: "translate(0, 0)" },
+          "50%": { transform: "translate(-16px, 14px)" },
+        },
+        float2: {
+          "0%, 100%": { transform: "translate(0, 0)" },
+          "50%": { transform: "translate(14px, -16px)" },
+        },
+        // כניסה רכה יותר מ-fade-up, למסך הכניסה בלבד: מטושטש קלות
+        // ומתמקד תוך כדי הופעה, כמו שקע פוקוס מצלמה.
+        "blur-up": {
+          from: { opacity: "0", filter: "blur(6px)", transform: "translateY(6px)" },
+          to: { opacity: "1", filter: "blur(0)", transform: "none" },
+        },
       },
       animation: {
         "fade-up": "fade-up 260ms cubic-bezier(0.22, 1, 0.36, 1) both",
@@ -111,6 +127,9 @@ export default {
         drain: "drain 8s linear forwards",
         "slot-in": "slot-in 7s cubic-bezier(0.22, 1, 0.36, 1) infinite both",
         breathe: "breathe 6s ease-in-out infinite",
+        float1: "float1 22s ease-in-out infinite",
+        float2: "float2 26s ease-in-out infinite",
+        "blur-up": "blur-up 420ms cubic-bezier(0.22, 1, 0.36, 1) both",
       },
     },
   },

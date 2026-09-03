@@ -86,6 +86,38 @@
     border: 1px solid var(--hairline);
     box-shadow: var(--shadow-raised);
   }
+
+  /* כפתור ה-CTA הראשי במסך הכניסה: פס אור שנשבר על הכפתור בהעברת עכבר
+   * או בפוקוס, כמו זכוכית שתופסת אור. אפקט CSS טהור — בלי ספריית
+   * אנימציה — כי `overflow-hidden` על ה-`::after` הוא כל מה שצריך. */
+  .btn-glass-cta {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .btn-glass-cta::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      115deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.4) 50%,
+      transparent 70%
+    );
+    transform: translateX(-130%);
+    transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+  }
+  .btn-glass-cta:hover::after,
+  .btn-glass-cta:focus-visible::after {
+    transform: translateX(130%);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .btn-glass-cta::after {
+      display: none;
+    }
+  }
 }
 
 @layer utilities {

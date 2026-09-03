@@ -1,8 +1,9 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Logo, PRODUCT_TAGLINE } from "./Logo.jsx";
 import { Icon } from "./icons.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 import LiveSchedulePreview from "./LiveSchedulePreview.jsx";
+import AuthGradientBackdrop from "./AuthGradientBackdrop.jsx";
 import { Alert, Btn, Field, Input, Spinner } from "./ui.jsx";
 import { PROFILES, setTermProfile } from "../lib/terms.js";
 
@@ -16,8 +17,10 @@ import { PROFILES, setTermProfile } from "../lib/terms.js";
 //   הצד המתחבר  — לוח אטום ומורם (`glass-raised`) שנראה כמו חפץ פיזי
 //                  מונח על הנייר. זו הדלת.
 //
-// ההפרדה היא בחומר, לא בקו מפריד: מי שבא להתחבר מזהה את הלוח תוך רבע
-// שנייה בלי לקרוא מילה, ומי שבא ללמוד לא נתקל בטופס.
+// ההפרדה נושאת אותה על ניגוד החומר בין השניים, ותפר דק וממורכז — קו
+// אנכי במסלול השלישי של הגריד — מסמן בדיוק איפה נגמר חצי אחד ומתחיל
+// השני: מי שבא להתחבר מזהה את הלוח המורם תוך רבע שנייה בלי לקרוא מילה,
+// ומי שבא ללמוד לא נתקל בטופס.
 //
 // בטלפון הסדר מתהפך — הלוח עולה מעל הקיפול והסיפור יורד מתחתיו, כי מי
 // שפותח בטלפון כמעט תמיד בא להיכנס, לא להתרשם.
@@ -31,6 +34,70 @@ const FEATURES = [
   { icon: "bed", text: "חוקי מנוחה נאכפים אוטומטית" },
   { icon: "offline", text: "נקרא גם בלי קליטה" },
 ];
+
+/* ------------------------------------------------------------------ *
+ * שורת הכותרת המתחלפת
+ *
+ * אותה כותרת ראשית, שלוש השלמות — כל אחת כאב אמיתי שמנהל משמרות
+ * מכיר. במקום למכור פיצ'רים, הכותרת ממחישה את הבעיה שהמוצר פותר,
+ * ואז הפסקה שמתחתיה סוגרת עם הפתרון. `motion-reduce` עוצר על השורה
+ * הראשונה בשביל מי שביקש פחות תנועה.
+ * ------------------------------------------------------------------ */
+const PAIN_LINES = [
+  "מחזיק ארבעה דברים בראש.",
+  "שוכח מישהו — בלי לשים לב.",
+  "לא תמיד יודע מי קיבל הכי מעט.",
+];
+
+// משך הדהייה במילישניות — חייב להיות זהה למספר ב-duration-300 שלמטה,
+// כי הטיימר מחליף את הטקסט לפי השעון, לא לפי אירוע transitionend
+// (שיורה פעמיים לכל מעבר — פעם על opacity ופעם על transform — ותקע
+// את הרכיב במצב שקוף-לצמיתות אם מסתמכים עליו).
+const FADE_MS = 300;
+
+const RotatingLine = ({ lines, interval = 2800 }) => {
+  const [i, setI] = useState(0);
+  // כדי שלא לצייר שתי שורות מלאות זו על זו (מטושטש בעברית, שני
+  // הכיוונים מתנגשים בעין) המעבר הוא רצוף: קודם דוהה השורה הישנה,
+  // ורק אחרי שנעלמה לגמרי מוחלף הטקסט והשורה החדשה דוהה פנימה.
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    let hideTimer;
+    let showTimer;
+    let cancelled = false;
+
+    const schedule = () => {
+      hideTimer = setTimeout(() => {
+        setVisible(false);
+        showTimer = setTimeout(() => {
+          if (cancelled) return;
+          setI((v) => (v + 1) % lines.length);
+          setVisible(true);
+          schedule();
+        }, FADE_MS);
+      }, interval);
+    };
+    schedule();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(hideTimer);
+      clearTimeout(showTimer);
+    };
+  }, [lines.length, interval]);
+
+  return (
+    <span
+      className={`inline-block text-brand transition-[opacity,transform] duration-300 ease-out ${
+        visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1.5"
+      }`}
+    >
+      {lines[i]}
+    </span>
+  );
+};
 
 /* ------------------------------------------------------------------ *
  * קלט קוד צוות מפוצל
@@ -129,7 +196,7 @@ const DoorCard = ({ icon, tone, title, body, onClick, accent = false, badge, bus
       active:scale-[0.99] disabled:opacity-60 disabled:cursor-wait
       ${
         accent
-          ? "bg-gradient-to-l from-brand to-brand-strong shadow-lg shadow-brand/25 hover:shadow-xl hover:shadow-brand/30"
+          ? "bg-gradient-to-l from-brand to-brand-strong shadow-lg shadow-brand/25 hover:shadow-xl hover:shadow-brand/30 btn-glass-cta"
           : "bg-surface-sunken ring-1 ring-inset ring-hairline hover:bg-surface-hover hover:ring-hairline-strong"
       }`}
   >
@@ -176,7 +243,7 @@ const Panel = ({ title, subtitle, onBack, onSubmit, children }) => (
       e.preventDefault();
       onSubmit();
     }}
-    className="animate-fade-up"
+    className="animate-blur-up"
   >
     <button
       type="button"
@@ -337,7 +404,7 @@ export default function AuthPage({
   };
 
   const doors = (
-    <div className="space-y-3 animate-fade-up">
+    <div className="space-y-3 animate-blur-up">
       <DoorCard
         icon="play"
         accent
@@ -384,7 +451,7 @@ export default function AuthPage({
         e.preventDefault();
         nextStep();
       }}
-      className="animate-fade-up"
+      className="animate-blur-up"
     >
       <div className="flex items-center justify-between gap-4 mb-5">
         <button
@@ -398,7 +465,7 @@ export default function AuthPage({
       </div>
 
       {step === 0 && (
-        <div key="s0" className="animate-fade-up">
+        <div key="s0" className="animate-blur-up">
           <h2 className="text-content font-bold text-xl">נעים להכיר</h2>
           <p className="text-muted text-xs mt-1">שתי שאלות, ואפשר להתחיל</p>
           <div className="mt-5 space-y-4">
@@ -430,7 +497,7 @@ export default function AuthPage({
       )}
 
       {step === 1 && (
-        <div key="s1" className="animate-fade-up">
+        <div key="s1" className="animate-blur-up">
           <h2 className="text-content font-bold text-xl">איפה אתה עובד?</h2>
           <p className="text-muted text-xs mt-1">
             נתאים את המילים בממשק. אפשר לשנות בכל רגע בהגדרות.
@@ -472,7 +539,7 @@ export default function AuthPage({
       )}
 
       {step === 2 && (
-        <div key="s2" className="animate-fade-up">
+        <div key="s2" className="animate-blur-up">
           <h2 className="text-content font-bold text-xl">פרטי הכניסה שלך</h2>
           <p className="text-muted text-xs mt-1">הסידור נשמר בענן וזמין מכל מכשיר</p>
           <div className="mt-5 space-y-4">
@@ -516,7 +583,7 @@ export default function AuthPage({
         </div>
       )}
 
-      <Btn type="submit" size="lg" className="w-full mt-5" loading={busy}>
+      <Btn type="submit" size="lg" className="w-full mt-5 btn-glass-cta" loading={busy}>
         {step === 2 ? "צור צוות וקבל קוד" : "המשך"}
       </Btn>
 
@@ -536,20 +603,21 @@ export default function AuthPage({
   );
 
   return (
-    <div className="app-canvas min-h-[100dvh]" dir="rtl">
+    <div className="app-canvas min-h-[100dvh] relative" dir="rtl">
+      <AuthGradientBackdrop />
       <div
-        className="mx-auto w-full max-w-6xl px-4 sm:px-6 py-8 sm:py-12 min-h-[100dvh]
-          grid lg:grid-cols-[1fr_minmax(0,24rem)] gap-10 lg:gap-16 items-center"
+        className="mx-auto w-full max-w-6xl px-4 sm:px-6 py-6 sm:py-12 min-h-[100dvh]
+          grid gap-6 lg:grid-cols-[1fr_auto_minmax(0,24rem)] lg:gap-10 lg:gap-x-8 items-center"
       >
         {/* ================= הצד המספר =================
-          * יושב על הקרם בלי מסגרת. הניגוד מול הלוח האטום שלצידו הוא
-          * ההפרדה — קו מפריד היה מוסיף רעש ולא מידע. */}
+          * יושב על הקרם בלי מסגרת. הניגוד מול הלוח האטום שלצידו נושא
+          * את ההיררכיה, והקו במסלול האמצעי מסמן את התפר ביניהם. */}
         <section className="order-2 lg:order-1 flex flex-col gap-7 lg:gap-9">
           <div>
             <h1 className="text-[28px] sm:text-4xl lg:text-[2.6rem] font-black text-content leading-[1.15] tracking-tight">
               מי שמסדר משמרות ביד
               <br />
-              <span className="text-brand">מחזיק ארבעה דברים בראש.</span>
+              <RotatingLine lines={PAIN_LINES} />
             </h1>
             <p className="text-muted mt-4 text-[15px] leading-relaxed max-w-md">
               מי זמין, מי לא צבר מספיק מנוחה, מי עבר את התקרה, ומי מקבל בעקביות פחות מכולם.
@@ -569,15 +637,29 @@ export default function AuthPage({
           </ul>
         </section>
 
+        {/* התפר בין שני החצאים — קו אנכי שממורכז במסלול האמצעי של
+          * הגריד. `self-stretch` הכרחי: המכולה היא `items-center`, ובלעדיו
+          * גובה ה-div אפס והקו לא מצויר בכלל. קיים רק מ-lg ומעלה — בפריסה
+          * הנערמת אין שני חצאים זה לצד זה, וקו אנכי שם הוא רעש.
+          * `via-brand/35` ולא `hairline-strong`: התפר יושב מעל הרקע
+          * המטושטש הנע של `AuthGradientBackdrop`, וב-20% אטימות הוא נבלע
+          * בתוכו לגמרי. גוון המותג באטימות בינונית נשאר קריא בשני המצבים
+          * (בהיר/כהה) בלי להפוך לגבול כבד. */}
+        <div
+          aria-hidden="true"
+          className="hidden lg:block order-3 lg:order-2 self-stretch w-0.5
+            bg-gradient-to-b from-transparent via-brand/45 to-transparent"
+        />
+
         {/* ================= הצד המתחבר ================= */}
-        <aside className="order-1 lg:order-2 w-full max-w-md mx-auto lg:mx-0 lg:sticky lg:top-10">
+        <aside className="order-1 lg:order-3 w-full max-w-md mx-auto lg:mx-0 lg:sticky lg:top-10">
           <div className="relative">
             {/* הילה רכה מאחורי הלוח — נותנת לו להתרומם מהנייר בלי צל כבד.
               * `inset-0` ולא `-inset-6`: התיבה חייבת להישאר בתוך הפריסה, אחרת
               * היא מוסיפה גלילה אופקית בטלפון. הטשטוש כבר פורש אותה החוצה
               * ויזואלית, והוא לא משפיע על ה-layout. */}
             <div
-              className="absolute inset-0 -z-10 rounded-[2rem] bg-brand/15 blur-3xl
+              className="hidden lg:block absolute inset-0 -z-10 rounded-[2rem] bg-brand/15 blur-3xl
                 animate-breathe motion-reduce:animate-none"
               aria-hidden="true"
             />
@@ -619,7 +701,7 @@ export default function AuthPage({
                     />
                   </Field>
                   {fail && <Alert tone="danger">{fail}</Alert>}
-                  <Btn type="submit" size="lg" className="w-full" loading={busy}>
+                  <Btn type="submit" size="lg" className="w-full btn-glass-cta" loading={busy}>
                     כניסה למערכת
                   </Btn>
                 </Panel>
@@ -653,7 +735,7 @@ export default function AuthPage({
                     />
                   </Field>
                   {fail && <Alert tone="danger">{fail}</Alert>}
-                  <Btn type="submit" size="lg" className="w-full" loading={busy}>
+                  <Btn type="submit" size="lg" className="w-full btn-glass-cta" loading={busy}>
                     כניסה
                   </Btn>
                   <div className="flex items-center justify-between gap-3 pt-1">
@@ -704,7 +786,7 @@ export default function AuthPage({
                         />
                       </Field>
                       {fail && <Alert tone="danger">{fail}</Alert>}
-                      <Btn type="submit" size="lg" className="w-full" loading={busy}>
+                      <Btn type="submit" size="lg" className="w-full btn-glass-cta" loading={busy}>
                         שלח לי קישור
                       </Btn>
                     </>
