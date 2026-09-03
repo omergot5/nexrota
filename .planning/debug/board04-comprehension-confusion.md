@@ -1,8 +1,8 @@
 ---
-status: diagnosed
+status: resolved
 trigger: "UAT gap G-05-1 (05-UAT.md Test 1, BOARD-04/D-13): naive first-time viewer of unified board was confused; user report (verbatim Hebrew): \"ולמי שהראיתי האפליקצייה בכלל לא עונה על מה שאמרת האפליקצייה בילבלה אותו מאוד , ניראלי צריך לעשות פה עבודה\""
 created: 2026-09-03T00:00:00Z
-updated: 2026-09-03T00:00:00Z
+updated: 2026-09-03T12:30:00Z
 ---
 
 ## Current Focus
@@ -141,6 +141,33 @@ root_cause: |
   criterion): fixing the icon overload alone still leaves an unreadable
   label; fixing only the label size still leaves the icon meaning ambiguous
   with the out-of-engine badge.
-fix: "" # not applied — find_root_cause_only mode
-verification: "" # not applied — find_root_cause_only mode
-files_changed: []
+fix: |
+  Applied via 05-05-PLAN.md (commit 8906942, merged into main):
+  1. Added a new `clock-off` glyph to icons.jsx (circle + shortened clock
+     hands + cancel-diagonal), used exclusively for the "מחוץ למנוע"
+     out-of-engine badge on both UnifiedBoard.jsx and views.jsx's TaskRow —
+     freeing the padlock icon to mean only "qualification-blocked."
+  2. Removed the avatar-derived `fontSize: Math.round(size * 0.24)` formula
+     from People's isBlocked branch (views.jsx); "לא כשיר/ה" now renders as
+     its own standalone `<span>` at a fixed 11px, outside the avatar circle.
+  3. Fixed the board's empty-state copy to name the actual on-screen primary
+     button ("המשך לבניית השבוע") instead of the dangling nav.smart phrase.
+  New deterministic gate `scripts/verify-board-signals.mjs` (proven failing
+  pre-fix, passing post-fix) wired into `npm test` to prevent regression.
+verification: |
+  Live-verified in-browser 2026-09-03 (Claude Browser MCP): confirmed the
+  clock-off glyph is visually and structurally distinct from the padlock
+  (both light/dark theme), the qualification-blocked avatar shows a neutral
+  ring + padlock + legible 11px standalone label, no stray padlock appears
+  elsewhere on the board, the empty state names the real button, and the
+  יומן week-mode entry point renders the identical treatment. See
+  05-UAT.md Test 1 note for the full observation list. Guard-side (GuardApp)
+  parity was inferred from shared component reuse, not independently
+  re-observed (browser tool's shared-localStorage limitation).
+files_changed:
+  - src/components/icons.jsx
+  - src/components/supervisor/UnifiedBoard.jsx
+  - src/components/supervisor/views.jsx
+  - src/components/supervisor/WeekFlow.jsx
+  - scripts/verify-board-signals.mjs
+  - package.json
