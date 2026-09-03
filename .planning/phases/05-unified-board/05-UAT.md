@@ -1,9 +1,9 @@
 ---
-status: complete
+status: diagnosed
 phase: 05-unified-board
 source: [05-VERIFICATION.md]
 started: 2026-09-03T00:00:00Z
-updated: 2026-09-03T08:15:00Z
+updated: 2026-09-03T08:30:00Z
 ---
 
 ## Current Test
@@ -111,5 +111,31 @@ blocked: 0
   reason: "User reported: ולמי שהראיתי האפליקצייה בכלל לא עונה על מה שאמרת האפליקצייה בילבלה אותו מאוד , ניראלי צריך לעשות פה עבודה (the app confused the naive viewer significantly and did not deliver the described comprehension result)"
   severity: major
   test: 1
-  artifacts: []
-  missing: []
+  root_cause: |
+    Two compounding code-level defects, not a D-14 "no legend" policy problem:
+    (1) Icon overload — the same lock glyph (icons.jsx:30) is reused for two
+    unrelated meanings on the same board: the "מחוץ למנוע" (out-of-engine)
+    badge on BoardRow (UnifiedBoard.jsx:155-161) and the qualification-block
+    corner icon on a blocked assignee's avatar (views.jsx:1572-1578). A naive
+    viewer has no way to tell them apart.
+    (2) Illegible label — the "לא כשיר/ה" qualification-block text is squeezed
+    inside the avatar circle itself at fontSize = size*0.24 (views.jsx's
+    People isBlocked branch), and UnifiedBoard.jsx calls People with size=24,
+    producing an unreadable 6px label. This is a regression against the
+    AssignView precedent (avatar size 30, label as a separate 10px row below
+    it) that D-09 required to be reused verbatim.
+    A minor secondary contributor: the board's empty-state copy references
+    "סדר לי את השבוע" as plain prose, not an actual link/action, creating a
+    "where do I click first" friction point.
+  artifacts:
+    - path: "src/components/supervisor/UnifiedBoard.jsx"
+      issue: "BoardRow reuses the lock icon for the out-of-engine badge (lines 155-161) and calls People with size=24 for qualification blocks (lines 187-196), triggering the illegible-label formula"
+    - path: "src/components/supervisor/views.jsx"
+      issue: "People's isBlocked branch (lines 1541-1589) computes fontSize: Math.round(size * 0.24) and uses Icon name=\"lock\" for the corner badge (line 1577) — compare the legible original at lines 1090-1170 (AssignView, size=30, separate label row)"
+    - path: "src/components/icons.jsx"
+      issue: "Single lock icon (line 30) shared by two unrelated meanings"
+  missing:
+    - "Give the out-of-engine timeless badge a visually distinct icon from the qualification-block lock (they already have distinct text: \"מחוץ למנוע\" vs \"לא כשיר/ה\" — only the icon is redundant/confusing)"
+    - "Restore the qualification-block label to a separate, legibly-sized text element near the avatar in the board's compact row, instead of a formula-derived font size compressed inside the avatar circle"
+    - "Fix the empty-state's dangling 'start from סדר לי את השבוע' prose reference to be an actual actionable pointer"
+  debug_session: ".planning/debug/board04-comprehension-confusion.md"
