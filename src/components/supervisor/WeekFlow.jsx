@@ -124,7 +124,20 @@ export default function WeekFlow({
   };
 
   const body = [
-    <UnifiedBoard key="board" shifts={shifts} tasks={tasks} guards={guards} dates={weekDates} />,
+    // מצב ריק משלו לשלב 0 (G-05-1): ברירת המחדל של UnifiedBoard לא קוראת
+    // בשם שום כפתור (D-15), כי היא גם מוצגת ביומן ואצל המשתתף — מסכים בלי
+    // הפעולה הזו על המסך. כאן, בתוך WeekFlow, הפעולה הראשית של שלב 0
+    // (action[0] למטה) כן נמצאת ממש מתחת ללוח, אז מותר לקרוא לה בשמה.
+    <UnifiedBoard
+      key="board"
+      shifts={shifts}
+      tasks={tasks}
+      guards={guards}
+      dates={weekDates}
+      empty={{
+        body: `בנה ${t("unit.shifts")} או משימות, והלוח ייבנה מעצמו — לחצו למטה על "המשך לבניית השבוע".`,
+      }}
+    />,
     <ShiftMgmt key="shifts" {...common} />,
     <AvailView key="avail" {...common} />,
     <div key="assign" className="space-y-5">
