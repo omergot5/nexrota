@@ -102,7 +102,7 @@ None yet.
 - אין test runner בפרויקט. כל בדיקה חדשה חייבת להיות סקריפט Node עצמאי שמדפיס `ok`/`FAIL` ומחזיר קוד יציאה, מחובר ל-`npm test`.
 - `conflicts.js` נטול כיסוי בדיקות היום (`codebase/CONCERNS.md`); Phase 2 נוגע בו ישירות.
 - טבלה חדשה נכנסת ב-Phase 4 (עמדות קבועות). RLS נכתבת באותה מיגרציה שיוצרת את הטבלה, לא אחריה.
-- G-05-1 not fully closed: Task 2's six human-check observations (05-05-PLAN.md) require live browser verification, both themes, normal zoom — not possible in this isolated worktree.
+- (resolved 2026-09-03) G-05-1's six human-check observations were verified live in-session: clock-off badge distinct from the qualification padlock in both light and dark theme; blocked avatar shows a neutral ring, corner padlock and a legible standalone "לא כשיר/ה" label (confirmed via DOM: 11px, outside the circle); no stray padlock elsewhere on the board; the manager's empty-state names the on-screen "המשך לבניית השבוע" button; no legend/key/tour text found anywhere; יומן week mode renders the identical treatment. Guard-side (GuardApp) parity was not independently re-observed this pass — inferred from shared-component reuse (UnifiedBoard/People), consistent with Phase 5's earlier UAT Test 2/4 findings, not a fresh direct observation.
 
 ## Deferred Items
 

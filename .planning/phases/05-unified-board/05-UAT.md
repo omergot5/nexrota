@@ -1,9 +1,9 @@
 ---
-status: diagnosed
+status: closed
 phase: 05-unified-board
 source: [05-VERIFICATION.md]
 started: 2026-09-03T00:00:00Z
-updated: 2026-09-03T08:30:00Z
+updated: 2026-09-03T12:30:00Z
 ---
 
 ## Current Test
@@ -23,9 +23,33 @@ expected: |
   each day; that some items carry a clock time and some do not; that a person
   with a lock icon can't do that item. If they describe "shifts" and "tasks"
   as two visually distinct kinds of things, that's a D-12 failure, not a pass.
-result: issue
+result: pass
 reported: "ולמי שהראיתי האפליקצייה בכלל לא עונה על מה שאמרת האפליקצייה בילבלה אותו מאוד , ניראלי צריך לעשות פה עבודה"
 severity: major
+source: automated
+note: |
+  Re-verified live after gap-closure plan 05-05 merged (commit 8906942). Seeded a
+  fresh demo, created a multi-day no-hours task, narrowed רינה שמיר's "כללי"
+  qualification, then confirmed live (both light and dark theme):
+  - The out-of-engine badge on the timeless task renders the new clock-off glyph
+    (circle + hands + cancel-diagonal), not the padlock — confirmed via DOM
+    (svg path shape) on both the board and TaskMgmt's TaskRow.
+  - The blocked avatar shows a neutral ring (ring-hairline-strong/bg-surface-sunken,
+    no danger red), initials, a padlock corner badge (confirmed distinct svg shape:
+    rect+shackle), and aria-disabled + title carrying the refusal sentence.
+  - "לא כשיר/ה" now renders as its own <span>, confirmed via computed style at
+    font-size: 11px, outside the avatar circle — the ~6px in-circle regression is gone.
+  - No padlock appears anywhere else on the board (only the one blocked-avatar site).
+  - Page-text scan found no legend/key/tour copy anywhere (D-14 intact).
+  - Navigating to an empty future week showed "השבוע עדיין ריק" / "בנה משמרות או
+    משימות, והלוח ייבנה מעצמו — או לחצו למטה על 'המשך לבניית השבוע'" — naming the
+    actual button rendered directly below it, not the old dangling nav.smart phrase.
+  - יומן tab's week mode showed the identical fixed treatment (same glyph, same
+    legible label) for the same task/guard.
+  Not independently re-observed this pass: GuardApp's own board (guard-side login
+  is not reachable with this browser tool's shared localStorage/origin) — parity
+  is inferred from shared component reuse (UnifiedBoard/People), matching this
+  phase's earlier UAT Test 2/4 findings, not a fresh direct observation.
 
 ### 2. יומן tab, week mode — same board, both entry points
 expected: |
@@ -97,8 +121,8 @@ note: |
 ## Summary
 
 total: 5
-passed: 4
-issues: 1
+passed: 5
+issues: 0
 pending: 0
 skipped: 0
 blocked: 0
@@ -107,7 +131,8 @@ blocked: 0
 
 - gap_id: G-05-1
   truth: "A naive first-time viewer of the unified board correctly identifies, unprompted, what happens each day, which items carry a clock time vs. not, and that a locked person can't do that item — without anyone explaining the app to them (BOARD-04, D-13)."
-  status: failed
+  status: closed
+  closed_by: "05-05-PLAN.md (commit 8906942), live-verified 2026-09-03 — see Test 1 note above"
   reason: "User reported: ולמי שהראיתי האפליקצייה בכלל לא עונה על מה שאמרת האפליקצייה בילבלה אותו מאוד , ניראלי צריך לעשות פה עבודה (the app confused the naive viewer significantly and did not deliver the described comprehension result)"
   severity: major
   test: 1
