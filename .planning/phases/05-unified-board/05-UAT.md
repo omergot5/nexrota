@@ -3,23 +3,21 @@ status: testing
 phase: 05-unified-board
 source: [05-VERIFICATION.md]
 started: 2026-09-03T00:00:00Z
-updated: 2026-09-03T07:30:00Z
+updated: 2026-09-03T08:00:00Z
 ---
 
 ## Current Test
 
-number: 1
-name: BOARD-04 comprehension test (D-13)
+number: 4
+name: Guard side — merged list, timed-only hero, matching qualification lock
 expected: |
-  A person who has never seen NexRota gets the running app and one sentence:
-  "בנה סידור שבועי מלא" — no other explanation. As supervisor, do they land on
-  the unified board first when opening "השבוע"? Do they build a full week
-  (shifts, assignment, publish) unaided, with every hesitation/question/
-  backtrack recorded? Afterward, ask them to describe in their own words what
-  the board shows — they should correctly identify, unprompted: what happens
-  each day; that some items carry a clock time and some do not; that a person
-  with a lock icon can't do that item. If they describe "shifts" and "tasks"
-  as two visually distinct kinds of things, that's a D-12 failure, not a pass.
+  A task assigned to the guard appears in their duty list next to their
+  shifts, ordered by time. The hero "התורנות הבאה שלך" card only ever shows
+  an item with a real clock time (never timeless). Nothing shown twice.
+  After a supervisor narrows the guard's qualification on a category they're
+  already assigned to (on both a shift and a task), both rows show the
+  identical lock/"לא כשיר/ה"/neutral ring — from both the guard's own view
+  and the supervisor's.
 awaiting: user response
 
 ## Tests
@@ -35,7 +33,9 @@ expected: |
   each day; that some items carry a clock time and some do not; that a person
   with a lock icon can't do that item. If they describe "shifts" and "tasks"
   as two visually distinct kinds of things, that's a D-12 failure, not a pass.
-result: [pending]
+result: issue
+reported: "ולמי שהראיתי האפליקצייה בכלל לא עונה על מה שאמרת האפליקצייה בילבלה אותו מאוד , ניראלי צריך לעשות פה עבודה"
+severity: major
 
 ### 2. יומן tab, week mode — same board, both entry points
 expected: |
@@ -117,9 +117,18 @@ note: |
 
 total: 5
 passed: 3
-issues: 0
-pending: 2
+issues: 1
+pending: 1
 skipped: 0
 blocked: 0
 
 ## Gaps
+
+- gap_id: G-05-1
+  truth: "A naive first-time viewer of the unified board correctly identifies, unprompted, what happens each day, which items carry a clock time vs. not, and that a locked person can't do that item — without anyone explaining the app to them (BOARD-04, D-13)."
+  status: failed
+  reason: "User reported: ולמי שהראיתי האפליקצייה בכלל לא עונה על מה שאמרת האפליקצייה בילבלה אותו מאוד , ניראלי צריך לעשות פה עבודה (the app confused the naive viewer significantly and did not deliver the described comprehension result)"
+  severity: major
+  test: 1
+  artifacts: []
+  missing: []
