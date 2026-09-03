@@ -20,6 +20,7 @@ import {
 } from "../../lib/dates.js";
 import { shiftTone } from "../../design/shiftPalette.js";
 import { isQualified } from "../../lib/autoAssign.js";
+import { t } from "../../lib/terms.js";
 import { People } from "./views.jsx";
 
 // זהה מילה במילה לתג שכבר קיים ב-TaskRow (views.jsx) — לא מנוסח מחדש.
@@ -46,7 +47,7 @@ const qualRefusal = (category) => `לא מוגדר/ת כשיר/ה לקטגורי
  */
 const missingOfItem = (item) => {
   if (item.requiredGuards == null) return 0;
-  return Math.max(0, Math.max(1, item.requiredGuards || 1) - (item.assignedGuards?.length || 0));
+  return Math.max(0, (item.requiredGuards || 1) - (item.assignedGuards?.length || 0));
 };
 
 export default function UnifiedBoard({
@@ -71,7 +72,7 @@ export default function UnifiedBoard({
         title={empty?.title || "השבוע עדיין ריק"}
         body={
           empty?.body ||
-          "בנה משמרות או משימות, והלוח ייבנה מעצמו — או תתחיל מ'תסדר לי את השבוע'."
+          `בנה ${t("unit.shifts")} או משימות, והלוח ייבנה מעצמו — או תתחיל מ'${t("nav.smart")}'.`
         }
       />
     );

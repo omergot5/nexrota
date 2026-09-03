@@ -6,8 +6,8 @@ import {
 import { Icon } from "./icons.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 import {
-  addDays, availabilityDeadline, boardItemsForDates, countdownHe, dayName, formatDateHe,
-  fromISODate, rangeLabelHe, shiftInterval, shortDate, toISODate, todayISO, weekByOffset,
+  availabilityDeadline, boardItemsForDates, countdownHe, dayName, formatDateHe,
+  rangeLabelHe, shiftInterval, shortDate, toISODate, todayISO, weekByOffset,
   withEngineTasks,
 } from "../lib/dates.js";
 import { availStatus, checkAssignment, teamAverages } from "../lib/autoAssign.js";
@@ -235,7 +235,7 @@ function MySchedule({ user, guards, shifts, tasks = [], positions = [] }) {
         empty={myEmpty}
       />
 
-      {publishedAll.length > 0 && (
+      {(publishedAll.length > 0 || tasks.length > 0) && (
         <Card>
           <h2 className="font-bold text-content mb-3 flex items-center gap-2">
             <Icon name="clipboard" size={17} className="text-muted" />
@@ -245,7 +245,10 @@ function MySchedule({ user, guards, shifts, tasks = [], positions = [] }) {
             shifts={publishedAll}
             tasks={tasks}
             guards={guards}
-            dates={[...new Set(publishedAll.map((s) => s.date))].sort()}
+            dates={[...new Set([
+              ...publishedAll.map((s) => s.date),
+              ...tasks.map((t) => t.dueDate || t.startDate).filter(Boolean),
+            ])].sort()}
           />
         </Card>
       )}
