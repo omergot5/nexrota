@@ -301,6 +301,9 @@ const Steps = ({ current, total }) => (
 export default function AuthPage({
   onRegister, onLogin, onJoin, onDemo, onForgot, busy, error, clearError,
 }) {
+  // המסך נפתח סגור — כרטיס אחד עם כפתור "התחל", לא טופס. מי שבא ללמוד
+  // לא נתקל בשדות לפני שביקש אותם.
+  const [started, setStarted] = useState(false);
   // null | 'login' | 'register' | 'guard' | 'forgot'
   const [mode, setMode] = useState(null);
   const [step, setStep] = useState(0);
@@ -670,8 +673,31 @@ export default function AuthPage({
                 <ThemeToggle />
               </div>
 
-              {mode === null && doors}
-              {mode === "register" && wizard}
+              {!started && (
+                <div className="animate-blur-up flex flex-col items-center text-center gap-4 py-6">
+                  <p className="text-content font-bold text-lg">מוכנים לראות איך זה עובד?</p>
+                  <p className="text-muted text-sm max-w-[22rem]">
+                    הדגמה חיה, או כניסה ישירה לצוות שלכם — שתי דקות, בלי התחייבות.
+                  </p>
+                  <Btn
+                    size="lg"
+                    className="w-full max-w-[14rem] mt-1 btn-glass-cta group"
+                    onClick={() => setStarted(true)}
+                  >
+                    <span className="flex items-center gap-2">
+                      התחילו
+                      <Icon
+                        name="left"
+                        size={17}
+                        className="transition-transform duration-200 group-hover:-translate-x-1"
+                      />
+                    </span>
+                  </Btn>
+                </div>
+              )}
+
+              {started && mode === null && doors}
+              {started && mode === "register" && wizard}
 
               {mode === "guard" && (
                 <Panel
