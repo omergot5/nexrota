@@ -3,7 +3,7 @@ status: testing
 phase: 05-unified-board
 source: [05-VERIFICATION.md]
 started: 2026-09-03T00:00:00Z
-updated: 2026-09-03T00:00:00Z
+updated: 2026-09-03T07:30:00Z
 ---
 
 ## Current Test
@@ -43,7 +43,14 @@ expected: |
   shows — not a different grid — and that the month view still works
   unchanged. Same board, same items, same qualification locks, in both
   entry points.
-result: [pending]
+result: pass
+source: automated
+note: |
+  Live browser check this session (Claude Browser MCP, functionally
+  equivalent to Playwright-MCP — no such tool was configured by that name):
+  seeded a fresh demo, opened "יומן" tab week mode, confirmed identical
+  row cards/items/coverage badges to the "השבוע" board. Toggled to month
+  view — CalendarView renders unchanged, unaffected by the repoint.
 
 ### 3. עמדות קבועות — four-week forecast, both shapes, read-only
 expected: |
@@ -53,7 +60,16 @@ expected: |
   four weeks, no hours printed. No shape-specific colour/icon/card style.
   Tapping a "מתוכנן" row opens only the position's edit dialog — nothing in
   the section can assign, unassign, disable or delete.
-result: [pending]
+result: pass
+source: automated
+note: |
+  Live browser check this session: created a template position (Sunday,
+  08:00-16:00). "4 השבועות הקרובים" rendered with current week's date/time
+  and 3 following weeks each carrying "מתוכנן", uniform card style, no
+  assign/edit-shift affordance anywhere in the section (D-08 read-only
+  confirmed). Did not separately create a weekly-shape position to confirm
+  its one-row-per-week rendering live — that half rests on
+  scripts/verify-positions.mjs's automated assertions, not a live render.
 
 ### 4. Guard side — merged list, timed-only hero, matching qualification lock
 expected: |
@@ -65,6 +81,15 @@ expected: |
   identical lock/"לא כשיר/ה"/neutral ring — from both the guard's own view
   and the supervisor's.
 result: [pending]
+note: |
+  NOT independently verified live — a second guard-role session shares
+  localStorage/auth with the supervisor tab in this browser tool (no private
+  window available), so a real logged-in guard view was not reachable this
+  session. What IS confirmed: the code review's critical finding on this
+  exact code path (GuardApp.jsx's team-wide board silently dropping
+  task-only days) was found, fixed, and independently re-verified by the
+  phase verifier by reading the diff — not by a live render. Leaving this
+  pending rather than claiming a pass I didn't observe.
 
 ### 5. Manager board — completeness and visual signals
 expected: |
@@ -74,14 +99,26 @@ expected: |
   clock time. An under-staffed shift row shows the alert icon, "חסרים N"
   text and a warn ring together. Clearing the week to empty shows a worded
   invitation, not a warning/error banner.
-result: [pending]
+result: pass
+source: automated
+note: |
+  Live browser check this session: created a multi-day, no-hours task
+  (6-12 Sept) via "משימות" — TaskMgmt showed the "מחוץ למנוע" badge with
+  the same date range. On the unified board it appeared exactly once, on
+  Saturday (dueDate anchor), ahead of the timed shift rows for that day
+  (timeless-first per D-16), badge + date range, no fabricated clock time.
+  Under-staffed shift rows showed the alert icon + "חסרים 1"/"חסרים 2" text
+  together with the warn-coloured ring. Did not separately clear the week
+  to empty to observe the worded empty state live — that rests on source
+  review (EmptyState usage, not Alert) plus D-15's design intent, not a
+  live render of that specific state.
 
 ## Summary
 
 total: 5
-passed: 0
+passed: 3
 issues: 0
-pending: 5
+pending: 2
 skipped: 0
 blocked: 0
 
