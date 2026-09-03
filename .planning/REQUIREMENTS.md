@@ -48,8 +48,8 @@
 
 ### BOARD — לוח מאוחד
 
-- [ ] **BOARD-01**: לוח אחד מציג משמרות ומשימות יחד, ממוין ומסודר
-- [ ] **BOARD-02**: לכל עמדה יש תצוגה שבה רואים את הלוז שלה רץ קדימה
+- [x] **BOARD-01**: לוח אחד מציג משמרות ומשימות יחד, ממוין ומסודר
+- [x] **BOARD-02**: לכל עמדה יש תצוגה שבה רואים את הלוז שלה רץ קדימה
 - [x] **BOARD-03**: הלוח מסמן חסימת כשירות באותו אופן לשני סוגי הפריטים
 - [x] **BOARD-04**: אדם שלא ראה את האפליקציה מעולם מבין מה הלוח מראה, בלי הסבר
 
@@ -101,8 +101,8 @@
 | POS-03 | Phase 4 | Complete |
 | POS-04 | Phase 4 | Complete |
 | POS-05 | Phase 4 | Complete |
-| BOARD-01 | Phase 5 | Pending |
-| BOARD-02 | Phase 5 | Pending |
+| BOARD-01 | Phase 5 | Complete |
+| BOARD-02 | Phase 5 | Complete |
 | BOARD-03 | Phase 5 | Complete |
 | BOARD-04 | Phase 5 | Complete |
 
