@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { SHIFT_TONES } from "../../design/shiftPalette.js";
 import { loadTable } from "../../lib/loadTable.js";
 import {
-  Alert, Avatar, Badge, Btn, Card, EmptyState, Field, guardColor, IconBtn, Input, Meter, Modal,
-  PageHeader, readableInk, Select, StatCard, Textarea,
+  Alert, Avatar, Badge, Btn, Card, EmptyState, Field, guardColor, IconBtn, initials, Input, Meter,
+  Modal, PageHeader, readableInk, Select, StatCard, Textarea,
 } from "../ui.jsx";
 import { Dot, Icon } from "../icons.jsx";
 import {
@@ -1537,6 +1537,15 @@ export const categoryOptions = (shifts = [], tasks = []) => {
  * מגיעים כפרופים מהקורא (`UnifiedBoard.jsx`) ולא ננעלים כאן — כך שהטקסט
  * "לא כשיר/ה" והטבעת הניטרלית (D-09/QUAL-08) נשארים מוגדרים במקום אחד,
  * לא משוכפלים כברירת מחדל בקובץ הזה.
+ *
+ * G-05-1 (BOARD-04/D-13): המילה "לא כשיר/ה" הייתה דחוסה בתוך עיגול
+ * האווטאר עצמו בגודל גופן שנגזר מגודל האווטאר — ב-size=24 (הקריאה מהלוח)
+ * זה יצא כ-6px, בלתי קריא. זו לא הייתה ההתאמה של תקדים QUAL-08 המקורי
+ * (AssignView למעלה בקובץ הזה), ששם אותה מילה יושבת בשורת טקסט נפרדת
+ * בגודל רגיל. כאן: תוכן העיגול חוזר להיות מה שאווטאר רגיל מציג (אותיות
+ * פתיחה, בלי גודל גופן מחושב מ-size), והמילה המפרשת יוצאת מהעיגול לשורת
+ * תווית אחת (11px, כמו מטא-הזמן של שורת הלוח) שמופיעה פעם אחת לכל
+ * הערימה — לא לכל אדם חסום, ולא כשום דבר לא חסום.
  */
 export const People = ({
   ids, guards, size = 22, max = 4,
@@ -1544,17 +1553,20 @@ export const People = ({
 }) => {
   const people = ids.map((id) => guards.find((g) => g.id === id)).filter(Boolean);
   if (!people.length) return <span className="text-[11px] text-faint">אין משויכים</span>;
+  const visible = people.slice(0, max);
+  const anyBlocked = isBlocked ? visible.some((g) => isBlocked(g)) : false;
   return (
     <div className="flex items-center">
       <div className="flex -space-x-1.5 space-x-reverse">
-        {people.slice(0, max).map((g) => {
+        {visible.map((g) => {
           const blocked = isBlocked ? isBlocked(g) : false;
           if (!blocked) {
             return <Avatar key={g.id} id={g.id} name={g.name} size={size} ring label={g.name} />;
           }
           // ארבעת האותות (D-09/QUAL-08), על האדם החסום בלבד: לא-אינטראקטיבי,
-          // תווית מוחלפת (לא מצורפת), מנעול צף בפינה, טבעת ניטרלית — לעולם
-          // לא ring-danger, כי חוסר כשירות הוא עובדה על האדם ולא שגיאה.
+          // עדיין מזוהה (אותיות פתיחה, כמו אווטאר רגיל בערימה), מנעול צף
+          // בפינה, טבעת ניטרלית — לעולם לא ring-danger, כי חוסר כשירות הוא
+          // עובדה על האדם ולא שגיאה. המילה המפרשת יושבת מחוץ לעיגול, מתחת.
           return (
             <div
               key={g.id}
@@ -1564,10 +1576,11 @@ export const People = ({
               <div
                 aria-disabled="true"
                 className={`rounded-full ring-2 ring-bg flex items-center justify-center text-center
-                  leading-none cursor-not-allowed select-none ${blockedClassName}`}
-                style={{ width: size, height: size, fontSize: Math.round(size * 0.24) }}
+                  leading-none cursor-not-allowed select-none font-bold text-[10px] text-muted
+                  ${blockedClassName}`}
+                style={{ width: size, height: size }}
               >
-                <span className="px-0.5 font-semibold text-muted">{blockedLabel}</span>
+                {initials(g.name)}
               </div>
               <span
                 className="absolute -top-1 -right-1.5 min-w-[18px] h-[18px] px-1
@@ -1583,6 +1596,14 @@ export const People = ({
       {people.length > max && (
         <span className="text-[11px] text-muted font-semibold mr-2" data-numeric>
           +{people.length - max}
+        </span>
+      )}
+      {/* התווית המפרשת: פעם אחת לכל הערימה (לא לכל אדם חסום), בגודל
+        * התווית הרגיל של שורת הלוח — לא בתוך שום עיגול, ובלי גודל גופן
+        * מחושב מ-size (G-05-1). */}
+      {anyBlocked && (
+        <span className="text-[11px] font-semibold text-muted mr-2">
+          {blockedLabel}
         </span>
       )}
     </div>
@@ -1809,7 +1830,9 @@ export function TaskMgmt({
               <span
                 title="המשימה לא נושאת שעות, או פרושה על יותר מיום אחד — ולכן היא לא נכנסת למנוע: היא לא נספרת במנוחה, ברצף, בתקרה השבועית או בנטל."
               >
-                <Badge tone="neutral" icon="lock">
+                {/* clock-off, לא lock (G-05-1): אותו סטייה מכוונת מ-UI-SPEC
+                  * שהלוח המאוחד עושה — המנעול שמור לחסימת כשירות בלבד. */}
+                <Badge tone="neutral" icon="clock-off">
                   מחוץ למנוע
                 </Badge>
               </span>

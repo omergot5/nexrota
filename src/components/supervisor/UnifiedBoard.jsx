@@ -65,15 +65,16 @@ export default function UnifiedBoard({
     .filter((day) => day.timeless.length > 0 || day.timed.length > 0);
 
   // מצב ריק שלם: ניסוח, לא אזהרה (D-15) — לא Alert, לא danger, לא warn.
+  // ברירת המחדל (G-05-1) לא קוראת בשם שום כפתור: זו התצוגה שמופיעה גם
+  // ביומן וגם אצל המשתתף, ובאף אחד מהם אין את שלב "תסדר לי" על המסך.
+  // מסך "השבוע" של המנהל מעביר `empty` משלו (WeekFlow.jsx) שקורא בשם
+  // הפעולה הראשית שכן נמצאת שם, ממש מתחת ללוח.
   if (days.length === 0) {
     return (
       <EmptyState
         icon="inbox"
         title={empty?.title || "השבוע עדיין ריק"}
-        body={
-          empty?.body ||
-          `בנה ${t("unit.shifts")} או משימות, והלוח ייבנה מעצמו — או תתחיל מ'${t("nav.smart")}'.`
-        }
+        body={empty?.body || `בנה ${t("unit.shifts")} או משימות, והלוח ייבנה מעצמו.`}
       />
     );
   }
@@ -155,7 +156,11 @@ function BoardRow({ item, guards }) {
                 {rangeTextHe(item)}
               </span>
               <span title={OUT_OF_ENGINE_TOOLTIP}>
-                <Badge tone="neutral" icon="lock">
+                {/* clock-off, לא lock (G-05-1): המנעול שמור כולו לחסימת
+                  * כשירות אישית (People למטה) — הגלף הזה הוא הנגדת השעון
+                  * הרגיל שהשורה המתוזמנת מציגה, לא סימן נעילה נוסף. סטייה
+                  * מכוונת מ-UI-SPEC (ראו 05-05-SUMMARY.md). */}
+                <Badge tone="neutral" icon="clock-off">
                   מחוץ למנוע
                 </Badge>
               </span>

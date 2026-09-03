@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 05
 current_phase_name: הלוח המאוחד
 status: executing
-stopped_at: Phase 05 UI-SPEC approved
-last_updated: "2026-09-02T12:42:27.027Z"
+stopped_at: Completed 05-05-PLAN.md (G-05-1 gap closure)
+last_updated: "2026-09-03T12:05:20.291Z"
 last_activity: 2026-09-02
 last_activity_desc: Phase 05 execution started
-state_head: 731136ade0f7d8265b47f02fe654162901a66053
+state_head: 00067fc5dd81ec82e3dcde04521a80bf2d4dbe45
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 16
-  completed_plans: 12
+  total_plans: 17
+  completed_plans: 17
   percent: 20
 ---
 
@@ -31,7 +31,7 @@ Phase: 05 (הלוח המאוחד) — EXECUTING
 Status: Executing Phase 05
 Last activity: 2026-09-02 — Phase 05 execution started
 
-Progress: [████░░░░░░░░░░░░░░░░] 20% per ROADMAP.md's own progress table (note: phases 1-3's rows in that table were never updated to reflect their actual completion in prior sessions — a pre-existing staleness unrelated to Phase 4, not corrected here to avoid re-auditing phases outside this session's scope)
+Progress: [██░░░░░░░░] 20% per ROADMAP.md's own progress table (note: phases 1-3's rows in that table were never updated to reflect their actual completion in prior sessions — a pre-existing staleness unrelated to Phase 4, not corrected here to avoid re-auditing phases outside this session's scope)
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [████░░░░░░░░░░░░░░░░] 20% per
 | Phase 02 P01 | 30min | 3 tasks | 5 files |
 | Phase 03 P03 | ~6min | 3 tasks | 2 files |
 | Phase 03-eligibility-model P04 | 35min | 2 tasks | 2 files |
+| Phase 05 P05 | ~35min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,7 @@ Recent decisions affecting current work:
 - [Phase 04]: D-05: Phase 4 builds only a minimal dedicated screen for POS-05 (who's qualified vs who's working this week); the polished forward-looking board view is explicitly Phase 5's BOARD-02.
 - [Phase 04]: gs_positions RLS must use gs_my_team()/gs_is_supervisor() (matching gs_shifts), not a raw auth.uid() subquery — the raw-subquery precedent (gs_task_templates/gs_role_compatibility) silently returns 0 rows for the app's real anonymous-demo auth flow, masked on those two tables only by their `team_code is null or ...` fallback. gs_positions has no such fallback, so this was the first table where the gap became user-visible. Found via live browser regression testing after both plans merged, fixed in supabase/migrations/0009_positions_rls_use_helpers.sql.
 - [Phase 04]: `npm run test:backend`'s "standing positions" section intermittently fails `permission denied for function gs_my_team` due to that section's guard client session going stale over the script's long, un-refreshed run — not a defect in the migration (confirmed via a clean isolated reproduction). Accepted as the same pre-existing test-harness-flakiness class already logged for this script; see deferred-items.md.
+- [Phase 05]: [Phase 5-05]: G-05-1 fixed by separating the timeless clock-off glyph from the qualification padlock and moving the לא כשיר/ה label outside the avatar circle to the board's own 11px label size; new deterministic gate scripts/verify-board-signals.mjs wired into npm test.
 
 ### Pending Todos
 
@@ -100,6 +102,7 @@ None yet.
 - אין test runner בפרויקט. כל בדיקה חדשה חייבת להיות סקריפט Node עצמאי שמדפיס `ok`/`FAIL` ומחזיר קוד יציאה, מחובר ל-`npm test`.
 - `conflicts.js` נטול כיסוי בדיקות היום (`codebase/CONCERNS.md`); Phase 2 נוגע בו ישירות.
 - טבלה חדשה נכנסת ב-Phase 4 (עמדות קבועות). RLS נכתבת באותה מיגרציה שיוצרת את הטבלה, לא אחריה.
+- G-05-1 not fully closed: Task 2's six human-check observations (05-05-PLAN.md) require live browser verification, both themes, normal zoom — not possible in this isolated worktree.
 
 ## Deferred Items
 
@@ -111,6 +114,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-02T07:39:21.674Z
-Stopped at: Phase 05 UI-SPEC approved
-Resume file: .planning/phases/05-unified-board/05-UI-SPEC.md
+Last session: 2026-09-03T12:05:19.730Z
+Stopped at: Completed 05-05-PLAN.md (G-05-1 gap closure)
+Resume file: None
