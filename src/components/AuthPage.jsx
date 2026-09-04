@@ -90,7 +90,8 @@ const RotatingLine = ({ lines, interval = 2800 }) => {
 
   return (
     <span
-      className={`inline-block text-brand transition-[opacity,transform] duration-300 ease-out ${
+      className={`inline-block bg-gradient-to-l from-brand to-accent bg-clip-text text-transparent
+        transition-[opacity,transform] duration-300 ease-out ${
         visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1.5"
       }`}
     >
@@ -617,7 +618,14 @@ export default function AuthPage({
           * את ההיררכיה, והקו במסלול האמצעי מסמן את התפר ביניהם. */}
         <section className="order-2 lg:order-1 flex flex-col gap-7 lg:gap-9">
           <div>
-            <h1 className="text-[28px] sm:text-4xl lg:text-[2.6rem] font-black text-content leading-[1.15] tracking-tight">
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 ring-1 ring-inset
+                ring-accent/25 px-3 py-1 text-[11px] font-bold text-accent"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse motion-reduce:animate-none" />
+              חי עכשיו — הדגמה מלאה, בלי הרשמה
+            </span>
+            <h1 className="mt-3 text-[28px] sm:text-4xl lg:text-[2.6rem] font-black text-content leading-[1.15] tracking-tight">
               מי שמסדר משמרות ביד
               <br />
               <RotatingLine lines={PAIN_LINES} />
@@ -630,10 +638,14 @@ export default function AuthPage({
 
           <LiveSchedulePreview />
 
-          <ul className="flex flex-wrap gap-x-6 gap-y-2.5 text-[13px] text-muted">
+          <ul className="flex flex-wrap gap-2 text-[12.5px] font-semibold text-content">
             {FEATURES.map((f) => (
-              <li key={f.text} className="flex items-center gap-2">
-                <Icon name={f.icon} size={15} className="text-accent flex-shrink-0" />
+              <li
+                key={f.text}
+                className="flex items-center gap-1.5 rounded-full bg-surface-sunken ring-1 ring-inset
+                  ring-hairline px-3 py-1.5"
+              >
+                <Icon name={f.icon} size={14} className="text-accent flex-shrink-0" />
                 {f.text}
               </li>
             ))}
