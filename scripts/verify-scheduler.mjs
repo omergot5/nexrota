@@ -1141,5 +1141,91 @@ const qlCodesMissingLabel = qlEmittedCodes.filter((code) => {
 check("QUAL-06 · לכל code שהמנוע יכול להחזיר יש מפתח תואם ב-labels של explainUnfilled",
   qlCodesMissingLabel.length === 0, JSON.stringify({ qlEmittedCodes, qlCodesMissingLabel }));
 
+// ============================================================
+// WKND — העדפת סופ"ש: ניקוד רך, סימטרי, לעולם לא חוסם.
+// ============================================================
+console.log("\nWKND — העדפת סופ\"ש: ניקוד רך שדוחף/מושך, לא אילוץ קשיח\n");
+
+const wkndGuards = [
+  { id: "wk-avoid", name: "נמנע/ת", weekendPreference: "avoid" },
+  { id: "wk-prefer", name: "מעדיף/ה", weekendPreference: "prefer" },
+  { id: "wk-none", name: "בלי העדפה" }, // weekendPreference undefined — הרוב
+];
+
+// שבת, כל השלושה זמינים ושווים בכל דבר אחר — need=3 כדי ששלושתם ייכנסו
+// לאותה משמרת ויהיו ניתנים להשוואה ישירה, לא רק המנצח/ת.
+const wkndSatShift = {
+  id: "wk-sat", date: dates[6], label: "משמרת שבת", type: "morning",
+  startTime: "07:00", endTime: "19:00", requiredGuards: 3, assignedGuards: [],
+};
+// ראשון — אותם שומרים, אותה משמרת, בלי סופ"ש — הבקרה.
+const wkndSunShift = {
+  id: "wk-sun", date: dates[0], label: "משמרת ראשון", type: "morning",
+  startTime: "07:00", endTime: "19:00", requiredGuards: 3, assignedGuards: [],
+};
+const wkndAvailability = {};
+for (const g of wkndGuards) {
+  wkndAvailability[`${g.id}-wk-sat`] = { status: "available" };
+  wkndAvailability[`${g.id}-wk-sun`] = { status: "available" };
+}
+
+const wkndPlan = autoAssign({ shifts: [wkndSatShift, wkndSunShift], guards: wkndGuards, availability: wkndAvailability });
+const wkndSatScores = Object.fromEntries(
+  (wkndPlan.detailByShift["wk-sat"] || []).map((r) => [r.guardId, r.score])
+);
+const wkndSunScores = Object.fromEntries(
+  (wkndPlan.detailByShift["wk-sun"] || []).map((r) => [r.guardId, r.score])
+);
+
+check("WKND · כל שלושת השומרים אוישו לשתי המשמרות (need=3, בלי חוסמים)",
+  Object.keys(wkndSatScores).length === 3 && Object.keys(wkndSunScores).length === 3,
+  JSON.stringify({ sat: wkndSatScores, sun: wkndSunScores }));
+
+check("WKND · בשבת: מי שסימן/ה 'מעדיף/ה' מנוקד/ת גבוה יותר ממי שבלי העדפה",
+  wkndSatScores["wk-prefer"] > wkndSatScores["wk-none"],
+  JSON.stringify(wkndSatScores));
+
+check("WKND · בשבת: מי שסימן/ה 'נמנע/ת' מנוקד/ת נמוך יותר ממי שבלי העדפה",
+  wkndSatScores["wk-avoid"] < wkndSatScores["wk-none"],
+  JSON.stringify(wkndSatScores));
+
+check("WKND · ביום ראשון (לא סופ\"ש) שלושתם מנוקדים אותו דבר בדיוק — ההעדפה חלה רק על משמרת סופ\"ש",
+  wkndSunScores["wk-avoid"] === wkndSunScores["wk-none"] &&
+    wkndSunScores["wk-prefer"] === wkndSunScores["wk-none"],
+  JSON.stringify(wkndSunScores));
+
+// maxScoreFor אסור לגדול מ-8 נקודות בגלל ההעדפה (D-02 style: אותה נוסחה
+// לכולם) — נבדק ישירות על raw, לא על האחוז המנורמל: אם ה-8 היו נכנסים
+// למכנה, ההפרש הגולמי בין prefer/none ובין none/avoid כבר לא היה 8 בדיוק.
+const wkndSatRaw = Object.fromEntries(
+  (wkndPlan.detailByShift["wk-sat"] || []).map((r) => [r.guardId, r.raw])
+);
+check("WKND · ההפרש הגולמי הוא בדיוק ±8 בין prefer/none ובין none/avoid — לא נכנס למכנה (maxScoreFor)",
+  wkndSatRaw["wk-prefer"] - wkndSatRaw["wk-none"] === 8 &&
+    wkndSatRaw["wk-none"] - wkndSatRaw["wk-avoid"] === 8,
+  JSON.stringify(wkndSatRaw));
+
+check("WKND · 'מעדיף/ה' לא חורג/ת מעל 100% (clamped) גם עם בונוס — האחוז נשאר קריא",
+  wkndPlan.detailByShift["wk-sat"].every((r) => r.score <= 100 && r.score >= 0));
+
+// חסימה: אף פעם לא. מי שסימן/ה 'נמנע/ת' עדיין חייב/ת להישבץ לשבת אם אין
+// ברירה — זו בדיוק ההבטחה "רך, לא חוסם" שהתכונה קיימת בשבילה.
+const wkndOnlyAvoidShift = {
+  id: "wk-sat-solo", date: dates[6], label: "משמרת שבת", type: "morning",
+  startTime: "07:00", endTime: "19:00", requiredGuards: 1, assignedGuards: [],
+};
+const wkndSoloGuard = [{ id: "wk-solo", name: "לבד/ה", weekendPreference: "avoid" }];
+const wkndSoloAvail = { "wk-solo-wk-sat-solo": { status: "available" } };
+const wkndSoloPlan = autoAssign({ shifts: [wkndOnlyAvoidShift], guards: wkndSoloGuard, availability: wkndSoloAvail });
+check("WKND · מי שסימן/ה 'נמנע/ת' עדיין משובץ/ת לשבת כשאין אף חלופה — לעולם לא חוסם",
+  wkndSoloPlan.summary.coverage === 100 && wkndSoloPlan.byShift["wk-sat-solo"]?.[0] === "wk-solo",
+  JSON.stringify(wkndSoloPlan.summary));
+
+check("WKND · deterministic — הרצה חוזרת על אותו קלט (אותן שתי המשמרות) נותנת אותם ציונים בדיוק",
+  JSON.stringify(
+    Object.fromEntries((autoAssign({ shifts: [wkndSatShift, wkndSunShift], guards: wkndGuards, availability: wkndAvailability })
+      .detailByShift["wk-sat"] || []).map((r) => [r.guardId, r.score]))
+  ) === JSON.stringify(wkndSatScores));
+
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);

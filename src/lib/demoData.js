@@ -125,8 +125,7 @@ export async function seedDemoTeam({ teamCode, existingGuards = [], existingShif
         type: tpl.type,
         color: tpl.color,
         location: "כניסה ראשית",
-        // Thursday and Friday nights are the busy ones — they need two guards.
-        required_guards: tpl.type === "night" && (i === 4 || i === 5) ? 2 : 1,
+        required_guards: 1,
       });
     }
   });

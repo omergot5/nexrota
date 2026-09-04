@@ -386,6 +386,25 @@ function scoreCandidate({ guard, shift, load, availability, rules, stats, check 
     parts.push({ label: "נשמר/ת למשמרת שביקש/ה במפורש", points: -6, kind: "preference" });
   }
 
+  // 4c. Weekend preference — an optional, personal, symmetric nudge (never
+  //     a hard constraint, never in maxScoreFor). Some guards would rather
+  //     not work Friday-evening/Saturday shifts; others actively want them
+  //     (weekend pay). Both are legitimate and this asks nothing about why —
+  //     it is a scheduling preference, not an identity field. Deliberately
+  //     excluded from maxScoreFor, same as the opportunity-cost penalty
+  //     above: the vast majority of guards never set this, and inflating
+  //     the denominator for everyone to accommodate a preference only a few
+  //     people set would make their honest 100% match unreachable.
+  if (isWeekendShift(shift)) {
+    if (guard.weekendPreference === "avoid") {
+      score -= 8;
+      parts.push({ label: 'סימן/ה העדפה לא לעבוד בסופ"ש', points: -8, kind: "weekend" });
+    } else if (guard.weekendPreference === "prefer") {
+      score += 8;
+      parts.push({ label: 'סימן/ה העדפה לעבוד בסופ"ש', points: 8, kind: "weekend" });
+    }
+  }
+
   // 5. Don't stack two shifts on one calendar day if it can be avoided.
   if (load.dates.has(shift.date)) {
     score -= 12;

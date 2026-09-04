@@ -30,6 +30,7 @@ const KIND_ICON = {
   night: "moon",
   rest: "bed",
   spread: "calendar",
+  weekend: "sun",
   continuity: "refresh",
   balance: "shuffle",
   locked: "pin",

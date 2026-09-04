@@ -2419,6 +2419,34 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts
 
   const qualEmptySelection = qualSelection.length === 0;
 
+  // ---- העדפת סופ"ש (רכה, סימטרית — ראו 0010_weekend_preference.sql) ----
+  const [wkndEditing, setWkndEditing] = useState(null); // guard object, or null
+  const WKND_OPTIONS = [
+    {
+      value: null,
+      label: "ללא העדפה",
+      body: "משתתף/ת בשיבוץ שישי-שבת כרגיל, לפי הזמינות שמוגשת כל שבוע.",
+      icon: "calendar",
+    },
+    {
+      value: "avoid",
+      label: 'מעדיף/ה לא לעבוד בסופ"ש',
+      body: 'המנוע ייתן משקל נמוך יותר למשמרות שישי בערב ושבת — לא חוסם, רק מוריד עדיפות. עדיין ישובץ/תשובץ אם אין ברירה.',
+      icon: "moon",
+    },
+    {
+      value: "prefer",
+      label: 'מעדיף/ה לעבוד בסופ"ש',
+      body: 'המנוע ייתן משקל גבוה יותר למשמרות שישי בערב ושבת — שימושי למי שמעדיף/ה את תגמול הסופ"ש.',
+      icon: "sun",
+    },
+  ];
+  const saveWkndPreference = async (value) => {
+    if (!wkndEditing) return;
+    await actions.setGuardWeekendPreference(wkndEditing.id, value);
+    setWkndEditing(null);
+  };
+
   const saveQualifications = async () => {
     if (!qualEditing || qualEmptySelection) return;
     // בונים לפי סדר הרשימה הקנונית (סינון, לא צבירה לפי סדר קליק) — כדי
@@ -2592,6 +2620,18 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts
                           {`כשיר/ה ל-${g.qualifiedCategories.length} קטגוריות בלבד`}
                         </Badge>
                       )}
+                      {/* מופיע רק למי שסימנו בפועל — אותו כלל בדיוק כמו
+                        * שאר התגים בשורה הזאת (D-03). */}
+                      {g.weekendPreference === "avoid" && (
+                        <Badge tone="neutral" icon="moon">
+                          פחות סופ״ש
+                        </Badge>
+                      )}
+                      {g.weekendPreference === "prefer" && (
+                        <Badge tone="neutral" icon="sun">
+                          יותר סופ״ש
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2602,6 +2642,13 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts
                     size="sm"
                     label={`ערוך כשירות של ${g.name}`}
                     onClick={() => openQualEditor(g)}
+                  />
+                  <IconBtn
+                    icon={g.weekendPreference === "avoid" ? "moon" : g.weekendPreference === "prefer" ? "sun" : "calendar"}
+                    size="sm"
+                    label={`ערוך העדפת סופ״ש של ${g.name}`}
+                    className={g.weekendPreference ? "text-info" : ""}
+                    onClick={() => setWkndEditing(g)}
                   />
                   {/* Per-guard exception. A deadline with no way to grant one
                       is a deadline that generates phone calls — reservists,
@@ -2692,6 +2739,44 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts
               {qualEditing?.name || "האדם"} מהצוות, זו הפעולה המתאימה, לא איפוס הכשירות.
             </p>
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(wkndEditing)}
+        onClose={() => setWkndEditing(null)}
+        title={wkndEditing ? `העדפת סופ״ש של ${wkndEditing.name}` : ""}
+      >
+        <div className="space-y-2">
+          <p className="text-xs text-muted mb-1">
+            שישי-שבת הם לא זהים לכולם — יש מי שמעדיף/ה פחות מהם ויש מי שדווקא מעדיף/ה יותר.
+            זו רק דחיפה בניקוד, לעולם לא חסימה.
+          </p>
+          {WKND_OPTIONS.map((opt) => {
+            const on = (wkndEditing?.weekendPreference || null) === opt.value;
+            return (
+              <button
+                key={opt.label}
+                type="button"
+                onClick={() => saveWkndPreference(opt.value)}
+                disabled={busy}
+                aria-pressed={on}
+                className={`w-full flex items-center gap-3 text-right p-3 rounded-xl cursor-pointer
+                  ring-1 ring-inset transition-colors duration-200 disabled:opacity-60 ${
+                    on
+                      ? "bg-brand/12 ring-brand/45 text-content"
+                      : "bg-surface-sunken ring-hairline text-muted hover:text-content"
+                  }`}
+              >
+                <Icon name={opt.icon} size={18} className="flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-content">{opt.label}</p>
+                  <p className="text-xs text-muted">{opt.body}</p>
+                </div>
+                {on && <Icon name="check" size={16} className="text-brand flex-shrink-0" strokeWidth={3} />}
+              </button>
+            );
+          })}
         </div>
       </Modal>
     </div>

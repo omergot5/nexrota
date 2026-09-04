@@ -85,6 +85,12 @@ export const profileFromRow = (row) => ({
   // בתוך המנוע. בדיקת מערך אמיתית (`Array.isArray`) ולא בדיקת אמת-שקר,
   // כי עמודת jsonb יכולה להכיל כל ערך JSON.
   qualifiedCategories: Array.isArray(row.qualified_categories) ? row.qualified_categories : null,
+  // 'avoid' | 'prefer' | null — ניקוד רך במנוע (autoAssign.js), לא אילוץ
+  // קשיח. כל ערך אחר (עמודה חסרה, NULL, שיבוש) נופל ל-null כמו qualifiedCategories.
+  weekendPreference:
+    row.weekend_preference === "avoid" || row.weekend_preference === "prefer"
+      ? row.weekend_preference
+      : null,
 });
 
 export const availKey = (guardId, shiftId) => `${guardId}-${shiftId}`;
@@ -552,6 +558,24 @@ export async function setGuardQualifications(profileId, categories) {
   if (error) throw new Error(error.message);
   if (!data?.length) {
     throw new Error("אין לך הרשאה לשנות את הכשירות של האדם הזה — התחבר מחדש ונסה שוב");
+  }
+}
+
+/**
+ * כותב את העדפת הסופ"ש של אדם אחד. מנרמלת כל דבר שאינו בדיוק 'avoid'
+ * או 'prefer' ל-null — אותה מוסכמה בדיוק כמו setGuardQualifications,
+ * כדי שבסיס הנתונים לעולם לא יחזיק ערך שלישי בשקט.
+ */
+export async function setGuardWeekendPreference(profileId, preference) {
+  const normalized = preference === "avoid" || preference === "prefer" ? preference : null;
+  const { data, error } = await supabase
+    .from("gs_profiles")
+    .update({ weekend_preference: normalized })
+    .eq("id", profileId)
+    .select("id");
+  if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה לשנות את העדפת הסופ״ש של האדם הזה — התחבר מחדש ונסה שוב");
   }
 }
 
