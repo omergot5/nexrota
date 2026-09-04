@@ -21,7 +21,7 @@
 //    רשימה בלי מידע.
 // ============================================================
 
-import { shiftHours, addDays, todayISO } from "./dates.js";
+import { shiftHours, addDays } from "./dates.js";
 import { shiftLoad } from "./autoAssign.js";
 
 const round1 = (n) => Math.round(n * 10) / 10;
@@ -32,8 +32,13 @@ const round1 = (n) => Math.round(n * 10) / 10;
  * החלון נמדד לאחור מתחילת השבוע שמסדרים, ולא מהיום: מנהל שבונה את שבוע
  * הבא ביום חמישי צריך לראות את מה שקדם לשבוע ההוא, לא את מה שקדם לרגע
  * שבו הוא יושב מול המסך.
+ *
+ * `until` הוא ארגומנט חובה בכוונה, בלי ברירת מחדל של "היום": מודול טהור
+ * שקורא ל-new Date() בשקט כשהקורא שוכח פרמטר מפר את ההבטחה של קלט זהה ⟵
+ * פלט זהה בלי שום סימן ברגע הקריאה, בדיוק כמו שהאיסור על Math.random()
+ * חל על autoAssign.js. הקריאה היחידה כרגע (views.jsx) כבר מעבירה weekStart.
  */
-export function rollingLoad({ guards = [], shifts = [], until = todayISO(), days = 14 }) {
+export function rollingLoad({ guards = [], shifts = [], until, days = 14 }) {
   const from = addDays(until, -days);
   return { from, until, per: tally(guards, shifts, (s) => s.date >= from && s.date < until) };
 }
@@ -81,7 +86,7 @@ export function meanShiftLoad(shifts = []) {
   return shifts.length ? shifts.reduce((a, s) => a + shiftLoad(s), 0) / shifts.length : 1;
 }
 
-export function fairnessPlan({ guards = [], history = [], planned = [], until = todayISO(), days = 14 }) {
+export function fairnessPlan({ guards = [], history = [], planned = [], until, days = 14 }) {
   const active = guards.filter((g) => g.active !== false);
   if (!active.length) return { rows: [], avgLoad: 0, perShiftLoad: 1, window: { days } };
 
@@ -111,7 +116,11 @@ export function fairnessPlan({ guards = [], history = [], planned = [], until = 
         needs: Math.round(deficit / (perShiftLoad || 1)),
       };
     })
-    .sort((a, b) => b.deficit - a.deficit);
+    // שובר שוויון לקסיקוגרפי על מזהה, לא רק מיון ראשי — בדיוק כמו tieBreak
+    // ב-autoAssign.js ו-workingGuardIdsForWeek ב-positions.js. בלעדיו, שני
+    // שומרים עם אותו deficit בדיוק (הצוות הטרי ביותר: כולם על אפס) יוצאים
+    // בסדר שתלוי במקרה בסדר שבו guards הגיע מהקורא, לא בערכים עצמם.
+    .sort((a, b) => b.deficit - a.deficit || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
   return { rows, avgLoad: round1(avgLoad), perShiftLoad: round1(perShiftLoad), window: { days, from: past.from, until } };
 }
