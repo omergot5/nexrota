@@ -613,11 +613,21 @@ export function useGuardian() {
         );
       },
 
+      // `rethrow: true` — יחיד בין הפעולות הרגילות: SmartAssign.jsx מציג "הוחל"
+      // (ירוק, לצמיתות) מיד אחרי ה-await הזה בלי שום תנאי. בלי rethrow, run()
+      // בולע את השגיאה ומחזיר undefined בשקט — SmartAssign היה מראה "הוחל
+      // בהצלחה" גם כשהכתיבה בפועל נכשלה (RLS, רשת), בדיוק ההפך מ"מה שהמערכת
+      // אומרת על עצמה נכון" (CLAUDE.md). באג ה-UI הזה קיים גם בלי קשר לתיקון
+      // ה-.select() ב-api.js — עכשיו ששניהם מתוקנים, כשל אמיתי מגיע עד הרכיב
+      // שצריך לדעת עליו, לא נבלע באמצע.
       applyPlan: (shiftIds, assignments) =>
-        run(async () => {
-          await api.applyPlan({ shiftIds, assignments });
-          await refresh();
-        }),
+        run(
+          async () => {
+            await api.applyPlan({ shiftIds, assignments });
+            await refresh();
+          },
+          { rethrow: true }
+        ),
 
       clearAssignments: (shiftIds) =>
         deferred(

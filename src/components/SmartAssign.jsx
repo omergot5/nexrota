@@ -91,9 +91,9 @@ function RulesPanel({ rules, setRules, open, onClose }) {
         שיבוץ שמפר אילוץ קשיח פשוט לא ייווצר — המשמרת תישאר פתוחה עם הסבר למה.
       </p>
       <div className="bg-surface-sunken rounded-xl px-4 py-1 mb-4">
-        {num("minRestHours", "מנוחה מינימלית בין משמרות", 0, 24, "שעות")}
+        {num("minRestHours", `מנוחה מינימלית בין ${t("unit.shifts")}`, 0, 24, "שעות")}
         {num("maxConsecutiveHours", "מקסימום שעות רצופות", 4, 24, "שעות")}
-        {num("maxShiftsPerWeek", "מקסימום משמרות בשבוע", 1, 14, "משמרות")}
+        {num("maxShiftsPerWeek", `מקסימום ${t("unit.shifts")} בשבוע`, 1, 14, t("unit.shifts"))}
         {num("maxNightsPerWeek", "מקסימום לילות בשבוע", 0, 7, "לילות")}
       </div>
       <div className="bg-surface-sunken rounded-xl px-4 py-1">
@@ -168,13 +168,23 @@ function WhyModal({ entry, guard, shift, onClose }) {
           </p>
         </div>
         <div className="text-left">
-          <p className="text-3xl font-black text-content leading-none" data-numeric>
-            {entry.score}
-            <span className="text-lg text-muted">%</span>
-          </p>
-          <Badge tone={tone.tone} className="mt-1">
-            {tone.label}
-          </Badge>
+          {/* שיבוץ ידני קיים (keepExisting) מקבל score:0 כערך-שומר, לא ניקוד
+            * אמיתי (autoAssign.js addAssignment ל-keepExisting) — scoreTone(0)
+            * היה מציג "0%" ו"התאמה בדוחק" באדום על שיבוץ שהמנוע כלל לא בדק,
+            * כאילו זו הייתה החלטת ניקוד גרועה שלו. */}
+          {entry.locked ? (
+            <Badge tone="neutral">נשמר כפי שהיה</Badge>
+          ) : (
+            <>
+              <p className="text-3xl font-black text-content leading-none" data-numeric>
+                {entry.score}
+                <span className="text-lg text-muted">%</span>
+              </p>
+              <Badge tone={tone.tone} className="mt-1">
+                {tone.label}
+              </Badge>
+            </>
+          )}
         </div>
       </div>
 
@@ -185,9 +195,9 @@ function WhyModal({ entry, guard, shift, onClose }) {
       </div>
 
       <p className="text-xs text-faint mt-4 leading-relaxed">
-        אחוז ההתאמה הוא סכום הנקודות למעלה ({entry.raw ?? "—"}) חלקי המקסימום האפשרי למשמרת מסוג זה.
-        אילוצים קשיחים — מנוחה, שעות רצופות וזמינות — לא מנוקדים כלל: הם פוסלים מועמד על הסף, ולכן
-        שיבוץ שמפר אותם פשוט לא נוצר.
+        {entry.locked
+          ? "השיבוץ הזה כבר היה קיים לפני ההרצה וסומן להישאר — המנוע לא ניקד אותו וגם לא בדק אותו מול אף אילוץ קשיח."
+          : `אחוז ההתאמה הוא סכום הנקודות למעלה (${entry.raw ?? "—"}) חלקי המקסימום האפשרי למשמרת מסוג זה. אילוצים קשיחים — מנוחה, שעות רצופות וזמינות — לא מנוקדים כלל: הם פוסלים מועמד על הסף, ולכן שיבוץ שמפר אותם פשוט לא נוצר.`}
       </p>
     </Modal>
   );
@@ -253,9 +263,18 @@ export default function SmartAssign({
     setApplied(false);
   };
 
+  // onApply (actions.applyPlan) עכשיו נזרקת עם rethrow: true בדיוק בשביל
+  // הרגע הזה — בלי ה-try/catch כאן, setApplied(true) היה רץ תמיד, גם כשהכתיבה
+  // בפועל נכשלה, ומראה "הוחל" ירוק על שיבוץ שמעולם לא נשמר. השגיאה עצמה כבר
+  // מוצגת דרך באנר השגיאה המשותף (run() קובע error state בכל מקרה,
+  // rethrow או לא) — ה-catch כאן רק מונע מהמסך "לתקן את עצמו" בטעות.
   const apply = async () => {
-    await onApply(weekShifts.map((s) => s.id), plan.assignments);
-    setApplied(true);
+    try {
+      await onApply(weekShifts.map((s) => s.id), plan.assignments);
+      setApplied(true);
+    } catch {
+      /* השגיאה כבר מוצגת דרך הבאנר המשותף (useGuardian's run()) */
+    }
   };
 
   const header = (
@@ -284,8 +303,8 @@ export default function SmartAssign({
         {header}
         <EmptyState
           icon="calendar"
-          title="אין משמרות בשבוע הזה"
-          body={`צור משמרות במסך "${t("nav.shifts")}" — יש שם כפתור שממלא שבוע שלם בלחיצה אחת — ואז חזור לכאן.`}
+          title={`אין ${t("unit.shifts")} בשבוע הזה`}
+          body={`צור ${t("unit.shifts")} במסך "${t("nav.shifts")}" — יש שם כפתור שממלא שבוע שלם בלחיצה אחת — ואז חזור לכאן.`}
         />
       </div>
     );
@@ -297,7 +316,7 @@ export default function SmartAssign({
     <div className="space-y-6">
       <PageHeader
         title={embedded ? null : t("nav.smart")}
-        subtitle={`${rangeLabelHe(weekDates)} · ${weekShifts.length} משמרות · ${guards.length} שומרים`}
+        subtitle={`${rangeLabelHe(weekDates)} · ${weekShifts.length} ${t("unit.shifts")} · ${guards.length} שומרים`}
         actions={
           <>
             <Btn variant="outline" icon="sliders" onClick={() => setShowRules(true)}>
@@ -346,7 +365,7 @@ export default function SmartAssign({
         <EmptyState
           icon="zap"
           title="מוכן לשבץ"
-          body={`המנוע יעבור על ${weekShifts.length} המשמרות, יפסול כל מי שלא עומד באילוצים (זמינות, ${rules.minRestHours} שעות מנוחה, מקס' ${rules.maxConsecutiveHours} שעות רצוף), וידרג את השאר לפי הוגנות עומס וסבב לילות.`}
+          body={`המנוע יעבור על ${weekShifts.length} ה${t("unit.shifts")}, יפסול כל מי שלא עומד באילוצים (זמינות, ${rules.minRestHours} שעות מנוחה, מקס' ${rules.maxConsecutiveHours} שעות רצוף), וידרג את השאר לפי הוגנות עומס וסבב לילות.`}
           action={
             <Btn size="lg" icon="zap" onClick={run} loading={busy}>
               {t("nav.smart")}
@@ -363,7 +382,7 @@ export default function SmartAssign({
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Kpi
-              label="כיסוי משמרות"
+              label={`כיסוי ${t("unit.shifts")}`}
               value={plan.summary.coverage}
               unit="%"
               hint={`${plan.summary.filledSlots}/${plan.summary.totalSlots} תקנים אוישו`}
@@ -380,7 +399,7 @@ export default function SmartAssign({
               meterColor="rgb(var(--brand))"
             />
             <Kpi
-              label="משמרות פתוחות"
+              label={`${t("unit.shifts")} פתוחות`}
               value={plan.summary.openSlots}
               tone={plan.summary.openSlots ? "text-warn" : "text-accent"}
               hint={plan.summary.openSlots ? "דורשות טיפול ידני" : "הכל מאויש"}
@@ -407,7 +426,10 @@ export default function SmartAssign({
             <Btn variant="accent" size="lg" icon={applied ? "check" : "check-circle"} onClick={apply} loading={busy} disabled={applied}>
               {applied ? "הוחל" : "החל את השיבוץ הזה"}
             </Btn>
-            <Btn variant="outline" onClick={() => setPlan(null)}>
+            {/* disabled={busy}: apply() כבר בדרך לשרת — איפוס plan כאן משאיר
+              * את המסך אומר "לא קרה כלום" בזמן שהכתיבה עוד רצה ברקע (run()
+              * לא מתבטל עם reset מקומי). */}
+            <Btn variant="outline" onClick={() => setPlan(null)} disabled={busy}>
               בטל
             </Btn>
             <Btn
@@ -588,7 +610,7 @@ export default function SmartAssign({
             <Card className="!border-warn/30">
               <h2 className="font-bold text-content mb-1 flex items-center gap-2">
                 <Icon name="alert" size={18} className="text-warn" />
-                משמרות שלא הצלחנו לאייש
+                {t("unit.shifts")} שלא הצלחנו לאייש
               </h2>
               <p className="text-xs text-muted mb-4">
                 המנוע לא מפר אילוץ קשיח. הנה בדיוק מי נפסל ולמה — כך אפשר להחליט אם לשנות כלל או
