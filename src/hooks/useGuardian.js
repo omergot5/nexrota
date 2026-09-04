@@ -504,16 +504,39 @@ export function useGuardian() {
       /**
        * החלפת תוכן השבוע: מה שהיה יורד, ומה שנבחר עולה במקומו.
        *
-       * לא עובר דרך `deferred` בכוונה — מחיקה והוספה שמחכות שמונה שניות
-       * היו מתחרות זו בזו, והמשתמש היה רואה שבוע כפול באמצע. פעולה אחת,
-       * מיידית, ואם משהו נופל ברשת ה-refresh מחזיר את המצב האמיתי.
+       * עכשיו כן עובר דרך `deferred`, בניגוד להערה הישנה כאן — ההערה חששה
+       * ממה שקורה כששני `deferred` נפרדים (מחיקה, ואז הוספה) רצים זה לצד
+       * זה: כל אחד עם חלון-ביטול משלו, שמתחרים ומראים שבוע כפול. הפתרון
+       * הוא לא לוותר על הביטול — זו בדיוק הפעולה ההרסנית ביותר במסך הזה,
+       * ו-clearWeek הצמוד אליה כבר מקבל 8 שניות — אלא לצייר את שני הצדדים
+       * (מה שיורד, מה שעולה) כ-patch אחד, אטומי, בקריאת deferred אחת. אין
+       * שני חלונות שמתחרים כי יש רק אחד. השורות החדשות מקבלות מזהה זמני
+       * (temp-) רק כדי שהתצוגה האופטימית תוכל למפות אותן — refresh() בסוף
+       * ה-work מחליף אותן במזהים האמיתיים מהשרת בכל מקרה.
        */
-      replaceShifts: (ids, rows) =>
-        run(async () => {
-          if (ids.length) await api.deleteShifts(ids);
-          if (rows.length) await api.createShifts(rows, dataRef.current.team?.code);
-          await refresh();
-        }),
+      replaceShifts: (ids, rows, label = "השבוע הוחלף") =>
+        deferred(
+          label,
+          (d) => ({
+            ...d,
+            shifts: [
+              ...d.shifts.filter((s) => !ids.includes(s.id)),
+              ...rows.map((r, i) => ({
+                id: `temp-${Date.now()}-${i}`,
+                assignedGuards: [],
+                published: false,
+                category: null,
+                requiredGuards: 1,
+                ...r,
+              })),
+            ],
+          }),
+          () => run(async () => {
+            if (ids.length) await api.deleteShifts(ids);
+            if (rows.length) await api.createShifts(rows, dataRef.current.team?.code);
+            await refresh();
+          })
+        ),
 
       publish: (shiftIds, published) =>
         optimistic(
@@ -652,13 +675,36 @@ export function useGuardian() {
           await refresh();
         }),
 
-      // Takes the whole request, not just its id: approving one moves the shift
-      // between two guards, so the roster has to be updated alongside the status.
+      // "אשר"/"דחה" הן כפתורים צמודים על אותה שורה — טעות-לחיצה בין השניים
+      // היא בדיוק המקרה ש"ביטול במקום אישור" (CLAUDE.md) קיים בשבילו, אבל
+      // עד עכשיו זו הייתה הפעולה ההרסנית היחידה במוצר בלי אף הגנה: לא
+      // confirm() (וזה טוב — המוצר לא רוצה את זה), אבל גם לא deferred/undo.
+      // עכשיו כן: הכתיבה בפועל (כולל העברת המשמרת בין השומרים, אם אושר)
+      // ממתינה כמו כל פעולה הרסנית אחרת, וה-patch כאן מצייר מראש בדיוק את
+      // מה ש-api.decideSwap יעשה בסוף, כדי שהמסך לא "יתקן את עצמו" ברגע
+      // שהכתיבה האמיתית מגיעה.
       decideSwap: (swap, status) =>
-        run(async () => {
-          await api.decideSwap(swap, status);
-          await refresh();
-        }),
+        deferred(
+          status === "approved" ? "בקשת ההחלפה אושרה" : "בקשת ההחלפה נדחתה",
+          (d) => ({
+            ...d,
+            swapRequests: d.swapRequests.map((r) => (r.id === swap.id ? { ...r, status } : r)),
+            shifts:
+              status === "approved" && swap.shiftId && swap.fromGuard && swap.toGuard
+                ? d.shifts.map((s) =>
+                    s.id === swap.shiftId
+                      ? {
+                          ...s,
+                          assignedGuards: s.assignedGuards
+                            .filter((id) => id !== swap.fromGuard)
+                            .concat(swap.toGuard),
+                        }
+                      : s
+                  )
+                : d.shifts,
+          }),
+          () => api.decideSwap(swap, status)
+        ),
 
       createTask: (task) =>
         run(async () => {

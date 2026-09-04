@@ -389,10 +389,13 @@ export const PrimaryAction = ({
  * הפוכה: הפעולה קורית, המסך מתעדכן, ושמונה שניות אחר כך היא נסגרת. הפס
  * הדק מתרוקן כדי שהזמן שנשאר ייראה ולא ינוחש.
  */
-export const UndoBar = ({ label, onUndo }) => {
+// `bottom` פרמטרי כי לא לכל מסך יש את אותו רצפה: SupervisorApp פנוי
+// למטה, אבל GuardApp יושב מעל שורת ניווט תחתונה קבועה (bottom tab bar) —
+// bottom-4 הקבוע היה יושב מתחתיה או חופף אותה.
+export const UndoBar = ({ label, onUndo, bottom = "bottom-4" }) => {
   if (!label) return null;
   return (
-    <div className="fixed bottom-4 inset-x-0 z-[60] flex justify-center px-4 pointer-events-none">
+    <div className={`fixed ${bottom} inset-x-0 z-[60] flex justify-center px-4 pointer-events-none`}>
       <div
         role="status"
         className="pointer-events-auto glass-raised rounded-2xl overflow-hidden

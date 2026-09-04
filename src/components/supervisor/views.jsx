@@ -318,7 +318,11 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
         });
       }
     }
-    await actions.replaceShifts(weekShifts.map((s) => s.id), rows);
+    actions.replaceShifts(
+      weekShifts.map((s) => s.id),
+      rows,
+      `השבוע נבנה מחדש — ${rows.length} משמרות`
+    );
     setShowFill(false);
   };
 

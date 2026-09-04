@@ -1,7 +1,7 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
 import {
   Alert, Avatar, Badge, Btn, Card, EmptyState, Field, Input, Meter, Modal, PageHeader,
-  readableInk, Segmented, Select,
+  readableInk, Segmented, Select, UndoBar,
 } from "./ui.jsx";
 import { Icon } from "./icons.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
@@ -13,6 +13,7 @@ import {
 import { availStatus, checkAssignment, teamAverages } from "../lib/autoAssign.js";
 import { qualifiedGuardsForPosition } from "../lib/positions.js";
 import { shiftTone } from "../design/shiftPalette.js";
+import { AVAIL, AVAIL_CHOICES } from "../design/availability.js";
 import { subscribeTerms, t, termProfile } from "../lib/terms.js";
 import UnifiedBoard from "./supervisor/UnifiedBoard.jsx";
 
@@ -21,16 +22,6 @@ const navItems = () => [
   { id: "availability", label: t("guard.nav.availability"), icon: "check-circle" },
   { id: "swaps", label: t("guard.nav.swaps"), icon: "swap", badge: true },
 ];
-
-/** Availability as icon + word + colour — never colour alone. */
-const AVAIL = {
-  preferred:   { icon: "star",         label: "מעדיף",   short: "מעדיף", tone: "brand" },
-  available:   { icon: "check-circle", label: "זמין",    short: "זמין",  tone: "accent" },
-  maybe:       { icon: "help",         label: "אולי",    short: "אולי",  tone: "warn" },
-  unavailable: { icon: "x-circle",     label: "לא זמין", short: "לא",    tone: "danger" },
-};
-
-const AVAIL_CHOICES = ["preferred", "available", "maybe", "unavailable"];
 
 const SWAP_STATUS = {
   pending:  { label: "ממתין", tone: "warn" },
@@ -759,7 +750,7 @@ function MySwaps({ user, guards, shifts, availability = {}, swapRequests, action
 export default function GuardApp({ state }) {
   const {
     user, team, guards, shifts, availability, swapRequests, tasks, positions, actions, busy, error,
-    clearError, logout, offline,
+    clearError, logout, offline, pending, undo,
   } = state;
   const [view, setView] = useState("schedule");
   const profile = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
@@ -884,6 +875,10 @@ export default function GuardApp({ state }) {
           })}
         </div>
       </nav>
+
+      {/* מעל שורת הניווט התחתונה, לא מתחתיה — bottom-4 הרגיל של UndoBar
+        * היה חופף את שורת הטאבים הקבועה כאן. */}
+      <UndoBar key={pending?.label} label={pending?.label} onUndo={undo} bottom="bottom-20" />
     </div>
   );
 }
