@@ -57,7 +57,10 @@ export const shiftToRow = (shift, teamCode) => ({
   start_time: shift.startTime,
   end_time: shift.endTime,
   location: shift.location || "כניסה ראשית",
-  required_guards: shift.requiredGuards || 1,
+  // `??` ולא `||`: shiftFromRow (מעלה) קורא את אותו שדה עם `?? 1`, ולכן 0
+  // הוא ערך לגיטימי ששומר על עצמו הלוך-חזור. `||` היה הופך כל 0 שנשמר ל-1
+  // באופן שקט — בדיוק מה שהמנהל *לא* בחר בטופס.
+  required_guards: shift.requiredGuards ?? 1,
   type: shift.type || "custom",
   color: shiftTone(shift.color, shift.type),
   published: Boolean(shift.published),
@@ -160,7 +163,9 @@ export const positionToRow = (position, teamCode) => ({
   weekdays: position.shape === "template" ? position.weekdays || [] : null,
   start_time: position.shape === "template" ? position.startTime || null : null,
   end_time: position.shape === "template" ? position.endTime || null : null,
-  required_guards: position.requiredGuards || 1,
+  // `??` ולא `||` — אותה סיבה בדיוק כמו shiftToRow ממש למעלה: positionFromRow
+  // כבר קורא את השדה הזה עם `?? 1`, אז 0 חייב לשרוד הלוך-חזור בלי להתהפך ל-1.
+  required_guards: position.requiredGuards ?? 1,
   active: position.active !== false,
 });
 
@@ -414,8 +419,14 @@ export async function updateShift(shiftId, patch, teamCode) {
 }
 
 export async function deleteShift(shiftId) {
-  const { error } = await supabase.from("gs_shifts").delete().eq("id", shiftId);
+  // .select() + בדיקת שורה חוזרת — אותה מוסכמה כמו updateShift ממש למעלה.
+  // בלי זה מחיקה ש-RLS חוסמת נראית כמו הצלחה: המשמרת נעלמת מהמסך ברגע
+  // האופטימי, וחוזרת ברענון הבא בלי שום הסבר.
+  const { data, error } = await supabase.from("gs_shifts").delete().eq("id", shiftId).select("id");
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה למחוק את המשמרת הזו — התחבר מחדש ונסה שוב");
+  }
 }
 
 /**
@@ -426,8 +437,11 @@ export async function deleteShift(shiftId) {
  */
 export async function deleteShifts(shiftIds) {
   if (!shiftIds.length) return;
-  const { error } = await supabase.from("gs_shifts").delete().in("id", shiftIds);
+  const { data, error } = await supabase.from("gs_shifts").delete().in("id", shiftIds).select("id");
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה למחוק את המשמרות האלה — התחבר מחדש ונסה שוב");
+  }
 }
 
 export async function setPublished(shiftIds, published) {
@@ -449,21 +463,33 @@ export async function setPublished(shiftIds, published) {
 // ---------- assignments ----------
 
 export async function assignGuard({ shiftId, guardId, source = "manual", score = null, reason = null }) {
-  const { error } = await supabase
+  // .select() + בדיקת שורה חוזרת — בלעדיה שיבוץ ש-RLS חוסם נראה כמו הצלחה:
+  // השומר מופיע במשבצת ברגע האופטימי, ונעלם ברענון הבא בלי שום הסבר.
+  const { data, error } = await supabase
     .from("gs_assignments")
-    .upsert({ shift_id: shiftId, guard_id: guardId, source, score, reason }, { onConflict: "shift_id,guard_id" });
+    .upsert({ shift_id: shiftId, guard_id: guardId, source, score, reason }, { onConflict: "shift_id,guard_id" })
+    .select("shift_id");
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה לשבץ את השומר הזה — התחבר מחדש ונסה שוב");
+  }
 }
 
 export async function unassignGuard({ shiftId, guardId }) {
-  const { error } = await supabase
-    .from("gs_assignments").delete().match({ shift_id: shiftId, guard_id: guardId });
+  const { data, error } = await supabase
+    .from("gs_assignments").delete().match({ shift_id: shiftId, guard_id: guardId }).select("shift_id");
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה להסיר את השיבוץ הזה — התחבר מחדש ונסה שוב");
+  }
 }
 
 /** Replace every auto-generated assignment for these shifts with a new plan. */
 export async function applyPlan({ shiftIds, assignments }) {
   if (shiftIds.length) {
+    // בלי .select() כאן בכוונה: אפס שורות שנמחקו הוא מצב לגיטימי (אין
+    // עדיין שיבוץ "auto" קודם לשבוע הזה), לא כשל — לא כמו שאר הפונקציות
+    // בקובץ הזה, שכל אחת מהן פועלת על שורה ספציפית שהקורא כבר יודע שקיימת.
     const { error } = await supabase
       .from("gs_assignments").delete().in("shift_id", shiftIds).eq("source", "auto");
     if (error) throw new Error(error.message);
@@ -478,9 +504,14 @@ export async function applyPlan({ shiftIds, assignments }) {
       reason: (a.parts || []).filter((p) => p.points > 0).map((p) => p.label).slice(0, 3).join(" · "),
     }));
   if (!rows.length) return;
-  const { error } = await supabase
-    .from("gs_assignments").upsert(rows, { onConflict: "shift_id,guard_id" });
+  // כאן כן: rows לא ריק (נבדק למעלה), אז אפס שורות חוזרות הוא תמיד כשל —
+  // לא מקרה לגיטימי כמו המחיקה שמעל.
+  const { data, error } = await supabase
+    .from("gs_assignments").upsert(rows, { onConflict: "shift_id,guard_id" }).select("shift_id");
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה לשמור את השיבוץ החדש — התחבר מחדש ונסה שוב");
+  }
 }
 
 export async function clearAssignments(shiftIds) {
@@ -492,11 +523,17 @@ export async function clearAssignments(shiftIds) {
 // ---------- availability ----------
 
 export async function setAvailability({ shiftId, guardId, status, comment }) {
-  const { error } = await supabase.from("gs_availability").upsert(
+  // .select() + בדיקת שורה חוזרת — בלעדיה הגשת זמינות ש-RLS חוסמת (למשל
+  // אחרי מועד ההגשה, או session שפג) נראית לשומר כמו הצלחה, בזמן שהאחמ"ש
+  // ממשיך לראות "לא הגיש".
+  const { data, error } = await supabase.from("gs_availability").upsert(
     { shift_id: shiftId, guard_id: guardId, status, comment: comment || null, updated_at: new Date().toISOString() },
     { onConflict: "shift_id,guard_id" }
-  );
+  ).select("shift_id");
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה לעדכן זמינות למשמרת הזו — התחבר מחדש ונסה שוב");
+  }
 }
 
 // ---------- guards ----------
@@ -605,8 +642,11 @@ export async function setGuardWeekendPreference(profileId, preference) {
 }
 
 export async function removeGuard(profileId) {
-  const { error } = await supabase.from("gs_profiles").delete().eq("id", profileId);
+  const { data, error } = await supabase.from("gs_profiles").delete().eq("id", profileId).select("id");
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה להסיר את האדם הזה מהצוות — התחבר מחדש ונסה שוב");
+  }
 }
 
 // ---------- swaps ----------
@@ -744,8 +784,11 @@ export async function updateTask(id, patch) {
 }
 
 export async function deleteTask(id) {
-  const { error } = await supabase.from("gs_tasks").delete().eq("id", id);
+  const { data, error } = await supabase.from("gs_tasks").delete().eq("id", id).select("id");
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה למחוק את המשימה הזו — התחבר מחדש ונסה שוב");
+  }
 }
 
 // ---------- positions (Phase 4) ----------
@@ -778,8 +821,11 @@ export async function updatePosition(id, patch) {
 }
 
 export async function deletePosition(id) {
-  const { error } = await supabase.from("gs_positions").delete().eq("id", id);
+  const { data, error } = await supabase.from("gs_positions").delete().eq("id", id).select("id");
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה למחוק את העמדה הזאת — התחבר מחדש ונסה שוב");
+  }
 }
 
 /**
