@@ -1603,6 +1603,110 @@ export const People = ({
   );
 };
 
+/**
+ * שורת משימה אחת ברשימה — מוגדרת ברמת המודול, לא בתוך TaskMgmt.
+ *
+ * הייתה מוגדרת בפנים, וזה בדיוק מה שהפך כל הקשה בטופס "משימה חדשה" (form
+ * state באותו closure) לרינדור-מחדש של TaskMgmt כולו: React ראה בכל הקשה
+ * הפניית פונקציה חדשה בשם TaskRow, התייחס לזה כאל טיפוס-רכיב חדש, ופירק
+ * ובנה מחדש את כל רשימת המשימות — כולל אובדן focus/מצב־ברשורה. אין כאן שום
+ * closure על form/editing, אז אין סיבה שהגדרתה תזוז עם כל הקשה.
+ */
+function TaskRow({ task, busy, actions, guards, onEdit }) {
+  const done = task.status === "done";
+  const prio = PRIORITY[task.priority] || PRIORITY.medium;
+  const range = rangeTextHe(task);
+  // אותה פונקציה בדיוק שהמנוע נשען עליה (isTaskEngineEligible) — כך
+  // שהתג הזה לעולם לא יכול לחלוק על מה שהמנוע באמת עשה עם המשימה
+  // (D-03, D-04).
+  const eligible = isTaskEngineEligible(task);
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors duration-200
+        hover:bg-surface-hover ${done ? "opacity-55" : ""}`}
+    >
+      <button
+        onClick={() => actions.toggleTask(task.id, done ? "pending" : "done")}
+        disabled={busy}
+        role="checkbox"
+        aria-checked={done}
+        aria-label={`${task.title} — ${done ? "בוצע" : "לא בוצע"}`}
+        className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 cursor-pointer
+          ring-1 ring-inset transition-colors duration-200 ${
+            done
+              ? "bg-accent text-on-accent ring-accent"
+              : "bg-surface-sunken ring-hairline hover:ring-accent/50"
+          }`}
+      >
+        {done && <Icon name="check" size={14} strokeWidth={3} />}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onEdit(task)}
+        className="flex-1 min-w-0 text-right cursor-pointer"
+      >
+        <div className="flex items-center gap-2 flex-wrap">
+          <span
+            className={`font-semibold text-sm ${done ? "line-through text-muted" : "text-content"}`}
+          >
+            {task.title}
+          </span>
+          <Badge tone={prio.tone}>
+            <Dot color={prio.color} size={6} />
+            {prio.label}
+          </Badge>
+          {/* תג ניטרלי, אייקון מנעול ומילים — לא צבע בלבד (WCAG 1.4.1,
+            * אותו עיקרון שכבר עוקב אחריו מפת הזמינות למעלה בקובץ הזה).
+            * מופיע רק כשהמשימה קפואה (D-03): פעילה היא המקרה הרגיל,
+            * ותג על כל שורה הוא רעש שמפסיקים לקרוא. */}
+          {!eligible && (
+            <span
+              title="המשימה לא נושאת שעות, או פרושה על יותר מיום אחד — ולכן היא לא נכנסת למנוע: היא לא נספרת במנוחה, ברצף, בתקרה השבועית או בנטל."
+            >
+              {/* clock-off, לא lock (G-05-1): אותו סטייה מכוונת מ-UI-SPEC
+                * שהלוח המאוחד עושה — המנעול שמור לחסימת כשירות בלבד. */}
+              <Badge tone="neutral" icon="clock-off">
+                מחוץ למנוע
+              </Badge>
+            </span>
+          )}
+        </div>
+        {task.description && <p className="text-xs text-muted mt-0.5">{task.description}</p>}
+        {(range || eligible) && (
+          <span className="flex items-center gap-3 mt-1 flex-wrap text-[11px] text-faint" data-numeric>
+            {range && (
+              <span className="flex items-center gap-1">
+                <Icon name="calendar" size={11} />
+                {range}
+              </span>
+            )}
+            {/* שעות מוצגות רק למשימה נספרת — זה מה שהיא בפועל תופסת
+              * (D-03: שורה מציגה שעות, או תג "מחוץ למנוע", אף פעם לא
+              * שניהם ואף פעם לא כלום). */}
+            {eligible && (
+              <span className="flex items-center gap-1">
+                <Icon name="clock" size={11} />
+                {task.startTime}–{task.endTime}
+              </span>
+            )}
+          </span>
+        )}
+      </button>
+
+      <People ids={task.assignees || []} guards={guards} size={24} max={3} />
+
+      <IconBtn
+        icon="trash"
+        label={`מחק את המשימה ${task.title}`}
+        size="sm"
+        className="hover:text-danger flex-shrink-0"
+        onClick={() => actions.deleteTask(task.id)}
+      />
+    </div>
+  );
+}
+
 export function TaskMgmt({
   guards, tasks, weekDates, actions, busy,
   templates = [], compatibility = [], mode = "civil", shifts = [],
@@ -1771,105 +1875,10 @@ export function TaskMgmt({
   const shown = openFolder ? folders.filter((f) => f.name === openFolder) : folders;
   const openCount = tasks.filter((t) => t.status !== "done").length;
 
-  const TaskRow = ({ task }) => {
-    const done = task.status === "done";
-    const prio = PRIORITY[task.priority] || PRIORITY.medium;
-    const range = rangeTextHe(task);
-    // אותה פונקציה בדיוק שהמנוע נשען עליה (isTaskEngineEligible) — כך
-    // שהתג הזה לעולם לא יכול לחלוק על מה שהמנוע באמת עשה עם המשימה
-    // (D-03, D-04).
-    const eligible = isTaskEngineEligible(task);
-    return (
-      <div
-        className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors duration-200
-          hover:bg-surface-hover ${done ? "opacity-55" : ""}`}
-      >
-        <button
-          onClick={() => actions.toggleTask(task.id, done ? "pending" : "done")}
-          disabled={busy}
-          role="checkbox"
-          aria-checked={done}
-          aria-label={`${task.title} — ${done ? "בוצע" : "לא בוצע"}`}
-          className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 cursor-pointer
-            ring-1 ring-inset transition-colors duration-200 ${
-              done
-                ? "bg-accent text-on-accent ring-accent"
-                : "bg-surface-sunken ring-hairline hover:ring-accent/50"
-            }`}
-        >
-          {done && <Icon name="check" size={14} strokeWidth={3} />}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => openEdit(task)}
-          className="flex-1 min-w-0 text-right cursor-pointer"
-        >
-          <div className="flex items-center gap-2 flex-wrap">
-            <span
-              className={`font-semibold text-sm ${done ? "line-through text-muted" : "text-content"}`}
-            >
-              {task.title}
-            </span>
-            <Badge tone={prio.tone}>
-              <Dot color={prio.color} size={6} />
-              {prio.label}
-            </Badge>
-            {/* תג ניטרלי, אייקון מנעול ומילים — לא צבע בלבד (WCAG 1.4.1,
-              * אותו עיקרון שכבר עוקב אחריו מפת הזמינות למעלה בקובץ הזה).
-              * מופיע רק כשהמשימה קפואה (D-03): פעילה היא המקרה הרגיל,
-              * ותג על כל שורה הוא רעש שמפסיקים לקרוא. */}
-            {!eligible && (
-              <span
-                title="המשימה לא נושאת שעות, או פרושה על יותר מיום אחד — ולכן היא לא נכנסת למנוע: היא לא נספרת במנוחה, ברצף, בתקרה השבועית או בנטל."
-              >
-                {/* clock-off, לא lock (G-05-1): אותו סטייה מכוונת מ-UI-SPEC
-                  * שהלוח המאוחד עושה — המנעול שמור לחסימת כשירות בלבד. */}
-                <Badge tone="neutral" icon="clock-off">
-                  מחוץ למנוע
-                </Badge>
-              </span>
-            )}
-          </div>
-          {task.description && <p className="text-xs text-muted mt-0.5">{task.description}</p>}
-          {(range || eligible) && (
-            <span className="flex items-center gap-3 mt-1 flex-wrap text-[11px] text-faint" data-numeric>
-              {range && (
-                <span className="flex items-center gap-1">
-                  <Icon name="calendar" size={11} />
-                  {range}
-                </span>
-              )}
-              {/* שעות מוצגות רק למשימה נספרת — זה מה שהיא בפועל תופסת
-                * (D-03: שורה מציגה שעות, או תג "מחוץ למנוע", אף פעם לא
-                * שניהם ואף פעם לא כלום). */}
-              {eligible && (
-                <span className="flex items-center gap-1">
-                  <Icon name="clock" size={11} />
-                  {task.startTime}–{task.endTime}
-                </span>
-              )}
-            </span>
-          )}
-        </button>
-
-        <People ids={task.assignees || []} guards={guards} size={24} max={3} />
-
-        <IconBtn
-          icon="trash"
-          label={`מחק את המשימה ${task.title}`}
-          size="sm"
-          className="hover:text-danger flex-shrink-0"
-          onClick={() => actions.deleteTask(task.id)}
-        />
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-6">
       <PageHeader
-        title="משימות"
+        title={t("nav.tasks")}
         subtitle={`${openCount} פתוחות · ${folders.length} תיקיות`}
         actions={
           <Btn icon="plus" onClick={openNew}>
@@ -2012,7 +2021,14 @@ export function TaskMgmt({
                 </div>
                 <div className="p-1.5">
                   {f.items.map((task) => (
-                    <TaskRow key={task.id} task={task} />
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      busy={busy}
+                      actions={actions}
+                      guards={guards}
+                      onEdit={openEdit}
+                    />
                   ))}
                 </div>
               </div>
