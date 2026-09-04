@@ -379,7 +379,13 @@ function MyAvailability({ user, team, shifts, availability, actions, busy }) {
 
           <Card>
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="min-w-0 flex-1">
+              {/* בלי min-w-0: הטקסט קצר וקבוע, ולא צריך הגנת truncate. עם
+                * min-w-0 הדפדפן היה מרשה לתיבה הזו להתכווץ עד כמעט אפס
+                * במקום לגלוש לשורה שנייה — שני כפתורי ה"סמן הכל" (טקסט
+                * ארוך, בלי flex-shrink) היו סופגים את כל הרוחב, ומשאירים
+                * ל"ענית על 1 מתוך 14 משמרות" ~38px ברוחב טלפון, שגורם לכל
+                * מילה להישבר לשורה משלה. */}
+              <div className="flex-1">
                 <p className="text-sm font-semibold text-content">
                   ענית על {answered} מתוך {weekShifts.length} משמרות
                 </p>
