@@ -135,8 +135,8 @@ export const Btn = ({
     disabled={disabled || loading}
     aria-busy={loading || undefined}
     className={`inline-flex items-center justify-center rounded-xl font-semibold cursor-pointer
-      transition-[background-color,border-color,box-shadow,transform] duration-200
-      active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100
+      transition-[background-color,border-color,box-shadow,transform,filter] duration-200
+      active:scale-[0.98] active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100
       ${BTN_VARIANTS[variant] || BTN_VARIANTS.primary} ${BTN_SIZES[size] || BTN_SIZES.md} ${className}`}
     {...rest}
   >
