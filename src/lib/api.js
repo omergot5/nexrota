@@ -10,6 +10,17 @@
 import { supabase } from "./supabaseClient.js";
 import { shiftTone } from "../design/shiftPalette.js";
 
+// A recovery/confirmation email is opened later, often on a different device
+// than the one that requested it — `window.location.origin` at request time
+// captured whatever the user happened to be looking at (a local dev server,
+// an ephemeral preview deploy) and baked *that* into the emailed link, so it
+// died the moment that origin stopped being reachable. Same override-with-
+// fallback pattern as `supabaseClient.js`: an env var wins if set, otherwise
+// this always points at the one stable production URL, never "wherever the
+// request happened to originate from".
+const SITE_URL =
+  import.meta.env?.VITE_SITE_URL || "https://nexrota-omergot5s-projects.vercel.app";
+
 // ---------- row <-> app mappers ----------
 
 const hhmm = (t) => String(t || "").slice(0, 5);
@@ -227,7 +238,7 @@ export async function loginSupervisor({ email, password }) {
  */
 export async function requestPasswordReset(email) {
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-    redirectTo: window.location.origin,
+    redirectTo: SITE_URL,
   });
   if (error && /rate limit|too many/i.test(error.message)) throw translateAuthError(error);
 }
