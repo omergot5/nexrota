@@ -7,6 +7,7 @@
 // than as a class-name soup at the call site.
 // ============================================================
 
+import { cloneElement, isValidElement, useEffect, useId, useRef } from "react";
 import { Icon } from "./icons.jsx";
 
 /* ------------------------------------------------------------------ *
@@ -232,13 +233,13 @@ export const Alert = ({ tone = "info", title, children, onClose }) => {
   );
 };
 
-export const Avatar = ({ id, name, size = 36, ring = false, label }) => {
+export const Avatar = ({ id, name, size = 36, ring = false, label, className = "", ...rest }) => {
   const bg = guardColor(id);
   return (
     <div
       className={`rounded-full flex items-center justify-center font-bold flex-shrink-0 select-none ${
         ring ? "ring-2 ring-bg" : ""
-      }`}
+      } ${className}`}
       style={{
         backgroundColor: bg,
         color: readableInk(bg),
@@ -247,6 +248,7 @@ export const Avatar = ({ id, name, size = 36, ring = false, label }) => {
         fontSize: Math.round(size * 0.38),
       }}
       title={name}
+      {...rest}
     >
       {label || initials(name)}
     </div>
@@ -261,6 +263,7 @@ export const StatCard = ({ title, value, subtitle, icon, tone = "brand", onClick
   const Tag = onClick ? "button" : "div";
   return (
     <Tag
+      type={onClick ? "button" : undefined}
       onClick={onClick}
       className={`glass rounded-2xl p-4 text-right w-full ${
         onClick
@@ -447,26 +450,41 @@ const CONTROL =
   "hover:border-hairline-strong focus:border-brand focus:ring-2 focus:ring-brand/30 focus:outline-none " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
-export const Field = ({ label, hint, error, htmlFor, children }) => (
-  <div>
-    {label && (
-      <label htmlFor={htmlFor} className="block text-sm font-medium text-content mb-1.5">
-        {label}
-      </label>
-    )}
-    {children}
-    {/* Hint and error share the slot, so the layout doesn't jump when a
-     * field goes invalid — and the error replaces rather than stacks. */}
-    {error ? (
-      <p className="text-xs text-danger mt-1.5 flex items-center gap-1">
-        <Icon name="alert" size={12} strokeWidth={2.25} />
-        {error}
-      </p>
-    ) : (
-      hint && <p className="text-xs text-faint mt-1.5">{hint}</p>
-    )}
-  </div>
-);
+export const Field = ({ label, hint, error, htmlFor, children }) => {
+  // useId, לא נגזר מ-htmlFor: לא כל קורא ל-Field מעביר htmlFor (רוב שדות
+  // ה-error בפועל ב-views.jsx לא מעבירים), אז זה חייב לעבוד גם בלעדיו.
+  // aria-describedby מקשר את הודעת השגיאה לשדה עצמו — בלעדיו aria-invalid
+  // (שכבר קיים ב-Input) אומר לקורא-מסך "פסול" בלי לומר למה.
+  const errorId = useId();
+  return (
+    <div>
+      {label && (
+        <label htmlFor={htmlFor} className="block text-sm font-medium text-content mb-1.5">
+          {label}
+        </label>
+      )}
+      {/* גם invalid וגם aria-invalid: Input הפנימי כבר קובע aria-invalid
+        * משלו מתוך הפרופ invalid (ומחליף כל aria-invalid שמגיע דרך
+        * ...rest, כי ה-JSX שלו קובע אותו שוב אחרי הפריסה) — בלי invalid
+        * כאן הערך שהזרקנו היה נדרס בחזרה ל-undefined. Textarea/Select
+        * אין להם invalid משלהם, אז ה-aria-invalid הגולמי הוא מה שמגיע
+        * אליהם דרך ה-rest, בלי החלפה. */}
+      {error && isValidElement(children)
+        ? cloneElement(children, { "aria-describedby": errorId, "aria-invalid": true, invalid: true })
+        : children}
+      {/* Hint and error share the slot, so the layout doesn't jump when a
+       * field goes invalid — and the error replaces rather than stacks. */}
+      {error ? (
+        <p id={errorId} className="text-xs text-danger mt-1.5 flex items-center gap-1">
+          <Icon name="alert" size={12} strokeWidth={2.25} />
+          {error}
+        </p>
+      ) : (
+        hint && <p className="text-xs text-faint mt-1.5">{hint}</p>
+      )}
+    </div>
+  );
+};
 
 export const Input = ({ className = "", invalid, ...rest }) => (
   <input
@@ -522,6 +540,22 @@ export const Segmented = ({ value, onChange, options, size = "md", className = "
  * ------------------------------------------------------------------ */
 
 export const Modal = ({ open, onClose, title, subtitle, children, wide = false, footer }) => {
+  const panelRef = useRef(null);
+
+  // Escape לסגירה, ופוקוס-פתיחה על הפאנל עצמו — בלי זה מקלדת/קורא-מסך
+  // נשארים על מה שהיה מאחורי ה-overlay, בלי שום דרך לדעת שמודל בכלל נפתח.
+  // לא מלכודת-פוקוס מלאה (Tab עדיין יכול לצאת) — זו הרחבה נפרדת, גדולה
+  // וסיכונית יותר, לרכיב משותף שכל מסך במוצר תלוי בו.
+  useEffect(() => {
+    if (!open) return;
+    panelRef.current?.focus();
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
   return (
     <div
@@ -537,8 +571,10 @@ export const Modal = ({ open, onClose, title, subtitle, children, wide = false, 
         aria-hidden="true"
       />
       <div
+        ref={panelRef}
+        tabIndex={-1}
         className={`glass-raised relative w-full rounded-t-3xl sm:rounded-2xl max-h-[92vh]
-          flex flex-col animate-scale-in ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}
+          flex flex-col animate-scale-in outline-none ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}
       >
         <header className="flex items-start justify-between gap-3 px-5 py-4 border-b border-hairline">
           <div className="min-w-0">
