@@ -606,6 +606,12 @@ function MySwaps({ user, guards, shifts, availability = {}, swapRequests, action
             {incoming.map((r) => {
               const s = shiftOf(r.shiftId);
               const status = SWAP_STATUS[r.status];
+              // מחושב פעם אחת, לא פעמיים (disabled + title) — ובעיקר: לא
+              // רק title. tooltip ב-hover לא קיים בטלפון, ופה בדיוק אמורים
+              // להיות רוב המשתמשים (ראו הערת ה-nav התחתון בקומפוננטה הזו).
+              // כפתור "מסכים" אפור בלי שום הסבר גלוי הוא בדיוק מה שהמוצר
+              // הזה אמור לעולם לא לעשות.
+              const check = r.status === "pending" ? legality(r) : { ok: true };
               return (
                 <Card key={r.id} className={r.status === "pending" ? "!border-warn/30" : "opacity-70"}>
                   <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -624,6 +630,12 @@ function MySwaps({ user, guards, shifts, availability = {}, swapRequests, action
                           {r.message}
                         </p>
                       )}
+                      {r.status === "pending" && !check.ok && (
+                        <p className="text-xs text-warn mt-1.5 flex items-start gap-1">
+                          <Icon name="alert" size={13} className="mt-0.5 flex-shrink-0" />
+                          <span>אי אפשר להסכים: {check.reason}</span>
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
                       <Badge tone={status.tone}>{status.label}</Badge>
@@ -634,8 +646,7 @@ function MySwaps({ user, guards, shifts, availability = {}, swapRequests, action
                             variant="accent"
                             icon="check"
                             onClick={() => actions.decideSwap(r, "approved")}
-                            disabled={busy || !legality(r).ok}
-                            title={legality(r).ok ? undefined : legality(r).reason}
+                            disabled={busy || !check.ok}
                           >
                             מסכים
                           </Btn>
