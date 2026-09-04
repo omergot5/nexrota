@@ -616,7 +616,10 @@ export default function AuthPage({
         {/* ================= הצד המספר =================
           * יושב על הקרם בלי מסגרת. הניגוד מול הלוח האטום שלצידו נושא
           * את ההיררכיה, והקו במסלול האמצעי מסמן את התפר ביניהם. */}
-        <section className="order-2 lg:order-1 flex flex-col gap-7 lg:gap-9">
+        <section
+          className="order-2 lg:order-1 flex flex-col gap-7 lg:gap-9
+            max-w-md mx-auto lg:max-w-none lg:mx-0"
+        >
           <div>
             <h1 className="text-[28px] sm:text-4xl lg:text-[2.6rem] font-black text-content leading-[1.15] tracking-tight">
               מי שמסדר משמרות ביד
