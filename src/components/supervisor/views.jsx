@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { SHIFT_TONES } from "../../design/shiftPalette.js";
+import { AVAIL } from "../../design/availability.js";
 import { loadTable } from "../../lib/loadTable.js";
 import {
   Alert, Avatar, Badge, Btn, Card, EmptyState, Field, guardColor, IconBtn, initials, Input, Meter,
@@ -54,18 +55,6 @@ const SHIFT_TEMPLATES = [
   { key: "noon",    label: "צהריים 15:00–23:00", startTime: "15:00", endTime: "23:00", type: "afternoon", color: SHIFT_TONES.afternoon },
   { key: "night8",  label: "לילה 23:00–07:00",   startTime: "23:00", endTime: "07:00", type: "night",     color: SHIFT_TONES.night },
 ];
-
-/**
- * Availability, as icon + word + colour. Three redundant channels, because
- * a colour alone fails WCAG 1.4.1 and an icon alone is ambiguous.
- */
-const AVAIL = {
-  preferred:   { icon: "star",         label: "מעדיף",    tone: "brand",  cls: "text-brand" },
-  available:   { icon: "check-circle", label: "זמין",     tone: "accent", cls: "text-accent" },
-  unavailable: { icon: "x-circle",     label: "לא זמין",  tone: "danger", cls: "text-danger" },
-  maybe:       { icon: "help",         label: "אולי",     tone: "warn",   cls: "text-warn" },
-  unknown:     { icon: "info",         label: "לא הגיש",  tone: "neutral", cls: "text-faint" },
-};
 
 // ============================================================
 // DASHBOARD
