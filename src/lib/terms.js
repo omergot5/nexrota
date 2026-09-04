@@ -46,6 +46,10 @@ const BASE = {
   // פעולות חוזרות
   "action.rerun":   "הרץ מחדש",
   "action.publish": "שלח לצוות",
+  "action.publishAll":       "פרסם הכל",
+  "action.unpublish":        "בטל פרסום",
+  "action.publishDay":       "פרסם יום",
+  "action.unpublishShort":   "בטל",
 
   // יחידות מידה בכיתובי עומס והוגנות
   "unit.load":   "נטל",
@@ -86,6 +90,9 @@ const PROFILE_TERMS = {
     "guard.nav.availability": "דיווח זמינות",
     "guard.nav.swaps":        "חילופים",
     "action.publish":   "הפץ סד\"כ",
+    "action.publishAll":     "הפץ הכל",
+    "action.unpublish":      "בטל הפצה",
+    "action.publishDay":     "הפץ יום",
     "unit.shifts":      "תורנויות",
     "positions.working": "מי מחזיק בה השבוע",
     "nav.board":        "תמונת מצב שבועית",

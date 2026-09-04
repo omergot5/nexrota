@@ -168,7 +168,7 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
           onClick={() => onNavigate("shifts")}
         />
         <StatCard
-          title="בקשות החלפה"
+          title={t("nav.swaps")}
           value={pendingSwaps}
           subtitle="ממתינות"
           icon="swap"
@@ -711,12 +711,12 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
           <div>
             <p className="text-sm font-medium text-content mb-2">תבניות מהירות</p>
             <div className="flex flex-wrap gap-2">
-              {SHIFT_TEMPLATES.map((t) => {
-                const active = form.startTime === t.startTime && form.endTime === t.endTime;
+              {SHIFT_TEMPLATES.map((tpl) => {
+                const active = form.startTime === tpl.startTime && form.endTime === tpl.endTime;
                 return (
                   <button
-                    key={t.key}
-                    onClick={() => applyTemplate(t)}
+                    key={tpl.key}
+                    onClick={() => applyTemplate(tpl)}
                     aria-pressed={active}
                     className={`px-3 h-9 rounded-lg text-xs font-medium ring-1 ring-inset cursor-pointer transition-colors duration-200 ${
                       active
@@ -724,7 +724,7 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
                         : "bg-surface-sunken ring-hairline text-muted hover:text-content hover:ring-brand/40"
                     }`}
                   >
-                    {t.label}
+                    {tpl.label}
                   </button>
                 );
               })}
@@ -1242,12 +1242,12 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
           <>
             {publishedCount < weekShifts.length && (
               <Btn variant="accent" icon="share" onClick={() => actions.publish(allIds, true)} loading={busy}>
-                פרסם הכל
+                {t("action.publishAll")}
               </Btn>
             )}
             {publishedCount > 0 && (
               <Btn variant="outline" onClick={() => actions.publish(allIds, false)} loading={busy}>
-                בטל פרסום
+                {t("action.unpublish")}
               </Btn>
             )}
             {weekShifts.length > 0 && (
@@ -1287,7 +1287,7 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
                       variant={allPub ? "outline" : "primary"}
                       onClick={() => actions.publish(dayShifts.map((s) => s.id), !allPub)}
                     >
-                      {allPub ? "בטל" : "פרסם יום"}
+                      {allPub ? t("action.unpublishShort") : t("action.publishDay")}
                     </Btn>
                   </div>
                 </div>
@@ -1375,11 +1375,11 @@ export function SwapMgmt({ guards, shifts, availability = {}, swapRequests, acti
 
   return (
     <div className="space-y-6">
-      <PageHeader title="בקשות החלפה" subtitle={`${pending.length} ממתינות לאישור`} />
+      <PageHeader title={t("nav.swaps")} subtitle={`${pending.length} ממתינות לאישור`} />
       {swapRequests.length === 0 ? (
         <EmptyState
           icon="swap"
-          title="אין בקשות החלפה"
+          title={`אין ${t("nav.swaps")}`}
           body="כשמאבטח יבקש להחליף משמרת, הבקשה תופיע כאן לאישורך."
         />
       ) : (
