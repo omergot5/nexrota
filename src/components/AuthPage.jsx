@@ -618,14 +618,7 @@ export default function AuthPage({
           * את ההיררכיה, והקו במסלול האמצעי מסמן את התפר ביניהם. */}
         <section className="order-2 lg:order-1 flex flex-col gap-7 lg:gap-9">
           <div>
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 ring-1 ring-inset
-                ring-accent/25 px-3 py-1 text-[11px] font-bold text-accent"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse motion-reduce:animate-none" />
-              חי עכשיו — הדגמה מלאה, בלי הרשמה
-            </span>
-            <h1 className="mt-3 text-[28px] sm:text-4xl lg:text-[2.6rem] font-black text-content leading-[1.15] tracking-tight">
+            <h1 className="text-[28px] sm:text-4xl lg:text-[2.6rem] font-black text-content leading-[1.15] tracking-tight">
               מי שמסדר משמרות ביד
               <br />
               <RotatingLine lines={PAIN_LINES} />
@@ -668,6 +661,35 @@ export default function AuthPage({
 
         {/* ================= הצד המתחבר ================= */}
         <aside className="order-1 lg:order-3 w-full max-w-md mx-auto lg:mx-0 lg:sticky lg:top-10">
+          {!started ? (
+            /* לפני שהתחילו — בלי כרטיס. לוגו גדול, משפט אחד, וכפתור זכוכית
+             * בודד צף על הרקע עצמו, לא טופס בתוך קופסה. זו ההזמנה; הקופסה
+             * מגיעה רק אחרי שביקשו אותה. */
+            <div className="animate-blur-up flex flex-col items-center text-center gap-6 py-8">
+              <ThemeToggle />
+              <Logo size={68} stacked tagline={PRODUCT_TAGLINE} />
+              <p className="text-muted text-sm max-w-[20rem] -mt-1">
+                הדגמה חיה עם צוות מלא, או כניסה ישירה לצוות שלכם — שתי דקות, בלי התחייבות.
+              </p>
+              <div className="relative">
+                <div
+                  className="absolute inset-0 -z-10 rounded-full bg-brand/30 blur-2xl
+                    animate-breathe motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+                <Btn size="lg" className="px-12 btn-glass-cta group" onClick={() => setStarted(true)}>
+                  <span className="flex items-center gap-2">
+                    התחילו
+                    <Icon
+                      name="left"
+                      size={17}
+                      className="transition-transform duration-200 group-hover:-translate-x-1"
+                    />
+                  </span>
+                </Btn>
+              </div>
+            </div>
+          ) : (
           <div className="relative">
             {/* הילה רכה מאחורי הלוח — נותנת לו להתרומם מהנייר בלי צל כבד.
               * `inset-0` ולא `-inset-6`: התיבה חייבת להישאר בתוך הפריסה, אחרת
@@ -679,37 +701,14 @@ export default function AuthPage({
               aria-hidden="true"
             />
 
-            <div className="glass-raised rounded-3xl p-5 sm:p-7">
+            <div className="glass-raised rounded-3xl p-5 sm:p-7 animate-blur-up">
               <div className="flex items-center justify-between gap-3 mb-6">
                 <Logo size={38} tagline={PRODUCT_TAGLINE} />
                 <ThemeToggle />
               </div>
 
-              {!started && (
-                <div className="animate-blur-up flex flex-col items-center text-center gap-4 py-6">
-                  <p className="text-content font-bold text-lg">מוכנים לראות איך זה עובד?</p>
-                  <p className="text-muted text-sm max-w-[22rem]">
-                    הדגמה חיה, או כניסה ישירה לצוות שלכם — שתי דקות, בלי התחייבות.
-                  </p>
-                  <Btn
-                    size="lg"
-                    className="w-full max-w-[14rem] mt-1 btn-glass-cta group"
-                    onClick={() => setStarted(true)}
-                  >
-                    <span className="flex items-center gap-2">
-                      התחילו
-                      <Icon
-                        name="left"
-                        size={17}
-                        className="transition-transform duration-200 group-hover:-translate-x-1"
-                      />
-                    </span>
-                  </Btn>
-                </div>
-              )}
-
-              {started && mode === null && doors}
-              {started && mode === "register" && wizard}
+              {mode === null && doors}
+              {mode === "register" && wizard}
 
               {mode === "guard" && (
                 <Panel
@@ -833,6 +832,7 @@ export default function AuthPage({
               )}
             </div>
           </div>
+          )}
         </aside>
       </div>
     </div>
