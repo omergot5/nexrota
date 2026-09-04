@@ -92,31 +92,41 @@ export default function WeekFlow({
 
   const meta = [
     {
+      id: "board",
       label: t("nav.board"),
       count: boardCount > 0 ? String(boardCount) : null,
       done: boardCount > 0,
     },
     {
+      id: "shifts",
       label: t("nav.shifts"),
       count: hasShifts ? String(weekShifts.length) : null,
       done: hasShifts,
     },
     {
+      id: "availability",
       label: t("nav.availability"),
       count: guards.length ? `${submitted}/${guards.length}` : null,
       done: guards.length > 0 && submitted === guards.length,
     },
     {
+      id: "smart",
       label: t("nav.smart"),
       count: slots.need ? `${slots.filled}/${slots.need}` : null,
       done: slots.need > 0 && slots.filled >= slots.need,
     },
     {
+      id: "schedule",
       label: t("nav.schedule"),
       count: hasShifts ? `${published}/${weekShifts.length}` : null,
       done: hasShifts && published === weekShifts.length,
     },
   ];
+
+  // התווית של פעולת שלב 0 מורכבת מ-t() ולא סתם מזכירה אותה: מצב הריק של
+  // הלוח המאוחד (למטה, ב-body[0]) מצטט את שם הכפתור הזה במפורש בתוך משפט —
+  // מקור אחד מונע משתי המחרוזות לסטות זו מזו כשפרופיל משנה את nav.shifts.
+  const goBuildLabel = `המשך ל${t("nav.shifts")}`;
 
   // `embedded` אומר לרכיב שכותרת המסך כבר נאמרה — פס השלבים הוא הכותרת.
   const common = {
@@ -135,7 +145,7 @@ export default function WeekFlow({
       guards={guards}
       dates={weekDates}
       empty={{
-        body: `בנה ${t("unit.shifts")} או משימות, והלוח ייבנה מעצמו — לחצו למטה על "המשך לבניית השבוע".`,
+        body: `בנה ${t("unit.shifts")} או משימות, והלוח ייבנה מעצמו — לחצו למטה על "${goBuildLabel}".`,
       }}
     />,
     <ShiftMgmt key="shifts" {...common} />,
@@ -173,22 +183,26 @@ export default function WeekFlow({
   const action = [
     {
       // ניווט בלבד, לא כתיבת נתון — הלוח לקריאה בלבד (D-03, D-08).
-      children: "המשך לבניית השבוע",
+      children: goBuildLabel,
       icon: "left",
       onClick: () => setStep(1),
       hint: boardCount > 0 ? `${boardCount} פריטים השבוע` : undefined,
     },
     {
-      children: "בניתי את השבוע — מי הגיש?",
+      children: `בניתי את השבוע — ${t("nav.availability")}?`,
       icon: "left",
       onClick: () => setStep(2),
       disabled: !hasShifts,
       hint: hasShifts
-        ? `${weekShifts.length} משמרות בשבוע הזה`
+        ? `${weekShifts.length} ${t("unit.shifts")} בשבוע הזה`
+        // "משמרת אחת" נשאר קשיח בכוונה: unit.shifts הוא רק צורת הרבים
+        // ("משמרות"/"תורנויות"), והטיה לצורת יחיד נכונה לשני הפרופילים
+        // (ובעברית התקנית של כל אחד מהם) היא עבודת אוצר מילים שדורשת
+        // מפתח t() נפרד, לא ניחוש דקדוקי כאן — ראה אבן דרך ב'.
         : "צריך לפחות משמרת אחת כדי להמשיך",
     },
     {
-      children: "סדר לי את השבוע",
+      children: t("nav.smart"),
       icon: "zap",
       onClick: () => {
         setAssignMode("auto");
@@ -215,7 +229,7 @@ export default function WeekFlow({
             : "כל המקומות מאוישים",
     },
     {
-      children: hasShifts && published === weekShifts.length ? "הסידור אצל הצוות" : "שלח לצוות",
+      children: hasShifts && published === weekShifts.length ? "הסידור אצל הצוות" : t("action.publish"),
       icon: "send",
       variant: "accent",
       onClick: () => actions.publish(weekShifts.map((s) => s.id), true),
@@ -245,7 +259,7 @@ export default function WeekFlow({
         {meta.map((s, i) => {
           const active = i === step;
           return (
-            <li key={s.label} className="flex-1 min-w-[9.5rem]">
+            <li key={s.id} className="flex-1 min-w-[9.5rem]">
               <button
                 onClick={() => setStep(i)}
                 aria-current={active ? "step" : undefined}
