@@ -275,13 +275,16 @@ const Steps = ({ current, total }) => (
         <li key={i} className="flex items-center gap-2">
           <span
             aria-current={active ? "step" : undefined}
-            className={`flex items-center justify-center rounded-full text-[10px] font-black
-              transition-all duration-300 ${
+            // תמיד w-5 h-5 — הנקודה הקטנה היא אותה תיבה במידה מוקטנת
+            // (scale), לא box-model שמשתנה. אנימציה על width/height מכריחה
+            // reflow; transform לא נוגע בפריסה בכלל.
+            className={`flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-black
+              transition-[transform,background-color,box-shadow] duration-300 ${
                 done
-                  ? "w-5 h-5 bg-accent text-on-accent"
+                  ? "bg-accent text-on-accent"
                   : active
-                    ? "w-5 h-5 bg-brand text-on-brand ring-4 ring-brand/20"
-                    : "w-2 h-2 bg-hairline-strong"
+                    ? "bg-brand text-on-brand ring-4 ring-brand/20"
+                    : "scale-[0.4] bg-hairline-strong"
               }`}
           >
             {done ? <Icon name="check" size={11} strokeWidth={3} /> : active ? i + 1 : ""}
