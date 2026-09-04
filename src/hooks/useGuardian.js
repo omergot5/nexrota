@@ -130,6 +130,18 @@ export function useGuardian() {
     setStatus("ready");
   }, []);
 
+  // אחרי כתיבה טרייה (הרשמה/הצטרפות/הדגמה), getMyProfile() יכול להחזיר
+  // null על עיכוב קריאה-אחרי-כתיבה — אותו race ש-login() כבר שולל דרך
+  // NO_TEAM. בלי השומר הזה hydrate(null) קורס עם TypeError גולמי באנגלית
+  // (profile.teamCode על null) במקום הודעה בעברית שאפשר לפעול לפיה.
+  const hydrateSelf = useCallback(async () => {
+    const profile = await api.getMyProfile();
+    if (!profile) {
+      throw new Error("הפרופיל עוד לא מוכן — נסה שוב בעוד רגע");
+    }
+    await hydrate(profile);
+  }, [hydrate]);
+
   const boot = useCallback(async () => {
     try {
       // A recovery link carries a valid session, so this has to be checked
@@ -332,12 +344,12 @@ export function useGuardian() {
       run(
         async () => {
           const { teamCode: code } = await api.registerSupervisor(form);
-          await hydrate(await api.getMyProfile());
+          await hydrateSelf();
           return code;
         },
         { rethrow: true }
       ),
-    [run, hydrate]
+    [run, hydrateSelf]
   );
 
   const login = useCallback(
@@ -367,11 +379,11 @@ export function useGuardian() {
       run(
         async () => {
           await api.createTeamForCurrentUser(form);
-          await hydrate(await api.getMyProfile());
+          await hydrateSelf();
         },
         { rethrow: true }
       ),
-    [run, hydrate]
+    [run, hydrateSelf]
   );
 
   const requestPasswordReset = useCallback(
@@ -417,6 +429,17 @@ export function useGuardian() {
           if (!session) {
             const { error: e } = await supabase.auth.signInAnonymously();
             if (e) throw new Error("לא הצלחנו לפתוח הדגמה — בדוק את החיבור לאינטרנט");
+          } else {
+            // session קיים כבר יכול להחזיק צוות הדגמה מביקור קודם (אותה
+            // אנונימית נשמרת ב-localStorage) — בלי הבדיקה הזאת כל לחיצה
+            // נוספת על "הפעל הדגמה" יוצרת עוד "מוקד הדגמה" חדש בבסיס
+            // הנתונים, גם כשהמשתמש כבר בתוך אחד. תריסרי הצוותים היתומים
+            // שכבר קיימים שם הם בדיוק התוצאה של החוסר הזה.
+            const existing = await api.getMyProfile();
+            if (existing) {
+              await hydrate(existing);
+              return existing.teamCode;
+            }
           }
           const { data: rows, error: rpcErr } = await supabase.rpc("gs_create_team", {
             p_team_name: "מוקד הדגמה",
@@ -426,12 +449,12 @@ export function useGuardian() {
           const row = Array.isArray(rows) ? rows[0] : rows;
 
           await seedDemoTeam({ teamCode: row.team_code, existingGuards: [], existingShifts: [] });
-          await hydrate(await api.getMyProfile());
+          await hydrateSelf();
           return row.team_code;
         },
         { rethrow: true }
       ),
-    [run, hydrate]
+    [run, hydrate, hydrateSelf]
   );
 
   const logout = useCallback(async () => {
