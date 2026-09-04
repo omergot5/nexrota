@@ -23,7 +23,8 @@ const round1 = (n) => Math.round(n * 10) / 10;
  *
  * @returns {{
  *   rows: Array<{guardId:string, name:string, fullName:string, count:number,
- *     nights:number, hours:number, load:number, morning:number, afternoon:number}>,
+ *     nights:number, hours:number, load:number, morning:number, afternoon:number,
+ *     evening:number}>,
  *   meanLoad: number,
  *   perShiftLoad: number,
  *   byType: Record<string, number>,
@@ -40,7 +41,7 @@ export function loadTable(guards = [], shifts = []) {
   // ו-`nights` שכבר קיימים ב-`teamAverages`.
   const byType = {};
   const perGuardByType = {};
-  for (const g of guards) perGuardByType[g.id] = { morning: 0, afternoon: 0 };
+  for (const g of guards) perGuardByType[g.id] = { morning: 0, afternoon: 0, evening: 0 };
 
   let totalAssigned = 0;
   for (const s of shifts) {
@@ -48,7 +49,7 @@ export function loadTable(guards = [], shifts = []) {
     if (!assigned.length) continue;
     byType[s.type] = (byType[s.type] || 0) + assigned.length;
     totalAssigned += assigned.length;
-    if (s.type === "morning" || s.type === "afternoon") {
+    if (s.type === "morning" || s.type === "afternoon" || s.type === "evening") {
       for (const id of assigned) {
         const rec = perGuardByType[id];
         if (rec) rec[s.type] += 1; // שובץ ואז הוסר מהצוות — מתעלמים בשקט
@@ -59,7 +60,7 @@ export function loadTable(guards = [], shifts = []) {
   const rows = guards
     .map((g) => {
       const src = perGuard[g.id] || { count: 0, nights: 0, hours: 0, load: 0 };
-      const byTypeRow = perGuardByType[g.id] || { morning: 0, afternoon: 0 };
+      const byTypeRow = perGuardByType[g.id] || { morning: 0, afternoon: 0, evening: 0 };
       const first = String(g.name || "").split(" ")[0] || g.name || "";
       return {
         guardId: g.id,
@@ -71,6 +72,7 @@ export function loadTable(guards = [], shifts = []) {
         load: round1(src.load),
         morning: byTypeRow.morning,
         afternoon: byTypeRow.afternoon,
+        evening: byTypeRow.evening,
       };
     })
     // ממוין מהעמוס ביותר לפי נטל — בדיוק כמו שהמנוע ממיין את ה-perGuard

@@ -17,6 +17,7 @@ import { withEngineTasks } from "../../lib/dates.js";
 const SHIFT_TYPES = [
   { type: "morning", label: "בוקר/יום", color: SHIFT_TONES.morning },
   { type: "afternoon", label: "צהריים", color: SHIFT_TONES.afternoon },
+  { type: "evening", label: "ערב", color: SHIFT_TONES.evening },
   { type: "night", label: "לילה", color: SHIFT_TONES.night },
 ];
 
@@ -77,7 +78,7 @@ export default function AnalyticsDash({ guards, shifts, tasks = [] }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="דוחות"
+        title={t("nav.analytics")}
         subtitle={`${table.totalAssigned} שיבוצים · ${table.guardCount} שומרים · ${t("unit.load")} ממוצע ${table.meanLoad}`}
       />
 
@@ -96,6 +97,7 @@ export default function AnalyticsDash({ guards, shifts, tasks = [] }) {
               />
               <Bar dataKey="morning" stackId="a" fill={SHIFT_TONES.morning} />
               <Bar dataKey="afternoon" stackId="a" fill={SHIFT_TONES.afternoon} />
+              <Bar dataKey="evening" stackId="a" fill={SHIFT_TONES.evening} />
               <Bar dataKey="nights" stackId="a" fill={SHIFT_TONES.night} radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -154,6 +156,7 @@ export default function AnalyticsDash({ guards, shifts, tasks = [] }) {
                 t("unit.load"),
                 "בוקר/יום",
                 "צהריים",
+                "ערב",
                 t("unit.nights"),
                 t("unit.shifts"),
                 t("unit.hours"),
@@ -187,6 +190,7 @@ export default function AnalyticsDash({ guards, shifts, tasks = [] }) {
                   <td className="py-2.5 px-3 text-center font-bold text-content">{r.load}</td>
                   <td className="py-2.5 px-3 text-center text-warn font-semibold">{r.morning}</td>
                   <td className="py-2.5 px-3 text-center text-brand font-semibold">{r.afternoon}</td>
+                  <td className="py-2.5 px-3 text-center font-semibold" style={{ color: SHIFT_TONES.evening }}>{r.evening}</td>
                   <td className="py-2.5 px-3 text-center text-info font-semibold">{r.nights}</td>
                   <td className="py-2.5 px-3 text-center text-muted">{r.count}</td>
                   <td className="py-2.5 px-3 text-center text-muted">{r.hours}</td>
@@ -203,7 +207,7 @@ export default function AnalyticsDash({ guards, shifts, tasks = [] }) {
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={8} className="py-2 px-3 text-center text-xs text-muted">
+              <td colSpan={9} className="py-2 px-3 text-center text-xs text-muted">
                 {t("unit.load")} ממוצע לצוות: {table.meanLoad}
               </td>
             </tr>
