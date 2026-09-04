@@ -404,7 +404,13 @@ export async function updateShift(shiftId, patch, teamCode) {
     .from("gs_shifts").update(row).eq("id", shiftId)
     .select("*, gs_assignments(guard_id, source, score, reason)").maybeSingle();
   if (error) throw new Error(error.message);
-  return data ? shiftFromRow(data) : null;
+  // `data` הוא null גם על "הצלחה" ש-RLS סינן אותה עד כדי אפס שורות — לא רק
+  // כשהמשמרת נמחקה. בלי הבדיקה הזאת השורה נשארת בדיוק כמו שהייתה, אבל
+  // save() (views.jsx) סוגר את חלון העריכה כאילו הצליח, בלי שגיאה בכלל.
+  if (!data) {
+    throw new Error("אין לך הרשאה לערוך את המשמרת הזו — התחבר מחדש ונסה שוב");
+  }
+  return shiftFromRow(data);
 }
 
 export async function deleteShift(shiftId) {
@@ -426,8 +432,18 @@ export async function deleteShifts(shiftIds) {
 
 export async function setPublished(shiftIds, published) {
   if (!shiftIds.length) return;
-  const { error } = await supabase.from("gs_shifts").update({ published }).in("id", shiftIds);
+  // .select() + בדיקת ספירה — לא רק בדיקת error. פרסום/ביטול-פרסום הוא
+  // בדיוק המקום שבו "success" שקרי הכי יקר: המנהל רואה "פורסם" ומאמין
+  // שהצוות רואה את הסידור, כשבפועל אף שורה לא השתנתה.
+  const { data, error } = await supabase
+    .from("gs_shifts")
+    .update({ published })
+    .in("id", shiftIds)
+    .select("id");
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה לפרסם את המשמרות האלה — התחבר מחדש ונסה שוב");
+  }
 }
 
 // ---------- assignments ----------
@@ -529,9 +545,18 @@ export async function updateTeamSettings(teamCode, { deadlineDays, deadlineHour,
 }
 
 export async function setGuardExempt(profileId, exempt) {
-  const { error } = await supabase
-    .from("gs_profiles").update({ deadline_exempt: exempt }).eq("id", profileId);
+  // אותה בדיקה בדיוק כמו setGuardQualifications/setGuardWeekendPreference
+  // ממש למטה — .select() ובדיקת שורה חוזרת, כי בלעדיה עדכון ש-RLS מסנן
+  // עד אפס שורות נראה כמו הצלחה (error: null) בזמן שכלום לא נכתב.
+  const { data, error } = await supabase
+    .from("gs_profiles")
+    .update({ deadline_exempt: exempt })
+    .eq("id", profileId)
+    .select("id");
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה לשנות פטור ממועד הגשה לאדם הזה — התחבר מחדש ונסה שוב");
+  }
 }
 
 /**
@@ -618,8 +643,15 @@ export async function decideSwap(swap, status) {
     }
   }
 
-  const { error } = await supabase.from("gs_swap_requests").update({ status }).eq("id", id);
+  const { data, error } = await supabase
+    .from("gs_swap_requests")
+    .update({ status })
+    .eq("id", id)
+    .select("id");
   if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה להחליט על הבקשה הזו — התחבר מחדש ונסה שוב");
+  }
 }
 
 // ---------- tasks ----------
