@@ -194,7 +194,7 @@ export default function SupervisorApp({ state }) {
             dates={weekDates}
           />
         ) : (
-          <CalendarView shifts={shifts} guards={guards} onNavigate={go} />
+          <CalendarView shifts={shifts} tasks={tasks} guards={guards} onNavigate={go} />
         )}
       </div>
     ),

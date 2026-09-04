@@ -2,9 +2,10 @@ import { useMemo, useState } from "react";
 import { Badge, Btn, Card, EmptyState, IconBtn, PageHeader, guardColor, readableInk } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import { t } from "../../lib/terms.js";
+import { shiftTone } from "../../design/shiftPalette.js";
 import {
-  DAYS_HE, DAYS_HE_SHORT, addDays, dayName, formatDateHe, fromISODate, monthGrid, monthLabelHe,
-  rangeLabelHe, shiftHours, startOfWeek, toISODate, todayISO, weekFrom,
+  DAYS_HE, DAYS_HE_SHORT, addDays, boardItemsForDates, dayName, formatDateHe, fromISODate, monthGrid,
+  monthLabelHe, rangeLabelHe, rangeTextHe, shiftHours, startOfWeek, toISODate, todayISO, weekFrom,
 } from "../../lib/dates.js";
 
 // ============================================================
@@ -13,6 +14,11 @@ import {
 // One dataset, three zoom levels. A month to see the shape of the roster and
 // spot the empty days, a week to work in, a day to check who is actually on.
 // The mode never changes what the data means — only how far back you stand.
+//
+// משימות עוברות דרך boardItemsForDates — אותו מיזוג יחיד שהלוח המאוחד
+// (UnifiedBoard) ומסך הדוחות כבר עוברים דרכו — כדי שמשימה לעולם לא תיעלם
+// כאן בזמן שהיא מופיעה בכל מסך אחר (היה הפער לפני התיקון הזה: יומן זה בנה
+// לעצמו byDate מ-shifts בלבד).
 // ============================================================
 
 const MODES = [
@@ -21,28 +27,28 @@ const MODES = [
   { id: "day", label: "יום", icon: "clock" },
 ];
 
-/** Compact coverage state — the one thing worth seeing from a month away. */
-const coverageOf = (dayShifts) => {
-  if (!dayShifts.length) return null;
-  const need = dayShifts.reduce((n, s) => n + Math.max(1, s.requiredGuards || 1), 0);
-  const got = dayShifts.reduce((n, s) => n + s.assignedGuards.length, 0);
+// זהה מילה במילה לתג שכבר קיים ב-UnifiedBoard/TaskRow — לא מנוסח מחדש.
+const OUT_OF_ENGINE_TOOLTIP =
+  "המשימה לא נושאת שעות, או פרושה על יותר מיום אחד — ולכן היא לא נכנסת למנוע: היא לא נספרת במנוחה, ברצף, בתקרה השבועית או בנטל.";
+
+/**
+ * חוסר האיוש היומי — סופר רק פריטים שיש להם בכלל מושג "כמה צריך"
+ * (requiredGuards != null). לפריט timeless (משימה בלי שעות, או שורת עמדה
+ * שבועית) אין מושג איוש בכלל — אותה מוסכמה בדיוק כמו missingOfItem
+ * ב-UnifiedBoard.jsx, כדי ששני המסכים לעולם לא יחלקו על "כמה חסר".
+ */
+const coverageOf = (dayItems) => {
+  const counted = dayItems.filter((s) => s.requiredGuards != null);
+  if (!counted.length) return null;
+  const need = counted.reduce((n, s) => n + Math.max(1, s.requiredGuards || 1), 0);
+  const got = counted.reduce((n, s) => n + (s.assignedGuards?.length || 0), 0);
   return { need, got, full: got >= need, empty: got === 0 };
 };
 
-export default function CalendarView({ shifts, guards, onNavigate }) {
+export default function CalendarView({ shifts, tasks = [], guards, onNavigate }) {
   const today = todayISO();
   const [mode, setMode] = useState("month");
   const [cursor, setCursor] = useState(today); // any date inside the shown range
-
-  const byDate = useMemo(() => {
-    const map = new Map();
-    for (const s of shifts) {
-      if (!map.has(s.date)) map.set(s.date, []);
-      map.get(s.date).push(s);
-    }
-    for (const list of map.values()) list.sort((a, b) => a.startTime.localeCompare(b.startTime));
-    return map;
-  }, [shifts]);
 
   const cur = fromISODate(cursor);
   const dates =
@@ -51,6 +57,16 @@ export default function CalendarView({ shifts, guards, onNavigate }) {
       : mode === "week"
       ? weekFrom(startOfWeek(cursor))
       : [cursor];
+
+  // ממוזג רק על טווח התאריכים המוצג כרגע (חודש/שבוע/יום) — לא כל הנתונים
+  // של הצוות בכל הזמנים — ולכן רץ מחדש בכל ניווט, בדיוק כמו boardItemsForDates
+  // בכל קורא אחר שלה.
+  const merged = useMemo(() => boardItemsForDates(shifts, tasks, dates), [shifts, tasks, dates]);
+  const byDate = useMemo(() => {
+    const map = new Map();
+    for (const day of merged.days) map.set(day.date, [...day.timeless, ...day.timed]);
+    return map;
+  }, [merged]);
 
   const step = (dir) => {
     if (mode === "month") {
@@ -73,8 +89,8 @@ export default function CalendarView({ shifts, guards, onNavigate }) {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="יומן"
-        subtitle={`${shown.length} משמרות בתצוגה`}
+        title={t("nav.calendar")}
+        subtitle={`${shown.length} פריטים בתצוגה`}
         actions={
           <div
             role="radiogroup"
@@ -140,13 +156,13 @@ export default function CalendarView({ shifts, guards, onNavigate }) {
             onPick={(d) => { setCursor(d); setMode("day"); }} />
         )}
 
-        {mode === "day" && <DayList date={cursor} shifts={byDate.get(cursor) || []} guards={guards} />}
+        {mode === "day" && <DayList date={cursor} items={byDate.get(cursor) || []} guards={guards} />}
       </Card>
 
       {shown.length === 0 && mode !== "day" && (
         <EmptyState
           icon="calendar"
-          title="אין משמרות בתצוגה הזו"
+          title="אין מה להציג בתצוגה הזו"
           body={`נווט לתקופה אחרת, או צור משמרות במסך "${t("nav.shifts")}".`}
           action={
             onNavigate && (
@@ -174,15 +190,15 @@ function MonthGrid({ dates, month, byDate, today, onPick }) {
       </div>
       <div className="grid grid-cols-7 gap-1">
         {dates.map((date) => {
-          const dayShifts = byDate.get(date) || [];
-          const cov = coverageOf(dayShifts);
+          const dayItems = byDate.get(date) || [];
+          const cov = coverageOf(dayItems);
           const inMonth = fromISODate(date).getMonth() === month;
           const isToday = date === today;
           return (
             <button
               key={date}
               onClick={() => onPick(date)}
-              aria-label={`${formatDateHe(date)} — ${dayShifts.length} משמרות`}
+              aria-label={`${formatDateHe(date)} — ${dayItems.length} משמרות`}
               className={`aspect-square rounded-lg p-1 flex flex-col items-center justify-start gap-0.5
                 ring-1 ring-inset cursor-pointer transition-colors duration-200 min-h-[44px]
                 ${isToday ? "ring-brand ring-2 bg-brand/10" : "ring-hairline hover:ring-brand/40 hover:bg-surface-hover"}
@@ -196,13 +212,13 @@ function MonthGrid({ dates, month, byDate, today, onPick }) {
               </span>
               {/* Dots, capped at four, plus a count — a month cell that tries
                   to list shifts becomes unreadable at phone width. */}
-              {dayShifts.length > 0 && (
+              {dayItems.length > 0 && (
                 <div className="flex flex-wrap gap-[2px] justify-center leading-none">
-                  {dayShifts.slice(0, 4).map((s) => (
+                  {dayItems.slice(0, 4).map((s) => (
                     <span
                       key={s.id}
                       className="w-1.5 h-1.5 rounded-full"
-                      style={{ background: s.color }}
+                      style={{ background: shiftTone(s.color, s.type) }}
                     />
                   ))}
                 </div>
@@ -240,7 +256,7 @@ function WeekStrip({ dates, byDate, guards, today, onPick }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
       {dates.map((date) => {
-        const dayShifts = byDate.get(date) || [];
+        const dayItems = byDate.get(date) || [];
         const isToday = date === today;
         return (
           <div key={date}>
@@ -258,40 +274,43 @@ function WeekStrip({ dates, byDate, guards, today, onPick }) {
               </p>
             </button>
             <div className="space-y-1.5">
-              {dayShifts.map((s) => (
-                <div
-                  key={s.id}
-                  className="rounded-lg p-2 text-[11px]"
-                  style={{ background: s.color, color: readableInk(s.color) }}
-                >
-                  <div className="font-bold truncate">{s.label}</div>
-                  <div className="opacity-90 text-[10px]" data-numeric>
-                    {s.startTime}–{s.endTime}
-                  </div>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {s.assignedGuards.map((gid) => {
-                      const g = guards.find((x) => x.id === gid);
-                      if (!g) return null;
-                      const c = guardColor(gid);
-                      return (
-                        <span
-                          key={gid}
-                          className="px-1 py-0.5 rounded text-[9px] font-bold"
-                          style={{ background: c, color: readableInk(c) }}
-                        >
-                          {g.name.split(" ")[0]}
+              {dayItems.map((s) => {
+                const tone = shiftTone(s.color, s.type);
+                return (
+                  <div
+                    key={s.id}
+                    className="rounded-lg p-2 text-[11px]"
+                    style={{ background: tone, color: readableInk(tone) }}
+                  >
+                    <div className="font-bold truncate">{s.label}</div>
+                    <div className="opacity-90 text-[10px]" data-numeric>
+                      {s.timeless ? rangeTextHe(s) : `${s.startTime}–${s.endTime}`}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {(s.assignedGuards || []).map((gid) => {
+                        const g = guards.find((x) => x.id === gid);
+                        if (!g) return null;
+                        const c = guardColor(gid);
+                        return (
+                          <span
+                            key={gid}
+                            className="px-1 py-0.5 rounded text-[9px] font-bold"
+                            style={{ background: c, color: readableInk(c) }}
+                          >
+                            {g.name.split(" ")[0]}
+                          </span>
+                        );
+                      })}
+                      {(s.assignedGuards || []).length === 0 && (
+                        <span className="bg-black/25 text-white px-1 py-0.5 rounded text-[9px]">
+                          לא משובץ
                         </span>
-                      );
-                    })}
-                    {s.assignedGuards.length === 0 && (
-                      <span className="bg-black/25 text-white px-1 py-0.5 rounded text-[9px]">
-                        לא משובץ
-                      </span>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-              {dayShifts.length === 0 && (
+                );
+              })}
+              {dayItems.length === 0 && (
                 <p className="text-center text-[11px] text-faint py-3">—</p>
               )}
             </div>
@@ -302,20 +321,20 @@ function WeekStrip({ dates, byDate, guards, today, onPick }) {
   );
 }
 
-function DayList({ date, shifts, guards }) {
-  if (!shifts.length) {
+function DayList({ date, items, guards }) {
+  if (!items.length) {
     return (
       <EmptyState
         icon="calendar"
-        title={`אין משמרות ב${formatDateHe(date)}`}
+        title={`אין כלום ב${formatDateHe(date)}`}
         body="אפשר להוסיף משמרות במסך ניהול המשמרות."
       />
     );
   }
   return (
     <div className="space-y-2.5">
-      {shifts.map((s) => {
-        const short = s.assignedGuards.length < s.requiredGuards;
+      {items.map((s) => {
+        const short = !s.timeless && (s.assignedGuards?.length || 0) < (s.requiredGuards || 1);
         return (
           <div
             key={s.id}
@@ -323,31 +342,47 @@ function DayList({ date, shifts, guards }) {
           >
             <div
               className="w-1.5 self-stretch rounded-full flex-shrink-0"
-              style={{ background: s.color }}
+              style={{ background: shiftTone(s.color, s.type) }}
             />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-bold text-content text-sm">{s.label}</span>
-                <span className="text-xs text-muted" data-numeric>
-                  {s.startTime}–{s.endTime} · {shiftHours(s)} ש'
-                </span>
-                {s.published ? (
-                  <Badge tone="accent" icon="check">פורסם</Badge>
+                {s.timeless ? (
+                  <>
+                    <span className="text-xs text-muted" data-numeric>
+                      {rangeTextHe(s)}
+                    </span>
+                    <span title={OUT_OF_ENGINE_TOOLTIP}>
+                      <Badge tone="neutral" icon="clock-off">
+                        מחוץ למנוע
+                      </Badge>
+                    </span>
+                  </>
                 ) : (
-                  <Badge tone="neutral">טיוטה</Badge>
+                  <span className="text-xs text-muted" data-numeric>
+                    {s.startTime}–{s.endTime} · {shiftHours(s)} ש'
+                  </span>
                 )}
+                {!s.timeless &&
+                  (s.published ? (
+                    <Badge tone="accent" icon="check">פורסם</Badge>
+                  ) : (
+                    <Badge tone="neutral">טיוטה</Badge>
+                  ))}
                 {short && (
                   <Badge tone="danger" icon="alert">
                     חסרים {s.requiredGuards - s.assignedGuards.length}
                   </Badge>
                 )}
               </div>
-              <p className="text-xs text-faint mt-0.5 flex items-center gap-1">
-                <Icon name="map-pin" size={11} />
-                {s.location}
-              </p>
+              {s.location && (
+                <p className="text-xs text-faint mt-0.5 flex items-center gap-1">
+                  <Icon name="map-pin" size={11} />
+                  {s.location}
+                </p>
+              )}
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {s.assignedGuards.map((gid) => {
+                {(s.assignedGuards || []).map((gid) => {
                   const g = guards.find((x) => x.id === gid);
                   if (!g) return null;
                   const c = guardColor(gid);
@@ -361,7 +396,7 @@ function DayList({ date, shifts, guards }) {
                     </span>
                   );
                 })}
-                {s.assignedGuards.length === 0 && (
+                {(s.assignedGuards || []).length === 0 && (
                   <span className="text-[11px] text-danger font-medium">לא שובץ אף אחד</span>
                 )}
               </div>
