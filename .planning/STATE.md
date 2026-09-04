@@ -84,6 +84,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260903-wx1 | Add a real center dividing line to the AuthPage split layout | 2026-09-03 | (pending) | [260903-wx1-add-a-real-center-dividing-line-to-the-a](./quick/260903-wx1-add-a-real-center-dividing-line-to-the-a/) |
+| 260904-bal | Fix balanceWorkload oscillation bug — a shift whose load equaled the guard-pair gap flip-flopped for all 40 balance passes with zero net effect; found by replaying the demo roster directly through `autoAssign`, not from a test failure. Also fixed the resulting misleading "16 · כולל 40 העברות" KPI copy (grammatically wrong at n=1, numerically nonsensical at n>16) | 2026-09-04 | (pending) | — (direct fix, no quick-task dir; see commit for detail) |
 
 ## Deferred Items
 

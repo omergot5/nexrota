@@ -388,8 +388,15 @@ export default function SmartAssign({
               label="החלטות המנוע"
               value={plan.assignments.length}
               hint={
+                // "כולל" הטעה: מעברי איזון לא נספרים בתוך value למעלה, הם
+                // עדכון שיבוץ קיים (ראה balanceWorkload ב-autoAssign.js) —
+                // "מתוכן" ולא "כולל" מתאר נכון את מה שקורה בפועל.
                 plan.summary.balanceMoves > 0
-                  ? `כולל ${plan.summary.balanceMoves} העברות איזון`
+                  ? `מתוכן ${
+                      plan.summary.balanceMoves === 1
+                        ? "עדכון איזון אחד"
+                        : `${plan.summary.balanceMoves} עדכוני איזון`
+                    }`
                   : "ללא צורך באיזון"
               }
             />

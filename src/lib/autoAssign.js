@@ -668,6 +668,19 @@ function balanceWorkload({ openShifts, activeGuards, availability, rules, stats,
       if (!check.ok) continue;
       if (availStatus(availability, lightest.id, shift.id) === "unavailable") continue;
 
+      // Refuse a move that doesn't strictly shrink the pairwise gap. The
+      // post-move gap is `|gapLoad - 2w|`, which beats the pre-move
+      // `gapLoad` only for `0 < w < gapLoad` — at `w === gapLoad` the trade
+      // is a wash (new gap equals the old one, just flipped in sign), and
+      // above it the guards swap places by a margin at least as large as
+      // before. Caught live on the demo roster: a single Friday-night shift
+      // (weekend × night = 12h × 1.4 = 16.8 load) sat at *exactly* the gap
+      // between its two guards, so it flip-flopped between them for all
+      // `balancePasses`, never once improving anything. `>=`, not `>` — the
+      // equal case is the one that was silently passing before.
+      const w = shiftLoad(shift);
+      if (w >= gapLoad) continue;
+
       // Apply the move.
       removeFromLoad(heavyLoad, shift);
       const { score, raw, parts } = scoreCandidate({
