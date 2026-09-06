@@ -47,7 +47,10 @@ const coverageOf = (dayItems) => {
 
 export default function CalendarView({ shifts, tasks = [], guards, onNavigate }) {
   const today = todayISO();
-  const [mode, setMode] = useState("month");
+  // שבוע הוא ברירת המחדל, לא חודש: מי שנכנס ליומן בא לראות מה חסר *עכשיו*,
+  // וחור נראה רק על ציר שעות (הועבר לכאן מ-SupervisorApp.jsx, שנהג לעטוף את
+  // המסך הזה בבורר שבוע/חודש חיצוני משלו — שני מתגים לאותה שאלה בדיוק).
+  const [mode, setMode] = useState("week");
   const [cursor, setCursor] = useState(today); // any date inside the shown range
 
   const cur = fromISODate(cursor);

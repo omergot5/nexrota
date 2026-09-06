@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Alert, Avatar, Btn, CardButton, IconBtn, Modal, Segmented, Spinner, UndoBar } from "./ui.jsx";
+import { Alert, Avatar, Btn, CardButton, IconBtn, Modal, Spinner, UndoBar } from "./ui.jsx";
 import { Icon } from "./icons.jsx";
 import { LogoMark } from "./Logo.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
@@ -7,7 +7,6 @@ import { SupDashboard, SwapMgmt, TaskMgmt, TeamView } from "./supervisor/views.j
 import PositionsScreen from "./supervisor/PositionsScreen.jsx";
 import WeekFlow, { STEP_OF } from "./supervisor/WeekFlow.jsx";
 import CalendarView from "./supervisor/CalendarView.jsx";
-import UnifiedBoard from "./supervisor/UnifiedBoard.jsx";
 import { rangeLabelHe, weekByOffset } from "../lib/dates.js";
 import { subscribeTerms, t, termProfile } from "../lib/terms.js";
 
@@ -81,7 +80,6 @@ export default function SupervisorApp({ state }) {
   // לסדר את השבוע — הוא לא בא לקרוא סטטיסטיקה על עצמו.
   const [view, setView] = useState("week");
   const [weekStep, setWeekStep] = useState(0);
-  const [calMode, setCalMode] = useState("week");
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   // Default to next week — the week a supervisor actually plans.
@@ -174,30 +172,11 @@ export default function SupervisorApp({ state }) {
 
   const views = {
     week: <WeekFlow {...common} step={weekStep} setStep={setWeekStep} />,
-    calendar: (
-      // שבוע הוא ברירת המחדל, לא חודש: מי שנכנס ליומן בא לראות מה חסר
-      // *עכשיו*, וחור נראה רק על ציר שעות.
-      <div className="space-y-4">
-        <Segmented
-          value={calMode}
-          onChange={setCalMode}
-          options={[
-            { value: "week", label: "שבוע", icon: "calendar" },
-            { value: "month", label: "חודש", icon: "grid" },
-          ]}
-        />
-        {calMode === "week" ? (
-          <UnifiedBoard
-            shifts={shifts}
-            tasks={tasks}
-            guards={guards}
-            dates={weekDates}
-          />
-        ) : (
-          <CalendarView shifts={shifts} tasks={tasks} guards={guards} onNavigate={go} />
-        )}
-      </div>
-    ),
+    // CalendarView כבר מציע יום/שבוע/חודש בתוך עצמו — עטיפה חיצונית עם עוד
+    // שבוע/חודש מעליה הייתה שני מתגים לאותה שאלה, אחד בתוך השני. ברירת
+    // המחדל של CalendarView עצמו היא "שבוע" בדיוק מהסיבה שהייתה כתובה כאן:
+    // מי שנכנס ליומן בא לראות מה חסר *עכשיו*, וחור נראה רק על ציר שעות.
+    calendar: <CalendarView shifts={shifts} tasks={tasks} guards={guards} onNavigate={go} />,
     more: (
       <div className="grid gap-3 sm:grid-cols-2">
         {MORE.map((m) => (
