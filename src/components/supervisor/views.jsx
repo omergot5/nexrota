@@ -1543,18 +1543,33 @@ export const categoryOptions = (shifts = [], tasks = []) => {
 export const People = ({
   ids, guards, size = 22, max = 4,
   isBlocked, blockedLabel, blockedTitle, blockedClassName = "",
+  // גרירה היא תוספת רשות, לא ברירת מחדל: onDragStart מגיע רק מ-UnifiedBoard
+  // כשהוא מופעל במצב editable (BOARD-05) — כל קורא אחר ל-People (AssignView,
+  // WhyModal, TaskRow...) ממשיך לקבל ערימת אווטארים רגילה, בלי draggable
+  // בכלל, כי שום דבר שם לא נועד לזוז.
+  onDragStart,
 }) => {
   const people = ids.map((id) => guards.find((g) => g.id === id)).filter(Boolean);
   if (!people.length) return <span className="text-[11px] text-faint">אין משויכים</span>;
   const visible = people.slice(0, max);
   const anyBlocked = isBlocked ? visible.some((g) => isBlocked(g)) : false;
+  const draggable = Boolean(onDragStart);
   return (
     <div className="flex items-center">
       <div className="flex -space-x-1.5 space-x-reverse">
         {visible.map((g) => {
           const blocked = isBlocked ? isBlocked(g) : false;
           if (!blocked) {
-            return <Avatar key={g.id} id={g.id} name={g.name} size={size} ring label={g.name} />;
+            return (
+              <div
+                key={g.id}
+                draggable={draggable}
+                onDragStart={draggable ? (e) => onDragStart(e, g) : undefined}
+                className={draggable ? "cursor-grab active:cursor-grabbing" : undefined}
+              >
+                <Avatar id={g.id} name={g.name} size={size} ring label={g.name} />
+              </div>
+            );
           }
           // ארבעת האותות (D-09/QUAL-08), על האדם החסום בלבד: לא-אינטראקטיבי,
           // עדיין מזוהה (אותיות פתיחה, כמו אווטאר רגיל בערימה), מנעול צף

@@ -1,9 +1,9 @@
 // ============================================================
 // הלוח המאוחד (BOARD-01, BOARD-04).
 //
-// לקריאה בלבד, בכוונה (D-03, D-08): הרכיב הזה מקבל shifts/tasks/guards/
-// dates כפרופס כבר-טעונים, לא נוגע ב-actions ולא קורא ל-Supabase, ואין בו
-// שום onClick שכותב נתון. עריכה נשארת במסכי הניהול הקיימים (ShiftMgmt/
+// לקריאה בלבד כברירת מחדל (D-03, D-08): הרכיב מקבל shifts/tasks/guards/
+// dates כפרופס כבר-טעונים, לא נוגע ב-actions ולא קורא ל-Supabase בעצמו.
+// עריכת תוכן (יצירה/מחיקה/פרסום) נשארת במסכי הניהול הקיימים (ShiftMgmt/
 // TaskMgmt) — הלוח רק מציג את מה שהם כבר יצרו, ממוזג דרך boardItemsForDates
 // (המסלול היחיד) ולעולם לא במסלול מיזוג שני.
 //
@@ -16,8 +16,17 @@
 // בעין אחת, בדיוק כמו Google Calendar — ולא בגלילה דרך שבעה כותרי-יום בזה
 // אחר זה. אותם breakpoints בדיוק כמו ה-WeekStrip של CalendarView.jsx, כדי
 // ששני המסכים ידברו את אותה שפת רשת ולא יסטו זה מזה על אותה שאלה.
+//
+// BOARD-05: `onMove` הוא היציאה היחידה מהחוזה read-only, ורשות בלבד — לא
+// עובר כלל אם הקורא לא מוסר אותו (ברירת המחדל `undefined`, כמו ב-GuardApp
+// וב"יומן"). כשהוא כן מגיע (WeekFlow.jsx, שלב "השבוע במבט אחד" בזמן בנייה),
+// גרירת אווטאר ממשמרת אחת ומשמרת אחרת קוראת לו — הלוח עצמו לא כותב שום
+// דבר, רק מדווח "רוצים להעביר X מ-A ל-B" ומשאיר את ההחלטה (ואת הכתיבה
+// בפועל, כולל בדיקת כשירות) לקורא. זו אותה הפרדה בדיוק ש-`empty` כבר
+// משתמשת בה — הלוח מדבר בפרופס, לא בהנחות על מי קורא לו.
 // ============================================================
 
+import { useState } from "react";
 import { Badge, EmptyState, readableInk } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import {
@@ -55,7 +64,7 @@ const missingOfItem = (item) => {
 };
 
 export default function UnifiedBoard({
-  shifts = [], tasks = [], guards = [], dates = [], scopeGuardId = null, empty,
+  shifts = [], tasks = [], guards = [], dates = [], scopeGuardId = null, empty, onMove,
 }) {
   const merged = boardItemsForDates(shifts, tasks, dates);
 
@@ -107,14 +116,14 @@ export default function UnifiedBoard({
       )}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
         {days.map((day) => (
-          <DayColumn key={day.date} day={day} guards={guards} />
+          <DayColumn key={day.date} day={day} guards={guards} onMove={onMove} />
         ))}
       </div>
     </div>
   );
 }
 
-function DayColumn({ day, guards }) {
+function DayColumn({ day, guards, onMove }) {
   const iso = day.date;
   const today = isToday(iso);
   return (
@@ -131,7 +140,12 @@ function DayColumn({ day, guards }) {
       </div>
       <div className="space-y-1.5">
         {day.items.map((item) => (
-          <BoardCard key={`${item.timeless ? "t" : "s"}-${item.id}`} item={item} guards={guards} />
+          <BoardCard
+            key={`${item.timeless ? "t" : "s"}-${item.id}`}
+            item={item}
+            guards={guards}
+            onMove={onMove}
+          />
         ))}
         {day.items.length === 0 && <p className="text-center text-[11px] text-faint py-3">—</p>}
       </div>
@@ -139,17 +153,55 @@ function DayColumn({ day, guards }) {
   );
 }
 
-function BoardCard({ item, guards }) {
+// המחרוזת שה-drag נושא: מזהה השומר ומזהה המשמרת שממנה גוררים, מופרדים
+// בתו שלא יכול להופיע ב-UUID (BOARD-05). dataTransfer, לא state חיצוני —
+// כך שגרירה בין שני BoardCard נפרדים לא צריכה state משותף שיזוזו ביניהם.
+const DRAG_MIME = "application/x-nexrota-guard";
+
+function BoardCard({ item, guards, onMove }) {
   const timeless = Boolean(item.timeless);
   // חוסר איוש הוא מושג שקיים רק לפריט מתוזמן (D-08 — שורת עמדה עתידית אין
   // לה עוד ניצול; פריט timeless אין לו requiredGuards בכלל).
   const missing = timeless ? 0 : missingOfItem(item);
   const tone = shiftTone(item.color, item.type);
   const ink = readableInk(tone);
+  const [dragOver, setDragOver] = useState(false);
+
+  // גרירה קיימת רק לכרטיס מתוזמן: משימה מוקצית דרך TaskMgmt (ריבוי-מוקצים,
+  // בלי מושג "מקום"), לא דרך המסלול הזה. onMove מגיע מהקורא רק במסך הבנייה
+  // עצמו (WeekFlow.jsx) — בכל מקום אחר (יומן, GuardApp) הוא undefined, אז
+  // הכרטיס הזה נשאר קריאה-בלבד בדיוק כמו קודם.
+  const draggableHere = Boolean(onMove) && !timeless;
+
+  const dragProps = draggableHere
+    ? {
+        onDragOver: (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+        },
+        onDragEnter: (e) => {
+          if (e.dataTransfer.types.includes(DRAG_MIME)) setDragOver(true);
+        },
+        onDragLeave: () => setDragOver(false),
+        onDrop: (e) => {
+          e.preventDefault();
+          setDragOver(false);
+          const raw = e.dataTransfer.getData(DRAG_MIME);
+          if (!raw) return;
+          const [guardId, fromShiftId] = raw.split("::");
+          if (fromShiftId === item.id) return; // הוטל על עצמו — אין מה להעביר
+          onMove(fromShiftId, item.id, guardId);
+        },
+      }
+    : {};
+
   return (
     <div
-      className={`rounded-lg p-2 text-[11px] ring-1 ring-inset ${missing > 0 ? "ring-warn ring-2" : "ring-transparent"}`}
+      className={`rounded-lg p-2 text-[11px] ring-1 ring-inset transition-shadow ${
+        dragOver ? "ring-2 ring-content" : missing > 0 ? "ring-warn ring-2" : "ring-transparent"
+      }`}
       style={{ background: tone, color: ink }}
+      {...dragProps}
     >
       <p className="font-bold truncate">{item.label}</p>
       {/* ההבדל היחיד בין כרטיס טיימלס לכרטיס מתוזמן הוא איזה יסוד מטא מופיע
@@ -200,6 +252,11 @@ function BoardCard({ item, guards }) {
           blockedLabel={QUAL_BLOCK_LABEL}
           blockedClassName={QUAL_BLOCK_RING}
           blockedTitle={() => qualRefusal(item.category)}
+          onDragStart={
+            draggableHere
+              ? (e, g) => e.dataTransfer.setData(DRAG_MIME, `${g.id}::${item.id}`)
+              : undefined
+          }
         />
       </div>
     </div>

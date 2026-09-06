@@ -147,6 +147,10 @@ export default function WeekFlow({
       empty={{
         body: `בנה ${t("unit.shifts")} או משימות, והלוח ייבנה מעצמו — לחצו למטה על "${goBuildLabel}".`,
       }}
+      // עריכה רק כאן (BOARD-05): זה מסך הבנייה עצמו, לא היומן ולא הלוח של
+      // המשתתף — שני המסכים האחרים ממשיכים לקבל את הלוח בלי onMove, כלומר
+      // לקריאה בלבד בדיוק כמו קודם.
+      onMove={actions.moveAssignment}
     />,
     <ShiftMgmt key="shifts" {...common} />,
     <AvailView key="avail" {...common} />,

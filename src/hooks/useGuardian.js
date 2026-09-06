@@ -613,6 +613,46 @@ export function useGuardian() {
         );
       },
 
+      // גרירת שומר ממשמרת אחת לאחרת (BOARD-05) — אותה פעולה בדיוק ש-
+      // toggleAssignment כבר עושה, פעמיים, מצוירת כ-patch אחד כדי שהמסך לא
+      // יהבהב "הוסר" ואז "נוסף" בשני רגעים נפרדים. אותה בדיקה בדיוק כמו
+      // toggleAssignment בכיוון ההוספה — חסימת כשירות בלבד, לא אילוץ קשיח
+      // מלא — כי זו עדיין אותה פעולה ידנית, רק בעטיפה אחרת (גרירה במקום
+      // קליק), לא ערוץ חדש עם כללים משלו.
+      moveAssignment: (fromShiftId, toShiftId, guardId) => {
+        if (fromShiftId === toShiftId) return;
+        const toShift = dataRef.current.shifts.find((s) => s.id === toShiftId);
+        const guard = dataRef.current.guards.find((g) => g.id === guardId);
+        if (!toShift || !guard) return;
+        if (toShift.assignedGuards.includes(guardId)) return; // כבר שם — אין מה להעביר
+
+        const check = checkQualification({ guard, shift: toShift });
+        if (!check.ok) {
+          return run(async () => {
+            throw new Error(check.reason);
+          });
+        }
+
+        return optimistic(
+          (d) => ({
+            ...d,
+            shifts: d.shifts.map((s) => {
+              if (s.id === fromShiftId) {
+                return { ...s, assignedGuards: s.assignedGuards.filter((g) => g !== guardId) };
+              }
+              if (s.id === toShiftId) {
+                return { ...s, assignedGuards: [...s.assignedGuards, guardId] };
+              }
+              return s;
+            }),
+          }),
+          async () => {
+            await api.unassignGuard({ shiftId: fromShiftId, guardId });
+            await api.assignGuard({ shiftId: toShiftId, guardId, source: "manual" });
+          }
+        );
+      },
+
       // `rethrow: true` — יחיד בין הפעולות הרגילות: SmartAssign.jsx מציג "הוחל"
       // (ירוק, לצמיתות) מיד אחרי ה-await הזה בלי שום תנאי. בלי rethrow, run()
       // בולע את השגיאה ומחזיר undefined בשקט — SmartAssign היה מראה "הוחל
