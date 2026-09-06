@@ -11,10 +11,15 @@
 // נשמר רק אם `assignedGuards` שלו כולל את המזהה הזה. זה מה שמאפשר לפאזה
 // 5-02 להרכיב את אותו רכיב בדיוק בתוך מסך המשתתף — רכיב לוח שני היה בדיוק
 // המסלול השני האסור.
+//
+// רשת עמודות-ימים, לא רשימה מתגלגלת: "השבוע במבט אחד" (D-04) אמור להיקרא
+// בעין אחת, בדיוק כמו Google Calendar — ולא בגלילה דרך שבעה כותרי-יום בזה
+// אחר זה. אותם breakpoints בדיוק כמו ה-WeekStrip של CalendarView.jsx, כדי
+// ששני המסכים ידברו את אותה שפת רשת ולא יסטו זה מזה על אותה שאלה.
 // ============================================================
 
-import { Badge, EmptyState } from "../ui.jsx";
-import { Dot, Icon } from "../icons.jsx";
+import { Badge, EmptyState, readableInk } from "../ui.jsx";
+import { Icon } from "../icons.jsx";
 import {
   DAYS_HE_SHORT, boardItemsForDates, fromISODate, isToday, rangeTextHe, shortDate,
 } from "../../lib/dates.js";
@@ -41,9 +46,8 @@ const QUAL_BLOCK_RING = "ring-hairline-strong bg-surface-sunken";
 const qualRefusal = (category) => `לא מוגדר/ת כשיר/ה לקטגוריית "${category}"`;
 
 /**
- * חוסר האיוש של פריט מתוזמן — אותו חשבון שהיה קיים בתצוגת הרשת השבועית
- * הקודמת, מוצג כאן כשורת רשימה במקום כמלבן ברשת. לפריט טיימלס אין מושג
- * איוש בכלל (D-08 אין פעולה, ואין שדה requiredGuards על שורת עמדה שבועית).
+ * חוסר האיוש של פריט מתוזמן. לפריט טיימלס אין מושג איוש בכלל (D-08 אין
+ * פעולה, ואין שדה requiredGuards על שורת עמדה שבועית).
  */
 const missingOfItem = (item) => {
   if (item.requiredGuards == null) return 0;
@@ -60,16 +64,23 @@ export default function UnifiedBoard({
       ? items
       : items.filter((item) => (item.assignedGuards || []).includes(scopeGuardId));
 
-  const days = merged.days
-    .map((day) => ({ date: day.date, timeless: scope(day.timeless), timed: scope(day.timed) }))
-    .filter((day) => day.timeless.length > 0 || day.timed.length > 0);
+  // טיימלס קודם, אחר כך מתוזמן — בדיוק כמו שboardItemsForDates כבר החזיר;
+  // אין מיון שני כאן (D-16). כל תאריך ב-dates מקבל עמודה משלו, גם אם היא
+  // ריקה (D-04: עמודה חסרה הייתה שוברת את המשמעות המיקומית של "יום שלישי"
+  // ברשת — בדיוק כמו שWeekStrip לעולם לא מדלג על יום ריק).
+  const days = merged.days.map((day) => ({
+    date: day.date,
+    items: [...scope(day.timeless), ...scope(day.timed)],
+  }));
+
+  const totalItems = days.reduce((sum, d) => sum + d.items.length, 0);
 
   // מצב ריק שלם: ניסוח, לא אזהרה (D-15) — לא Alert, לא danger, לא warn.
   // ברירת המחדל (G-05-1) לא קוראת בשם שום כפתור: זו התצוגה שמופיעה גם
   // ביומן וגם אצל המשתתף, ובאף אחד מהם אין את שלב "תסדר לי" על המסך.
   // מסך "השבוע" של המנהל מעביר `empty` משלו (WeekFlow.jsx) שקורא בשם
   // הפעולה הראשית שכן נמצאת שם, ממש מתחת ללוח.
-  if (days.length === 0) {
+  if (totalItems === 0) {
     return (
       <EmptyState
         icon="inbox"
@@ -79,126 +90,118 @@ export default function UnifiedBoard({
     );
   }
 
-  // חוסר איוש ברמת השבוע כולו, פעם אחת מעל קבוצות הימים — לא באנר, לא
-  // Alert, ולא חוזר על עצמו בכל יום. שורה מטושטשת (text-muted), לא אזהרה.
+  // חוסר איוש ברמת השבוע כולו, פעם אחת מעל הרשת — לא באנר, לא Alert, ולא
+  // חוזר על עצמו בכל עמודה. שורה מטושטשת (text-muted), לא אזהרה. רק פריטים
+  // מתוזמנים נספרים (D-08 — לפריט טיימלס אין מושג איוש בכלל).
   const totalMissing = days.reduce(
-    (sum, day) => sum + day.timed.reduce((s, item) => s + missingOfItem(item), 0),
+    (sum, day) => sum + day.items.reduce((s, item) => s + (item.timeless ? 0 : missingOfItem(item)), 0),
     0
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {totalMissing > 0 && (
         <p className="text-xs text-muted px-1" data-numeric>
           {totalMissing} מקומות לא מאוישים
         </p>
       )}
-      {days.map((day) => (
-        <DayGroup key={day.date} day={day} guards={guards} />
-      ))}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+        {days.map((day) => (
+          <DayColumn key={day.date} day={day} guards={guards} />
+        ))}
+      </div>
     </div>
   );
 }
 
-function DayGroup({ day, guards }) {
+function DayColumn({ day, guards }) {
   const iso = day.date;
   const today = isToday(iso);
   return (
-    <div className="space-y-2">
-      {/* כותרת היום כבדה מכל שורה מתחתיה בכוונה — זה מה שהעין מוצאת קודם,
-        * בלי מקרא ובלי onboarding (D-14). */}
-      <div className={`flex items-baseline gap-2 px-1 py-1 rounded-lg ${today ? "bg-brand/10" : ""}`}>
-        <span className={`text-base font-bold ${today ? "text-brand" : "text-content"}`}>
+    <div>
+      <div
+        className={`text-center mb-2 pb-1.5 border-b-2 ${today ? "border-brand" : "border-hairline"}`}
+      >
+        <p className={`text-[11px] ${today ? "text-brand font-bold" : "text-muted"}`}>
           {DAYS_HE_SHORT[fromISODate(iso).getDay()]}
-        </span>
-        <span className="text-[11px] text-faint" data-numeric>
+        </p>
+        <p className={`text-sm font-bold ${today ? "text-brand" : "text-content"}`} data-numeric>
           {shortDate(iso)}
-        </span>
+        </p>
       </div>
-      <div className="space-y-2">
-        {/* טיימלס קודם, אחר כך מתוזמן — בדיוק כמו שboardItemsForDates כבר
-          * החזיר; אין מיון שני כאן (D-16). */}
-        {day.timeless.map((item) => (
-          <BoardRow key={`t-${item.id}`} item={item} guards={guards} />
+      <div className="space-y-1.5">
+        {day.items.map((item) => (
+          <BoardCard key={`${item.timeless ? "t" : "s"}-${item.id}`} item={item} guards={guards} />
         ))}
-        {day.timed.map((item) => (
-          <BoardRow key={`s-${item.id}`} item={item} guards={guards} />
-        ))}
+        {day.items.length === 0 && <p className="text-center text-[11px] text-faint py-3">—</p>}
       </div>
     </div>
   );
 }
 
-function BoardRow({ item, guards }) {
+function BoardCard({ item, guards }) {
   const timeless = Boolean(item.timeless);
   // חוסר איוש הוא מושג שקיים רק לפריט מתוזמן (D-08 — שורת עמדה עתידית אין
   // לה עוד ניצול; פריט timeless אין לו requiredGuards בכלל).
   const missing = timeless ? 0 : missingOfItem(item);
+  const tone = shiftTone(item.color, item.type);
+  const ink = readableInk(tone);
   return (
     <div
-      className={`flex items-center gap-3 rounded-xl p-2.5 ring-1 ring-inset bg-surface-sunken ${
-        missing > 0 ? "ring-warn" : "ring-hairline"
-      }`}
+      className={`rounded-lg p-2 text-[11px] ring-1 ring-inset ${missing > 0 ? "ring-warn ring-2" : "ring-transparent"}`}
+      style={{ background: tone, color: ink }}
     >
-      <Dot color={shiftTone(item.color, item.type)} size={10} />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-content truncate">{item.label}</p>
-        {/* ההבדל היחיד בין שורת טיימלס לשורה מתוזמנת הוא איזה יסוד מטא
-          * מופיע כאן — לא צבע, לא רקע, לא צורה (D-12). */}
-        <span
-          className="flex items-center gap-3 mt-0.5 flex-wrap text-[11px] text-faint"
-          data-numeric
-        >
-          {timeless ? (
-            <>
-              <span className="flex items-center gap-1">
-                <Icon name="calendar" size={11} />
-                {rangeTextHe(item)}
-              </span>
-              <span title={OUT_OF_ENGINE_TOOLTIP}>
-                {/* clock-off, לא lock (G-05-1): המנעול שמור כולו לחסימת
-                  * כשירות אישית (People למטה) — הגלף הזה הוא הנגדת השעון
-                  * הרגיל שהשורה המתוזמנת מציגה, לא סימן נעילה נוסף. סטייה
-                  * מכוונת מ-UI-SPEC (ראו 05-05-SUMMARY.md). */}
-                <Badge tone="neutral" icon="clock-off">
-                  מחוץ למנוע
-                </Badge>
-              </span>
-            </>
-          ) : (
-            <span className="flex items-center gap-1">
-              <Icon name="clock" size={11} />
-              {item.startTime}–{item.endTime}
-            </span>
-          )}
-          {/* שלושה ערוצים — אייקון, מילים, וטבעת אזהרה על השורה כולה —
-            * לעולם לא צבע לבדו (WCAG 1.4.1). שורה מאוישת במלואה לא מקבלת
-            * שום תג — תג "תקין" על כל שורה הוא בדיוק הרעש ש-TaskRow כבר
-            * נמנע ממנו. */}
-          {missing > 0 && (
-            <span className="flex items-center gap-1 font-bold text-warn">
-              <Icon name="alert" size={11} />
-              חסרים {missing}
-            </span>
-          )}
+      <p className="font-bold truncate">{item.label}</p>
+      {/* ההבדל היחיד בין כרטיס טיימלס לכרטיס מתוזמן הוא איזה יסוד מטא מופיע
+        * כאן — לא צבע, לא רקע, לא צורה (D-12). */}
+      {timeless ? (
+        <div className="mt-0.5 space-y-1 opacity-90">
+          <span className="flex items-center gap-1" data-numeric>
+            <Icon name="calendar" size={10} />
+            {rangeTextHe(item)}
+          </span>
+          <span title={OUT_OF_ENGINE_TOOLTIP}>
+            {/* clock-off, לא lock (G-05-1): המנעול שמור כולו לחסימת כשירות
+              * אישית (People למטה) — הגלף הזה הוא הנגדת השעון הרגיל שכרטיס
+              * מתוזמן מציג, לא סימן נעילה נוסף. */}
+            <Badge tone="neutral" icon="clock-off" className="!bg-black/20 !text-inherit !ring-0">
+              מחוץ למנוע
+            </Badge>
+          </span>
+        </div>
+      ) : (
+        <span className="flex items-center gap-1 mt-0.5 opacity-90" data-numeric>
+          <Icon name="clock" size={10} />
+          {item.startTime}–{item.endTime}
         </span>
-      </div>
+      )}
+      {/* שלושה ערוצים — אייקון, מילים, וטבעת אזהרה על הכרטיס כולו — לעולם לא
+        * צבע לבדו (WCAG 1.4.1). כרטיס מאויש במלואו לא מקבל שום תג — תג
+        * "תקין" על כל כרטיס הוא בדיוק הרעש ש-TaskRow כבר נמנע ממנו. */}
+      {missing > 0 && (
+        <span className="flex items-center gap-1 mt-0.5 font-bold" data-numeric>
+          <Icon name="alert" size={10} />
+          חסרים {missing}
+        </span>
+      )}
       {/* חסימת כשירות ברמת האדם, לא ברמת הפריט (D-11): People סורק רק את מי
         * שכבר ב-item.assignedGuards — בדיוק כפי שהתקבל למעלה — ולא את כל
         * הצוות (D-10). isQualified נקרא כאן, בזמן רינדור, עבור כל אדם בערימה
         * בנפרד; התוצאה לא נשמרת ולא נגזרת מחדש מהרשימה הגולמית על האדם. אותו
         * קוד בדיוק רץ בין אם item הוא משמרת ובין אם הוא משימה — אין כאן ענף
         * לפי סוג הפריט (BOARD-03). */}
-      <People
-        ids={item.assignedGuards || []}
-        guards={guards}
-        size={24}
-        max={3}
-        isBlocked={(g) => !isQualified(g, item.category)}
-        blockedLabel={QUAL_BLOCK_LABEL}
-        blockedClassName={QUAL_BLOCK_RING}
-        blockedTitle={() => qualRefusal(item.category)}
-      />
+      <div className="mt-1.5">
+        <People
+          ids={item.assignedGuards || []}
+          guards={guards}
+          size={20}
+          max={3}
+          isBlocked={(g) => !isQualified(g, item.category)}
+          blockedLabel={QUAL_BLOCK_LABEL}
+          blockedClassName={QUAL_BLOCK_RING}
+          blockedTitle={() => qualRefusal(item.category)}
+        />
+      </div>
     </div>
   );
 }
