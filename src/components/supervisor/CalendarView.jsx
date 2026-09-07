@@ -3,6 +3,7 @@ import { Badge, Btn, Card, EmptyState, IconBtn, PageHeader, guardColor, readable
 import { Icon } from "../icons.jsx";
 import { t } from "../../lib/terms.js";
 import { shiftTone } from "../../design/shiftPalette.js";
+import { DRAG_MIME } from "./UnifiedBoard.jsx";
 import {
   DAYS_HE, DAYS_HE_SHORT, addDays, boardItemsForDates, dayName, formatDateHe, fromISODate, monthGrid,
   monthLabelHe, rangeLabelHe, rangeTextHe, shiftHours, startOfWeek, toISODate, todayISO, weekFrom,
@@ -45,7 +46,7 @@ const coverageOf = (dayItems) => {
   return { need, got, full: got >= need, empty: got === 0 };
 };
 
-export default function CalendarView({ shifts, tasks = [], guards, onNavigate }) {
+export default function CalendarView({ shifts, tasks = [], guards, onNavigate, onMove }) {
   const today = todayISO();
   // שבוע הוא ברירת המחדל, לא חודש: מי שנכנס ליומן בא לראות מה חסר *עכשיו*,
   // וחור נראה רק על ציר שעות (הועבר לכאן מ-SupervisorApp.jsx, שנהג לעטוף את
@@ -155,7 +156,7 @@ export default function CalendarView({ shifts, tasks = [], guards, onNavigate })
         )}
 
         {mode === "week" && (
-          <WeekStrip dates={dates} byDate={byDate} guards={guards} today={today}
+          <WeekStrip dates={dates} byDate={byDate} guards={guards} today={today} onMove={onMove}
             onPick={(d) => { setCursor(d); setMode("day"); }} />
         )}
 
@@ -255,7 +256,13 @@ function MonthGrid({ dates, month, byDate, today, onPick }) {
   );
 }
 
-function WeekStrip({ dates, byDate, guards, today, onPick }) {
+function WeekStrip({ dates, byDate, guards, today, onPick, onMove }) {
+  // מזהה המשמרת שמעליה גוררים כרגע — משותף לכל התאים בשבוע, כי בכל רגע
+  // נתון יכולה להיות גרירה מעל תא אחד בלבד (אותו עיקרון פשוט כמו
+  // BoardCard ב-UnifiedBoard, רק ברמת הרכיב האב ולא מקומי לכל כרטיס,
+  // כי כאן הכרטיסים לא מרכיב נפרד משלהם).
+  const [dragOverId, setDragOverId] = useState(null);
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
       {dates.map((date) => {
@@ -279,11 +286,40 @@ function WeekStrip({ dates, byDate, guards, today, onPick }) {
             <div className="space-y-1.5">
               {dayItems.map((s) => {
                 const tone = shiftTone(s.color, s.type);
+                // אותו כלל בדיוק כמו UnifiedBoard.jsx's draggableHere: רק
+                // כשההורה סיפק onMove, ורק למשמרת אמיתית (לא timeless —
+                // משימה בלי שעות או שורת עמדה שבועית לא נכנסות למנוע
+                // בכלל, אז אין להן "העברה" משמעותית).
+                const draggableHere = Boolean(onMove) && !s.timeless;
+                const dragProps = draggableHere
+                  ? {
+                      onDragOver: (e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                      },
+                      onDragEnter: (e) => {
+                        if (e.dataTransfer.types.includes(DRAG_MIME)) setDragOverId(s.id);
+                      },
+                      onDragLeave: () => setDragOverId((id) => (id === s.id ? null : id)),
+                      onDrop: (e) => {
+                        e.preventDefault();
+                        setDragOverId(null);
+                        const raw = e.dataTransfer.getData(DRAG_MIME);
+                        if (!raw) return;
+                        const [guardId, fromShiftId] = raw.split("::");
+                        if (fromShiftId === s.id) return;
+                        onMove(fromShiftId, s.id, guardId);
+                      },
+                    }
+                  : {};
                 return (
                   <div
                     key={s.id}
-                    className="rounded-lg p-2 text-[11px]"
+                    className={`rounded-lg p-2 text-[11px] transition-shadow ${
+                      dragOverId === s.id ? "ring-2 ring-content" : ""
+                    }`}
                     style={{ background: tone, color: readableInk(tone) }}
+                    {...dragProps}
                   >
                     <div className="font-bold truncate">{s.label}</div>
                     <div className="opacity-90 text-[10px]" data-numeric>
@@ -297,7 +333,15 @@ function WeekStrip({ dates, byDate, guards, today, onPick }) {
                         return (
                           <span
                             key={gid}
-                            className="px-1 py-0.5 rounded text-[9px] font-bold"
+                            draggable={draggableHere}
+                            onDragStart={
+                              draggableHere
+                                ? (e) => e.dataTransfer.setData(DRAG_MIME, `${gid}::${s.id}`)
+                                : undefined
+                            }
+                            className={`px-1 py-0.5 rounded text-[9px] font-bold ${
+                              draggableHere ? "cursor-grab active:cursor-grabbing" : ""
+                            }`}
                             style={{ background: c, color: readableInk(c) }}
                           >
                             {g.name.split(" ")[0]}

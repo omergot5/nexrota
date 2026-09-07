@@ -156,7 +156,10 @@ function DayColumn({ day, guards, onMove }) {
 // המחרוזת שה-drag נושא: מזהה השומר ומזהה המשמרת שממנה גוררים, מופרדים
 // בתו שלא יכול להופיע ב-UUID (BOARD-05). dataTransfer, לא state חיצוני —
 // כך שגרירה בין שני BoardCard נפרדים לא צריכה state משותף שיזוזו ביניהם.
-const DRAG_MIME = "application/x-nexrota-guard";
+// מיוצא: CalendarView.jsx's WeekStrip משתמש באותו MIME בדיוק כדי לגרור
+// שם בין תאים ביומן — אותה אינטראקציה, שני רכיבים ויזואליים. מחרוזת
+// אחת, לא שתיים שעלולות להיסחף.
+export const DRAG_MIME = "application/x-nexrota-guard";
 
 function BoardCard({ item, guards, onMove }) {
   const timeless = Boolean(item.timeless);

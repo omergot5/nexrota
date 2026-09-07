@@ -176,7 +176,15 @@ export default function SupervisorApp({ state }) {
     // שבוע/חודש מעליה הייתה שני מתגים לאותה שאלה, אחד בתוך השני. ברירת
     // המחדל של CalendarView עצמו היא "שבוע" בדיוק מהסיבה שהייתה כתובה כאן:
     // מי שנכנס ליומן בא לראות מה חסר *עכשיו*, וחור נראה רק על ציר שעות.
-    calendar: <CalendarView shifts={shifts} tasks={tasks} guards={guards} onNavigate={go} />,
+    calendar: (
+      <CalendarView
+        shifts={shifts}
+        tasks={tasks}
+        guards={guards}
+        onNavigate={go}
+        onMove={actions.moveAssignment}
+      />
+    ),
     more: (
       <div className="grid gap-3 sm:grid-cols-2">
         {MORE.map((m) => (
