@@ -10,13 +10,13 @@
 // כשירות בעורך של TeamView חייב לראות בדיוק את אותה רשימה כאן.
 // ============================================================
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import {
   Badge, Btn, Card, EmptyState, Field, IconBtn, Input, Modal, PageHeader, Segmented, Select,
 } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import { DAYS_HE_SHORT, addDays, rangeLabelHe, shortDate, weekFrom } from "../../lib/dates.js";
-import { t } from "../../lib/terms.js";
+import { subscribeTerms, t, termProfile } from "../../lib/terms.js";
 import { categoryOptions } from "./views.jsx";
 import {
   missingRowsForWeek, plannedRowsForWeek, qualifiedGuardsForPosition, workingGuardIdsForWeek,
@@ -47,7 +47,10 @@ const formFromPosition = (p) => ({
 export default function PositionsScreen({
   positions = [], guards = [], shifts = [], tasks = [], weekDates = [], actions, busy,
 }) {
-  const categories = categoryOptions(shifts, tasks);
+  // תחום הפעילות מוחל מ-useGuardian (setTermProfile), לא מפרופ שהמסך הזה
+  // לא מקבל — אותה קריאה בדיוק ש-ProfilePicker כבר משתמש בה (views.jsx).
+  const mode = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
+  const categories = categoryOptions(shifts, tasks, mode);
   const [editing, setEditing] = useState(null); // "new" | position object | null
   const [form, setForm] = useState(null);
 

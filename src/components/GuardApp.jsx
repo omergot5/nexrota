@@ -407,7 +407,7 @@ function MyAvailability({ user, team, shifts, availability, actions, busy }) {
               <Icon name="star" size={13} className="text-brand mt-0.5 shrink-0" />
               <span>
                 <b className="text-content">מעדיף</b> = אני פנוי, ואם אפשר הייתי שמח דווקא למשמרת הזו.
-                זה לא סוגר לך שום אופציה ולא מבטיח שיבוץ — זה רק מכריע בין שני שומרים שממילא פנויים.
+                זה לא סוגר לך שום אופציה ולא מבטיח שיבוץ — זה רק מכריע בין שני {t("noun.memberPlural")} שממילא פנויים.
               </span>
             </p>
           </Card>
@@ -540,7 +540,7 @@ function MySwaps({ user, guards, shifts, availability = {}, swapRequests, action
     const shift = shifts.find((x) => x.id === r.shiftId);
     const guard = guards.find((g) => g.id === r.toGuard);
     if (!shift || !guard) {
-      return { ok: false, reason: "המשמרת או המאבטח כבר לא קיימים" };
+      return { ok: false, reason: `המשמרת או ה${t("noun.member")} כבר לא קיימים` };
     }
     return checkAssignment({ guard, shift, shifts, availability, tasks });
   };
@@ -724,7 +724,7 @@ function MySwaps({ user, guards, shifts, availability = {}, swapRequests, action
           </Field>
           <Field label="לבקש מ">
             <Select value={form.toGuard} onChange={field("toGuard")}>
-              <option value="">בחר שומר</option>
+              <option value="">בחר {t("noun.member")}</option>
               {guards
                 .filter((g) => g.id !== user.id)
                 .map((g) => (
@@ -805,7 +805,7 @@ export default function GuardApp({ state }) {
             <div className="min-w-0">
               <p className="font-bold text-sm text-content truncate">{user.name}</p>
               <p className="text-muted text-[11px]">
-                מאבטח · {team?.name || "צוות"}{" "}
+                {t("noun.member")} · {team?.name || "צוות"}{" "}
                 <span className="font-mono">{user.teamCode}</span>
               </p>
             </div>

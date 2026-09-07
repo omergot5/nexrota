@@ -15,8 +15,17 @@
  * *פעולה* בגוף ראשון או שנייה ("סדר לי את השבוע").
  */
 
-/** אוצר המילים האזרחי — ברירת המחדל, וגם הבסיס שכל פרופיל אחר יורש ממנו. */
+/** אוצר המילים של אבטחה — ברירת המחדל, וגם הבסיס שכל פרופיל אחר יורש ממנו. */
 const BASE = {
+  // האדם שמשובץ למשמרת — לא רק שם ניווט (guard.nav.*, שמדבר *אל* אותו
+  // אדם), אלא איך שמדברים *עליו* במסכי הניהול: "הוסף שומר", "3 שומרים
+  // הגישו". יחיד ורבים כמפתחות נפרדים, לא הטיה אוטומטית: עברית מטה שם
+  // עצם לרבים בסיומת, לא בקידומת, אז "noun.memberPlural".replace() היה
+  // באג-שפה מובטח (בדיוק כמו שקרה כבר פעם אחת בקובץ הזה עם "משמרות" →
+  // "משמרה" השגוי). קידומות (ה/ל/מ) כן בטוחות לצירוף ישיר — "ה"+"שומרים".
+  "noun.member":       "שומר",
+  "noun.memberPlural": "שומרים",
+
   // ניווט אחמ"ש
   "nav.dashboard":   "לוח בקרה",
   "nav.calendar":    "יומן",
@@ -71,12 +80,23 @@ const BASE = {
  * לא כמה מסכים.
  */
 const PROFILE_TERMS = {
-  // אזרחי — מסעדות, מוקדים, אבטחה. זהה ל-BASE.
-  civil: {},
+  // אבטחה. זהה ל-BASE — כל אוצר המילים הקיים (שומר, משמרת) כבר היה
+  // אבטחה-מוטה מההתחלה, גם כשהפרופיל עוד נקרא "civil" וכיסה גם מסעדנות
+  // ומוקד בבת אחת (מיגרציה 0011 מפרקת את שלושתם).
+  security: {},
+
+  // מסעדנות. "עובד/ים" במקום "שומר/ים" — מילה אחת ששינויה. "משמרת"
+  // עצמה נשארת: היא לא ספציפית לאבטחה, ומלצר/ה גם "עושה משמרת".
+  restaurant: {
+    "noun.member":       "עובד",
+    "noun.memberPlural": "עובדים",
+  },
 
   // צבאי. "סד\"כ" במקום "סידור", "תורנות" במקום "משמרת", ולשון פיקוד
   // במקום לשון שירות: מפקד *מפיץ* סד"כ, הוא לא "שולח לצוות".
   army: {
+    "noun.member":       "כפוף",
+    "noun.memberPlural": "כפופים",
     "nav.shifts":       "בניית סד\"כ",
     "nav.availability": "מי דיווח",
     "nav.smart":        "בנה לי סד\"כ",
@@ -102,10 +122,16 @@ const PROFILE_TERMS = {
 /** התצוגה של הפרופילים במסך הבחירה. הסדר כאן הוא הסדר על המסך. */
 export const PROFILES = [
   {
-    id: "civil",
-    label: "אבטחה, מסעדה או מוקד",
-    hint: "משמרות, סידור שבועי, החלפות בין עובדים",
+    id: "security",
+    label: "אבטחה",
+    hint: "משמרות שמירה, סידור שבועי, החלפות בין שומרים",
     icon: "users",
+  },
+  {
+    id: "restaurant",
+    label: "מסעדנות",
+    hint: "משמרות מטבח והגשה, סידור שבועי, החלפות בין עובדים",
+    icon: "clipboard",
   },
   {
     id: "army",
@@ -120,9 +146,9 @@ const STORE_KEY = "gs-profile";
 const readStored = () => {
   try {
     const v = localStorage.getItem(STORE_KEY);
-    return PROFILE_TERMS[v] ? v : "civil";
+    return PROFILE_TERMS[v] ? v : "security";
   } catch {
-    return "civil";
+    return "security";
   }
 };
 
@@ -144,7 +170,7 @@ export function subscribeTerms(fn) {
 
 /** נקרא בטעינת הצוות ובכל החלפת פרופיל. */
 export function setTermProfile(profile) {
-  const next = PROFILE_TERMS[profile] ? profile : "civil";
+  const next = PROFILE_TERMS[profile] ? profile : "security";
   if (next === active) return;
   active = next;
   terms = { ...BASE, ...PROFILE_TERMS[active] };

@@ -80,10 +80,10 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
 
   // A brand-new team sees a checklist instead of a wall of zeroes.
   const steps = [
-    { done: guards.length > 0, label: "הוסף שומרים לצוות", hint: "שתף את קוד הצוות או הוסף ידנית", to: "team" },
+    { done: guards.length > 0, label: `הוסף ${t("noun.memberPlural")} לצוות`, hint: "שתף את קוד הצוות או הוסף ידנית", to: "team" },
     { done: shifts.length > 0, label: "הגדר את משמרות השבוע", hint: 'יש כפתור "מלא שבוע" שעושה זאת בלחיצה', to: "shifts" },
-    { done: shifts.some((s) => s.assignedGuards.length > 0), label: "שבץ שומרים למשמרות", hint: "הרץ את השיבוץ החכם", to: "smart" },
-    { done: published > 0, label: "פרסם את הסידור", hint: "רק אחרי פרסום השומרים רואים אותו", to: "schedule" },
+    { done: shifts.some((s) => s.assignedGuards.length > 0), label: `שבץ ${t("noun.memberPlural")} למשמרות`, hint: "הרץ את השיבוץ החכם", to: "smart" },
+    { done: published > 0, label: "פרסם את הסידור", hint: `רק אחרי פרסום ה${t("noun.memberPlural")} רואים אותו`, to: "schedule" },
   ];
   const doneCount = steps.filter((s) => s.done).length;
   const isNew = doneCount < steps.length;
@@ -158,7 +158,7 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard title="שומרים בצוות" value={guards.length} icon="users" tone="brand" onClick={() => onNavigate("team")} />
+        <StatCard title={`${t("noun.memberPlural")} בצוות`} value={guards.length} icon="users" tone="brand" onClick={() => onNavigate("team")} />
         <StatCard
           title="משמרות היום"
           value={todayShifts.length}
@@ -221,10 +221,10 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
         <Card>
           <h2 className="font-bold text-content mb-4 flex items-center gap-2">
             <Icon name="users" size={17} className="text-muted" />
-            עומס השומרים
+            עומס ה{t("noun.memberPlural")}
           </h2>
           {loadRows.length === 0 ? (
-            <p className="text-muted text-sm text-center py-8">אין שומרים עדיין</p>
+            <p className="text-muted text-sm text-center py-8">אין {t("noun.memberPlural")} עדיין</p>
           ) : (
             <div className="space-y-3">
               {loadRows.map((row) => (
@@ -259,6 +259,9 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
 // ============================================================
 
 export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = [], embedded = false }) {
+  // תחום הפעילות מוחל מ-useGuardian (setTermProfile), לא מפרופ שהמסך הזה
+  // לא מקבל — אותה קריאה בדיוק ש-ProfilePicker כבר משתמש בה.
+  const mode = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [spreadFrom, setSpreadFrom] = useState(null); // date whose layout is being copied
@@ -631,7 +634,7 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
                     {s.startTime}–{s.endTime}
                   </span>
                   <span className="text-faint mr-auto" data-numeric>
-                    {s.requiredGuards} שומרים
+                    {s.requiredGuards} {t("noun.memberPlural")}
                   </span>
                 </div>
               ))}
@@ -752,7 +755,7 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
             <Field label="מיקום">
               <Input value={form.location} onChange={field("location")} />
             </Field>
-            <Field label="שומרים נדרשים">
+            <Field label={`${t("noun.memberPlural")} נדרשים`}>
               <Input
                 type="number"
                 min="1"
@@ -777,9 +780,9 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
             />
             {/* datalist ולא select: קטגוריה מוכרת מוצעת, ושם חדש עדיין
               * מותר — אותו דפוס הקלט של תיקיית המשימה. קריאה יחידה:
-              * `categoryOptions(shifts, tasks)`, הטקסונומיה המשותפת. */}
+              * `categoryOptions(shifts, tasks, mode)`, הטקסונומיה המשותפת. */}
             <datalist id="shift-categories">
-              {categoryOptions(shifts, tasks).map((n) => (
+              {categoryOptions(shifts, tasks, mode).map((n) => (
                 <option key={n} value={n} />
               ))}
             </datalist>
@@ -817,7 +820,7 @@ export function AvailView({ guards, shifts, availability, weekDates, embedded = 
         <EmptyState
           icon="calendar"
           title="אין משמרות בשבוע הזה"
-          body="צור משמרות כדי שהשומרים יוכלו להגיש זמינות."
+          body={`צור משמרות כדי שה${t("noun.memberPlural")} יוכלו להגיש זמינות.`}
         />
       </div>
     );
@@ -832,7 +835,7 @@ export function AvailView({ guards, shifts, availability, weekDates, embedded = 
 
       {submitted.length < guards.length && (
         <Alert tone="info">
-          {guards.length - submitted.length} שומרים טרם הגישו זמינות לשבוע הזה:{" "}
+          {guards.length - submitted.length} {t("noun.memberPlural")} טרם הגישו זמינות לשבוע הזה:{" "}
           <strong>
             {guards.filter((g) => !submitted.includes(g)).map((g) => g.name).join(", ")}
           </strong>
@@ -846,11 +849,11 @@ export function AvailView({ guards, shifts, availability, weekDates, embedded = 
           <Card key={date} className="overflow-x-auto">
             <h3 className="font-bold text-content mb-3">{formatDateHe(date)}</h3>
             <table className="w-full text-sm min-w-[420px]">
-              <caption className="sr-only">זמינות השומרים ל{formatDateHe(date)}</caption>
+              <caption className="sr-only">זמינות ה{t("noun.memberPlural")} ל{formatDateHe(date)}</caption>
               <thead>
                 <tr className="border-b border-hairline">
                   <th scope="col" className="text-right py-2 px-3 font-medium text-muted">
-                    שומר
+                    {t("noun.member")}
                   </th>
                   {dayShifts.map((s) => (
                     <th key={s.id} scope="col" className="text-center py-2 px-3 font-medium text-muted">
@@ -947,7 +950,7 @@ export function AssignView({
     <div className="space-y-6">
       <PageHeader
         title={embedded ? null : t("nav.assignment")}
-        subtitle="לחץ על שומר כדי לשבץ או להסיר"
+        subtitle={`לחץ על ${t("noun.member")} כדי לשבץ או להסיר`}
         actions={
           embedded ? null : (
             <Btn variant="outline" icon="zap" onClick={() => onNavigate("smart")}>
@@ -1050,7 +1053,7 @@ export function AssignView({
               </div>
               <div className="p-4">
                 {guards.length === 0 ? (
-                  <p className="text-muted text-sm text-center py-4">אין שומרים בצוות</p>
+                  <p className="text-muted text-sm text-center py-4">אין {t("noun.memberPlural")} בצוות</p>
                 ) : (
                   <>
                     <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
@@ -1263,7 +1266,7 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
         <>
           {unassigned > 0 && (
             <Alert tone="warn">
-              {unassigned} משמרות עדיין לא מאוישות במלואן. אפשר לפרסם בכל זאת — השומרים יראו אותן
+              {unassigned} משמרות עדיין לא מאוישות במלואן. אפשר לפרסם בכל זאת — ה{t("noun.memberPlural")} יראו אותן
               כפתוחות.
             </Alert>
           )}
@@ -1366,7 +1369,7 @@ export function SwapMgmt({ guards, shifts, availability = {}, swapRequests, acti
     const shift = shifts.find((x) => x.id === r.shiftId);
     const guard = guards.find((g) => g.id === r.toGuard);
     if (!shift || !guard) {
-      return { ok: false, reason: "המשמרת או המאבטח כבר לא קיימים" };
+      return { ok: false, reason: `המשמרת או ה${t("noun.member")} כבר לא קיימים` };
     }
     return checkAssignment({ guard, shift, shifts, availability, tasks });
   };
@@ -1380,7 +1383,7 @@ export function SwapMgmt({ guards, shifts, availability = {}, swapRequests, acti
         <EmptyState
           icon="swap"
           title={`אין ${t("nav.swaps")}`}
-          body="כשמאבטח יבקש להחליף משמרת, הבקשה תופיע כאן לאישורך."
+          body={`כש${t("noun.member")} יבקש להחליף משמרת, הבקשה תופיע כאן לאישורך.`}
         />
       ) : (
         [...pending, ...resolved].map((r) => {
@@ -1468,17 +1471,53 @@ const PRIORITY = {
  * תיקיות ובלי הרשאות. הרשימה כאן היא רק קיצור דרך לשמות הנפוצים —
  * מי שכותב שם אחר מקבל תיקייה חדשה באותה מידה.
  */
-const FOLDERS = [
-  { name: "שמירות", icon: "shield" },
-  { name: "סיור", icon: "target" },
-  { name: "מטבח", icon: "inbox" },
-  { name: "ציוד", icon: "wrench" },
-  { name: "ניקיון", icon: "sparkles" },
-  { name: "כללי", icon: "clipboard" },
-];
+// תיקיות מוצעות לפי תחום פעילות (מיגרציה 0011 — אבטחה/מסעדנות/צבא). לפני
+// הפיצול הזה הייתה כאן רשימה אחת שהתאימה לכולם בערך ולאף אחד בדיוק —
+// "מטבח" ו"ניקיון" מוצעים למסעדה, "שמירות" ו"סיור" לאבטחה, לא ההפך.
+// "כללי" (UNFILED) קבוע בסוף כל רשימה: הוא הדלי-ברירת-מחדל שכל משימה
+// לא-מסווגת נופלת אליו, לא קטגוריה דומיינית, ולכן לא יכול להשתנות
+// לפי תחום.
+const FOLDERS_BY_MODE = {
+  security: [
+    { name: "שמירות", icon: "shield" },
+    { name: "סיור", icon: "target" },
+    { name: "עמדה קבועה", icon: "pin" },
+    { name: "ציוד אבטחה", icon: "wrench" },
+    { name: "דוח משמרת", icon: "clipboard" },
+    { name: "כללי", icon: "clipboard" },
+  ],
+  restaurant: [
+    { name: "מטבח", icon: "inbox" },
+    { name: "הגשה", icon: "users" },
+    { name: "בר", icon: "star" },
+    { name: "קופה", icon: "briefcase" },
+    { name: "מלאי והזמנות", icon: "trending" },
+    { name: "ניקיון", icon: "sparkles" },
+    { name: "כללי", icon: "clipboard" },
+  ],
+  army: [
+    { name: "תורנות שמירה", icon: "shield" },
+    { name: "סיור", icon: "target" },
+    { name: "תורנות מטבח", icon: "inbox" },
+    { name: "אימונים", icon: "zap" },
+    { name: "ניקיון", icon: "sparkles" },
+    { name: "כללי", icon: "clipboard" },
+  ],
+};
+const DEFAULT_MODE = "security";
+const foldersFor = (mode) => FOLDERS_BY_MODE[mode] || FOLDERS_BY_MODE[DEFAULT_MODE];
 
 const UNFILED = "כללי";
-const folderIcon = (name) => FOLDERS.find((f) => f.name === name)?.icon || "clipboard";
+// מחפש בכל הרשימות ולא רק בזו של התחום הפעיל: קטגוריה שמישהו הקליד ביד
+// (או שהגיעה מתחום אחר לפני שהצוות עבר פרופיל) עדיין צריכה אייקון סביר,
+// לא רק "clipboard" גנרי כברירת מחדל.
+const folderIcon = (name) => {
+  for (const list of Object.values(FOLDERS_BY_MODE)) {
+    const hit = list.find((f) => f.name === name);
+    if (hit) return hit.icon;
+  }
+  return "clipboard";
+};
 
 /**
  * טקסונומיית הקטגוריות המשותפת (D-01).
@@ -1488,9 +1527,12 @@ const folderIcon = (name) => FOLDERS.find((f) => f.name === name)?.icon || "clip
  * משמרת יראה אותה מוצעת כשהוא מצמצם כשירות למישהו, ושתי המסכים לא ייסחפו
  * לשתי טקסונומיות ששתיהן רק *נראות* דומות.
  *
- * קריאה: `categoryOptions(shifts, tasks)` — שני הארגומנטים ברירת מחדל
- * למערך ריק, והפונקציה שורדת גם ערך לא-מערך (`null`/`undefined`) בכל אחד
- * מהם, כי היא נקראת מארבעה רכיבים עם ארבע זמינויות פרופס שונות.
+ * קריאה: `categoryOptions(shifts, tasks, mode)` — שלושת הארגומנטים ברירת
+ * מחדל (מערך ריק, מערך ריק, "security"), והפונקציה שורדת גם ערך לא-מערך
+ * (`null`/`undefined`) ב-shifts/tasks, כי היא נקראת מארבעה רכיבים עם ארבע
+ * זמינויות פרופס שונות. `mode` קובע איזו רשימת הצעה (FOLDERS_BY_MODE)
+ * פותחת את הרשימה — לא אילו קטגוריות מותרות: קטגוריה שנוצרה תחת תחום אחד
+ * ממשיכה להופיע (דרך `used`) גם אם הצוות עבר תחום אחר כך.
  *
  * הסדר קבוע ואינו מסדר איטרציה גולמי של Set: קודם התיקיות המוצעות לפי
  * סדרן המוצהר, ואחריהן כל שם שנמצא בפועל במשמרות/משימות ואינו אחת מהן,
@@ -1503,7 +1545,7 @@ const folderIcon = (name) => FOLDERS.find((f) => f.name === name)?.icon || "clip
  * היא לא מסננת לפי שימוש כמו החישוב `folders` של `TaskMgmt` למטה (שכן
  * מקבץ שורות אמיתיות ולכן חייב לסנן).
  */
-export const categoryOptions = (shifts = [], tasks = []) => {
+export const categoryOptions = (shifts = [], tasks = [], mode = DEFAULT_MODE) => {
   const used = new Set();
   for (const item of shifts || []) {
     if (item?.category) used.add(item.category);
@@ -1511,7 +1553,7 @@ export const categoryOptions = (shifts = [], tasks = []) => {
   for (const item of tasks || []) {
     if (item?.category) used.add(item.category);
   }
-  const known = FOLDERS.map((f) => f.name);
+  const known = foldersFor(mode).map((f) => f.name);
   const custom = [...used].filter((n) => !known.includes(n)).sort();
   return [...known, ...custom];
 };
@@ -1724,7 +1766,7 @@ function TaskRow({ task, busy, actions, guards, onEdit }) {
 
 export function TaskMgmt({
   guards, tasks, weekDates, actions, busy,
-  templates = [], compatibility = [], mode = "civil", shifts = [],
+  templates = [], compatibility = [], mode = "security", shifts = [],
 }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -1872,8 +1914,9 @@ export function TaskMgmt({
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(task);
     }
-    const known = FOLDERS.map((f) => f.name).filter((n) => map.has(n));
-    const custom = [...map.keys()].filter((n) => !FOLDERS.some((f) => f.name === n)).sort();
+    const folderNames = foldersFor(mode).map((f) => f.name);
+    const known = folderNames.filter((n) => map.has(n));
+    const custom = [...map.keys()].filter((n) => !folderNames.includes(n)).sort();
     return [...known, ...custom].map((name) => {
       const items = map.get(name);
       const open = items.filter((t) => t.status !== "done");
@@ -1959,7 +2002,7 @@ export function TaskMgmt({
         <EmptyState
           icon="clipboard"
           title="אין עדיין משימות"
-          body="משימה נשמרת בתיקייה — שמירות, סיור, מטבח — עם טווח תאריכים והאנשים שמבצעים אותה."
+          body={`משימה נשמרת בתיקייה — ${foldersFor(mode).slice(0, 3).map((f) => f.name).join(", ")} — עם טווח תאריכים והאנשים שמבצעים אותה.`}
           action={
             <Btn icon="plus" onClick={openNew}>
               משימה ראשונה
@@ -2103,7 +2146,7 @@ export function TaskMgmt({
               * על משמרת חייבת להיות מוצעת כאן, כדי שהטקסונומיה שממנה
               * מנהל מצמצם כשירות תהיה בדיוק זו שממנה הוא משבץ. */}
             <datalist id="task-folders">
-              {categoryOptions(shifts, tasks).map((n) => (
+              {categoryOptions(shifts, tasks, mode).map((n) => (
                 <option key={n} value={n} />
               ))}
             </datalist>
@@ -2311,7 +2354,7 @@ function DeadlineSettings({ team, actions, busy }) {
         עד מתי אפשר להגיש
       </h2>
       <p className="text-sm text-muted mb-4">
-        השומרים רואים ספירה לאחור, וההתראה מתחדדת ככל שהמועד מתקרב.
+        ה{t("noun.memberPlural")} רואים ספירה לאחור, וההתראה מתחדדת ככל שהמועד מתקרב.
       </p>
 
       <div className="grid grid-cols-2 gap-3 max-w-sm">
@@ -2349,7 +2392,7 @@ function DeadlineSettings({ team, actions, busy }) {
           {dayName(toISODate(preview))}, {preview.toLocaleDateString("he-IL")} בשעה{" "}
           {String(hour).padStart(2, "0")}:00
         </b>
-        . אפשר לפטור שומר מסוים דרך אייקון הפעמון ברשימה למטה.
+        . אפשר לפטור {t("noun.member")} מסוים דרך אייקון הפעמון ברשימה למטה.
       </Alert>
     </Card>
   );
@@ -2362,8 +2405,10 @@ function DeadlineSettings({ team, actions, busy }) {
  * שמשנה את אוצר המילים של כל המוצר. המבנה נשאר זהה בכל הפרופילים; מפקד
  * ואחמ"ש עושים בדיוק את אותם ארבעה שלבים, רק קוראים להם אחרת.
  *
- * הבחירה נשמרת מקומית ולא בשרת: היא מאפיין של מי שמסתכל, לא של הצוות, ואין
- * סיבה שהחלפה אצל אחד תשנה את המסך של אחר. חוץ מזה היא לא דורשת מיגרציה.
+ * הבחירה נשמרת על הצוות עצמו (updateTeamSettings, gs_teams.mode) ולא
+ * מקומית: היא תכונה של הצוות, לא של מי שמסתכל, ולכן כל השותפים רואים
+ * את אותו אוצר מילים. `fallback` (למטה) הוא רק הגשר לרגע שבין טעינת
+ * המסך לטעינת הצוות, לא מקור אמת חלופי.
  */
 function ProfilePicker({ team, actions, busy }) {
   // מקור האמת הוא הצוות. `termProfile` נשאר כגיבוי לרגע שבין טעינת המסך
@@ -2383,7 +2428,7 @@ function ProfilePicker({ team, actions, busy }) {
           הבחירה חלה על כל הצוות — לא רק על המכשיר הזה.
         </span>
       </p>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         {PROFILES.map((p) => {
           const on = p.id === active;
           return (
@@ -2426,7 +2471,7 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts
   // ---- עורך כשירות (QUAL-01, QUAL-02, D-03, D-04) ----
   // אותה טקסונומיה בדיוק שטופס המשמרת וטופס המשימה קוראים ממנה (D-01),
   // כדי שמנהל שמצמצם כאן יראה בדיוק את מה שהוא הציע במקום אחר.
-  const categories = categoryOptions(shifts, tasks);
+  const categories = categoryOptions(shifts, tasks, team?.mode);
   const [qualEditing, setQualEditing] = useState(null); // guard object, or null
   const [qualSelection, setQualSelection] = useState([]);
 
@@ -2487,7 +2532,7 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts
   const code = user.teamCode;
   const shareMsg = `שלום! מזמין אותך להצטרף למערכת NexRota של הצוות.
 קוד הצוות שלנו: ${code}
-נכנסים לאפליקציה, בוחרים "מאבטח" ומזינים את הקוד ואת השם המלא.`;
+נכנסים לאפליקציה, בוחרים "${t("noun.member")}" ומזינים את הקוד ואת השם המלא.`;
 
   const copy = (what, text) => async () => {
     try {
@@ -2508,7 +2553,7 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("nav.team")} subtitle={team?.name || "נהל שומרים ושתף את קוד הצוות"} />
+      <PageHeader title={t("nav.team")} subtitle={team?.name || `נהל ${t("noun.memberPlural")} ושתף את קוד הצוות`} />
 
       <ProfilePicker team={team} actions={actions} busy={busy} />
 
@@ -2522,7 +2567,7 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts
               קוד הצוות
             </h2>
             <p className="text-sm text-muted max-w-xs">
-              זה כל מה שמאבטח צריך כדי להיכנס — בלי סיסמה ובלי הרשמה
+              זה כל מה ש{t("noun.member")} צריך כדי להיכנס — בלי סיסמה ובלי הרשמה
             </p>
           </div>
           <div className="text-center">
@@ -2558,10 +2603,10 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts
       <Card>
         <h2 className="font-bold text-content mb-3 flex items-center gap-2">
           <Icon name="plus" size={17} className="text-muted" />
-          הוסף שומר ידנית
+          הוסף {t("noun.member")} ידנית
         </h2>
         <p className="text-xs text-muted mb-3">
-          שומר שהוספת כאן יוכל להיכנס עם קוד הצוות ואותו שם בדיוק, והפרופיל יתחבר אליו אוטומטית.
+          {t("noun.member")} שהוספת כאן יוכל להיכנס עם קוד הצוות ואותו שם בדיוק, והפרופיל יתחבר אליו אוטומטית.
         </p>
         <form
           onSubmit={(e) => {
@@ -2574,7 +2619,7 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="שם מלא"
-            aria-label="שם מלא של השומר"
+            aria-label={`שם מלא של ה${t("noun.member")}`}
             className="flex-1 min-w-[150px]"
           />
           <Input
@@ -2595,7 +2640,7 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts
         <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
           <h2 className="font-bold text-content flex items-center gap-2">
             <Icon name="users" size={17} className="text-muted" />
-            שומרים ({guards.length})
+            {t("noun.memberPlural")} ({guards.length})
           </h2>
           {guards.length === 0 && onSeedDemo && (
             <Btn variant="outline" size="sm" icon="sparkles" onClick={onSeedDemo} loading={busy}>
@@ -2605,7 +2650,7 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts
         </div>
         {guards.length === 0 ? (
           <p className="text-muted text-sm text-center py-8">
-            אין שומרים עדיין — שתף את קוד הצוות או הוסף ידנית
+            אין {t("noun.memberPlural")} עדיין — שתף את קוד הצוות או הוסף ידנית
           </p>
         ) : (
           <ul className="space-y-2">

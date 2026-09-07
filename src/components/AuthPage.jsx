@@ -5,7 +5,7 @@ import ThemeToggle from "./ThemeToggle.jsx";
 import LiveSchedulePreview from "./LiveSchedulePreview.jsx";
 import AuthGradientBackdrop from "./AuthGradientBackdrop.jsx";
 import { Alert, Btn, Field, Input, Spinner } from "./ui.jsx";
-import { PROFILES, setTermProfile } from "../lib/terms.js";
+import { PROFILES, setTermProfile, t } from "../lib/terms.js";
 
 // ============================================================
 // מסך הכניסה.
@@ -317,7 +317,7 @@ export default function AuthPage({
 
   const [form, setForm] = useState({
     email: "", password: "", fullName: "", teamName: "", confirm: "", teamCode: "", guardName: "",
-    profile: "civil",
+    profile: "security",
   });
 
   const set = (key) => (e) => {
@@ -438,7 +438,7 @@ export default function AuthPage({
       <DoorCard
         icon="shield"
         tone="bg-accent/12 text-accent ring-1 ring-inset ring-accent/25"
-        title="מאבטח"
+        title={t("noun.member")}
         body="מגיש זמינות וצופה בסידור — כניסה עם קוד צוות בלבד"
         onClick={go("guard")}
       />
@@ -718,7 +718,7 @@ export default function AuthPage({
 
               {mode === "guard" && (
                 <Panel
-                  title="כניסת מאבטח"
+                  title={`כניסת ${t("noun.member")}`}
                   subtitle="בלי סיסמה — רק הקוד שקיבלת ממנהל המשמרת והשם שלך"
                   onBack={go(null)}
                   onSubmit={submitJoin}

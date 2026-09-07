@@ -227,7 +227,7 @@ export default function SupervisorApp({ state }) {
         busy={busy}
         templates={taskTemplates}
         compatibility={compatibility}
-        mode={team?.mode || "civil"}
+        mode={team?.mode || "security"}
         shifts={shifts}
       />
     ),
@@ -427,7 +427,7 @@ export default function SupervisorApp({ state }) {
 
       <Modal open={welcome} onClose={dismissWelcome} title="הצוות שלך מוכן">
         <p className="text-sm text-muted mb-4">
-          שלח את הקוד הזה למאבטחים. הם נכנסים לאפליקציה, בוחרים "מאבטח", מזינים את הקוד ואת שמם —
+          שלח את הקוד הזה ל{t("noun.memberPlural")}. הם נכנסים לאפליקציה, בוחרים "{t("noun.member")}", מזינים את הקוד ואת שמם —
           בלי סיסמה ובלי הרשמה.
         </p>
         <div className="bg-brand/10 ring-1 ring-inset ring-brand/30 rounded-2xl p-5 text-center mb-4">

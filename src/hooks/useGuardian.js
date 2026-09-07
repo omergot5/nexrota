@@ -93,7 +93,7 @@ export function useGuardian() {
   // אותו: כך הוא נכון גם בטעינה ראשונה, גם מהמטמון הלא-מקוון, וגם כששותף
   // אחר החליף אותו וההודעה הגיעה ב-realtime.
   useEffect(() => {
-    setTermProfile(data.team?.mode || "civil");
+    setTermProfile(data.team?.mode || "security");
   }, [data.team?.mode]);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);

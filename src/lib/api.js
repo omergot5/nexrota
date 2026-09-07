@@ -21,6 +21,11 @@ import { shiftTone } from "../design/shiftPalette.js";
 const SITE_URL =
   import.meta.env?.VITE_SITE_URL || "https://nexrota-omergot5s-projects.vercel.app";
 
+// תואם בדיוק את ה-check constraint על gs_teams.mode (מיגרציה 0011). לא
+// מיובא מ-terms.js בכוונה — זו שכבת הנתונים, וטרמינולוגיית תצוגה שייכת
+// לשכבה שמעליה; שני המקומות משקפים באופן עצמאי את אותו constraint.
+const VALID_MODES = ["army", "security", "restaurant"];
+
 // ---------- row <-> app mappers ----------
 
 const hhmm = (t) => String(t || "").slice(0, 5);
@@ -349,7 +354,10 @@ export async function loadTeam(teamCode) {
           reminders: teamRes.data.avail_reminders !== false,
           // תחום הפעילות חי על הצוות ולא בדפדפן: אחרת כל אדם היה רואה
           // מילון מונחים אחר, ושיחה על "תורנות" מול "משמרת" הופכת לבלבול.
-          mode: teamRes.data.mode === "army" ? "army" : "civil",
+          // שלושת הערכים תואמים בדיוק את ה-check constraint על gs_teams.mode
+          // (מיגרציה 0011) — ערך לא מוכר (שורה ישנה, DB לא מעודכן) נופל
+          // ל-security, לא צונח בשקט ל"civil" שכבר לא קיים.
+          mode: VALID_MODES.includes(teamRes.data.mode) ? teamRes.data.mode : "security",
         }
       : null,
     members: profiles,
@@ -374,7 +382,7 @@ export async function loadTeam(teamCode) {
 const templateFromRow = (row) => ({
   id: row.id,
   teamCode: row.team_code || null,
-  mode: row.mode || "civil",
+  mode: row.mode || "security",
   title: row.title,
   category: row.category,
   icon: row.icon || "clipboard",
@@ -564,7 +572,7 @@ export async function updateTeamSettings(teamCode, { deadlineDays, deadlineHour,
   if (deadlineDays !== undefined) patch.avail_deadline_days = deadlineDays;
   if (deadlineHour !== undefined) patch.avail_deadline_hour = deadlineHour;
   if (reminders !== undefined) patch.avail_reminders = reminders;
-  if (mode !== undefined) patch.mode = mode === "army" ? "army" : "civil";
+  if (mode !== undefined) patch.mode = VALID_MODES.includes(mode) ? mode : "security";
 
   // `.select()` ולא עדכון עיוור: כש-RLS מסננת את כל השורות, Supabase מחזירה
   // `error: null` ומערך ריק — כלומר "הצלחה" שלא כתבה כלום. בלי הבדיקה הזאת

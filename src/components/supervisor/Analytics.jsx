@@ -79,12 +79,12 @@ export default function AnalyticsDash({ guards, shifts, tasks = [] }) {
     <div className="space-y-6">
       <PageHeader
         title={t("nav.analytics")}
-        subtitle={`${table.totalAssigned} שיבוצים · ${table.guardCount} שומרים · ${t("unit.load")} ממוצע ${table.meanLoad}`}
+        subtitle={`${table.totalAssigned} שיבוצים · ${table.guardCount} ${t("noun.memberPlural")} · ${t("unit.load")} ממוצע ${table.meanLoad}`}
       />
 
       <div className="grid lg:grid-cols-2 gap-5">
         <Card>
-          <h2 className="font-bold text-content mb-4">משמרות לפי שומר</h2>
+          <h2 className="font-bold text-content mb-4">משמרות לפי {t("noun.member")}</h2>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={table.rows} layout="vertical" margin={{ right: 8, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={grid} />
@@ -144,15 +144,15 @@ export default function AnalyticsDash({ guards, shifts, tasks = [] }) {
       </div>
 
       <Card className="overflow-x-auto">
-        <h2 className="font-bold text-content mb-4">פירוט לפי שומר</h2>
+        <h2 className="font-bold text-content mb-4">פירוט לפי {t("noun.member")}</h2>
         <table className="w-full text-sm min-w-[680px]">
           <caption className="sr-only">
-            פירוט נטל, משמרות, שעות ותג הוגנות לכל שומר, ממוין מהעמוס ביותר בנטל
+            פירוט נטל, משמרות, שעות ותג הוגנות לכל {t("noun.member")}, ממוין מהעמוס ביותר בנטל
           </caption>
           <thead>
             <tr className="border-b border-hairline">
               {[
-                "שומר",
+                t("noun.member"),
                 t("unit.load"),
                 "בוקר/יום",
                 "צהריים",
@@ -165,7 +165,7 @@ export default function AnalyticsDash({ guards, shifts, tasks = [] }) {
                 <th
                   key={h}
                   scope="col"
-                  className={`py-2 px-3 font-medium text-muted ${h === "שומר" ? "text-right" : "text-center"}`}
+                  className={`py-2 px-3 font-medium text-muted ${h === t("noun.member") ? "text-right" : "text-center"}`}
                 >
                   {h}
                 </th>

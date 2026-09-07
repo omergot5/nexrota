@@ -102,7 +102,7 @@ function RulesPanel({ rules, setRules, open, onClose }) {
         {toggle(
           "honourPreferences",
           'להתחשב במי שסימן "מעדיף"',
-          "מכריע בין שני שומרים פנויים — לא גובר על הוגנות או על כלל קשיח"
+          `מכריע בין שני ${t("noun.memberPlural")} פנויים — לא גובר על הוגנות או על כלל קשיח`
         )}
       </div>
     </Modal>
@@ -290,8 +290,8 @@ export default function SmartAssign({
         {header}
         <EmptyState
           icon="users"
-          title="אין עדיין שומרים בצוות"
-          body={`כדי לשבץ צריך לפחות שומר אחד. הוסף שומרים במסך "${t("nav.team")}", או שתף איתם את קוד הצוות כדי שיצטרפו בעצמם.`}
+          title={`אין עדיין ${t("noun.memberPlural")} בצוות`}
+          body={`כדי לשבץ צריך לפחות ${t("noun.member")} אחד. הוסף ${t("noun.memberPlural")} במסך "${t("nav.team")}", או שתף איתם את קוד הצוות כדי שיצטרפו בעצמם.`}
         />
       </div>
     );
@@ -316,7 +316,7 @@ export default function SmartAssign({
     <div className="space-y-6">
       <PageHeader
         title={embedded ? null : t("nav.smart")}
-        subtitle={`${rangeLabelHe(weekDates)} · ${weekShifts.length} ${t("unit.shifts")} · ${guards.length} שומרים`}
+        subtitle={`${rangeLabelHe(weekDates)} · ${weekShifts.length} ${t("unit.shifts")} · ${guards.length} ${t("noun.memberPlural")}`}
         actions={
           <>
             <Btn variant="outline" icon="sliders" onClick={() => setShowRules(true)}>
@@ -339,7 +339,7 @@ export default function SmartAssign({
           />
           <div className="flex-1 min-w-[16rem]">
             <p className="text-sm font-semibold text-content">
-              {submittedCount} מתוך {guards.length} שומרים הגישו זמינות לשבוע הזה
+              {submittedCount} מתוך {guards.length} {t("noun.memberPlural")} הגישו זמינות לשבוע הזה
             </p>
             <p className="text-xs text-muted mt-0.5">
               {allSubmitted
@@ -376,7 +376,7 @@ export default function SmartAssign({
         <div className="space-y-6 animate-fade-up">
           {applied && (
             <Alert tone="accent" onClose={() => setApplied(false)}>
-              השיבוץ הוחל. אפשר לפרסם אותו לשומרים במסך "{t("nav.schedule")}".
+              השיבוץ הוחל. אפשר לפרסם אותו ל{t("noun.memberPlural")} במסך "{t("nav.schedule")}".
             </Alert>
           )}
 
@@ -478,7 +478,7 @@ export default function SmartAssign({
           <Card>
             <h2 className="font-bold text-content mb-1">חלוקת העומס המוצעת</h2>
             <p className="text-xs text-muted mb-4" data-numeric>
-              ממוצע {plan.fairness.loadMean} {t("unit.load")} לשומר · יעד {plan.summary.targetPerGuard}{" "}
+              ממוצע {plan.fairness.loadMean} {t("unit.load")} ל{t("noun.member")} · יעד {plan.summary.targetPerGuard}{" "}
               {t("unit.shifts")}
             </p>
             <div className="space-y-3">
@@ -520,7 +520,7 @@ export default function SmartAssign({
 
           <div>
             <h2 className="font-bold text-content mb-3">
-              הסידור המוצע — לחץ על שומר כדי לראות למה נבחר
+              הסידור המוצע — לחץ על {t("noun.member")} כדי לראות למה נבחר
             </h2>
             <div className="space-y-4">
               {weekDates.map((date) => {
@@ -640,7 +640,7 @@ export default function SmartAssign({
                       ))}
                       {u.blockers.length > 6 && (
                         <p className="text-[11px] text-faint">
-                          ועוד {u.blockers.length - 6} שומרים…
+                          ועוד {u.blockers.length - 6} {t("noun.memberPlural")}…
                         </p>
                       )}
                     </div>
