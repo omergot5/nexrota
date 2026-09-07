@@ -51,7 +51,7 @@ function NextDuty({ shift, mates }) {
   const started = start <= Date.now();
   return (
     <div
-      className="rounded-3xl p-5 shadow-xl relative overflow-hidden animate-fade-up"
+      className="rounded-3xl p-6 shadow-xl relative overflow-hidden animate-fade-up"
       style={{ background: color, color: ink }}
     >
       <p className="text-[11px] font-bold uppercase tracking-[0.15em] opacity-75">
@@ -107,7 +107,7 @@ function FairnessLine({ mine }) {
     { label: "נטל", value: Math.round(mine.load), target: target.load, hint: "לילה וסופ״ש שוקלים יותר" },
   ];
   return (
-    <Card className="p-3.5">
+    <Card>
       <div className="grid grid-cols-3 divide-x divide-x-reverse divide-hairline">
         {rows.map((r) => {
           // סטייה של פחות מחצי יחידה היא רעש חישובי, לא אי־צדק.
@@ -115,14 +115,14 @@ function FairnessLine({ mine }) {
           const tone =
             diff > 0.5 ? "text-warn" : diff < -0.5 ? "text-accent" : "text-content";
           return (
-            <div key={r.label} className="text-center px-2">
-              <p className={`text-xl font-black ${tone}`} data-numeric>
+            <div key={r.label} className="text-center px-3">
+              <p className={`text-2xl font-black ${tone}`} data-numeric>
                 {r.value}
               </p>
-              <p className="text-[11px] font-semibold text-muted mt-0.5" title={r.hint}>
+              <p className="text-xs font-semibold text-muted mt-1" title={r.hint}>
                 {r.label}
               </p>
-              <p className="text-[10px] text-faint" data-numeric>
+              <p className="text-[11px] text-faint mt-0.5" data-numeric>
                 יעד {r.target}
               </p>
             </div>
@@ -259,8 +259,8 @@ function MySchedule({ user, guards, shifts, tasks = [], positions = [] }) {
             {t("positions.mine")}
           </h2>
           <p className="text-xs text-muted mb-3">
-            זו רשימת מה שמותר לך — לא לוח עבודה. מה שאתה בפועל עובד בו השבוע כבר מופיע למעלה בין
-            התורנויות.
+            אלה העמדות שאתה כשיר/ה לעבוד בהן — לא לוח עבודה. עמדה שאתה בפועל עובד/ת בה השבוע כבר
+            מופיעה למעלה, בין התורנויות.
           </p>
           <div className="flex flex-wrap gap-2">
             {myPositions.map((p) => (
@@ -429,7 +429,7 @@ function MyAvailability({ user, team, shifts, availability, actions, busy }) {
                     <span className="text-xs text-muted">{formatDateHe(date)}</span>
                     <div className="flex-1 h-px bg-hairline" />
                   </div>
-                  <div className="grid md:grid-cols-2 gap-3">
+                  <div className="grid md:grid-cols-2 gap-4">
                     {day.map((s) => {
                       const raw = availability[`${user.id}-${s.id}`];
                       const status = availStatus(availability, user.id, s.id);
@@ -438,7 +438,6 @@ function MyAvailability({ user, team, shifts, availability, actions, busy }) {
                       return (
                         <Card
                           key={s.id}
-                          className="p-4"
                           style={{ borderRightColor: s.color, borderRightWidth: 6 }}
                         >
                           <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
@@ -575,7 +574,7 @@ function MySwaps({ user, guards, shifts, availability = {}, swapRequests, action
     <div className="space-y-6">
       <PageHeader
         title="בקשות החלפה"
-        subtitle="בקש ממישהו אחר לקחת משמרת שלך"
+        subtitle="בקש ממישהו אחר לקחת את המשמרת שלך"
         actions={
           <Btn icon="plus" onClick={() => setShowForm(true)} disabled={!myShifts.length}>
             בקשה
@@ -628,7 +627,7 @@ function MySwaps({ user, guards, shifts, availability = {}, swapRequests, action
                       {r.status === "pending" && !check.ok && (
                         <p className="text-xs text-warn mt-1.5 flex items-start gap-1">
                           <Icon name="alert" size={13} className="mt-0.5 flex-shrink-0" />
-                          <span>אי אפשר להסכים: {check.reason}</span>
+                          <span>לא ניתן לאשר: {check.reason}</span>
                         </p>
                       )}
                     </div>
@@ -643,7 +642,7 @@ function MySwaps({ user, guards, shifts, availability = {}, swapRequests, action
                             onClick={() => actions.decideSwap(r, "approved")}
                             disabled={busy || !check.ok}
                           >
-                            מסכים
+                            אשר
                           </Btn>
                           <Btn
                             size="sm"
@@ -652,7 +651,7 @@ function MySwaps({ user, guards, shifts, availability = {}, swapRequests, action
                             onClick={() => actions.decideSwap(r, "rejected")}
                             disabled={busy}
                           >
-                            לא
+                            דחה
                           </Btn>
                         </>
                       )}
@@ -726,7 +725,7 @@ function MySwaps({ user, guards, shifts, availability = {}, swapRequests, action
               ))}
             </Select>
           </Field>
-          <Field label="לבקש מ">
+          <Field label="למי לשלוח את הבקשה">
             <Select value={form.toGuard} onChange={field("toGuard")}>
               <option value="">בחר {t("noun.member")}</option>
               {guards
@@ -828,7 +827,7 @@ export default function GuardApp({ state }) {
       </header>
 
       <div className="flex-1 overflow-auto">
-        <div className="max-w-3xl mx-auto p-3 sm:p-5 pb-24 space-y-5">
+        <div className="max-w-3xl mx-auto p-4 sm:p-6 pb-24 space-y-6">
           {error && (
             <Alert tone="danger" onClose={clearError}>
               {error}
