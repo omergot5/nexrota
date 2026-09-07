@@ -59,7 +59,7 @@ export function loadTable(guards = [], shifts = []) {
 
   const rows = guards
     .map((g) => {
-      const src = perGuard[g.id] || { count: 0, nights: 0, hours: 0, load: 0 };
+      const src = perGuard[g.id] || { count: 0, nights: 0, hours: 0, load: 0, target: { load: avg.load } };
       const byTypeRow = perGuardByType[g.id] || { morning: 0, afternoon: 0, evening: 0 };
       const first = String(g.name || "").split(" ")[0] || g.name || "";
       return {
@@ -70,6 +70,8 @@ export function loadTable(guards = [], shifts = []) {
         nights: src.nights,
         hours: Math.round(src.hours),
         load: round1(src.load),
+        // היעד האישי (חלק משרה) — לא ממוצע הצוות. ר' teamAverages/capacityOf.
+        target: round1(src.target?.load ?? avg.load),
         morning: byTypeRow.morning,
         afternoon: byTypeRow.afternoon,
         evening: byTypeRow.evening,

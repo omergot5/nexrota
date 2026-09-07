@@ -22,7 +22,7 @@
 // ============================================================
 
 import { shiftHours, addDays } from "./dates.js";
-import { shiftLoad } from "./autoAssign.js";
+import { shiftLoad, capacityOf } from "./autoAssign.js";
 
 const round1 = (n) => Math.round(n * 10) / 10;
 
@@ -100,19 +100,28 @@ export function fairnessPlan({ guards = [], history = [], planned = [], until, d
   // מדומות שלא מתאימות לתמהיל האמיתי.
   const perShiftLoad = meanShiftLoad([...history, ...planned]);
 
+  // היעד האישי, לא avgLoad השטוח: חלקו/ה של כל אדם מתוך total לפי חלק
+  // המשרה (capacityOf) — אותה עקרון בדיוק כמו autoAssign.js's
+  // stats.loadTargetPerGuard * capacityOf(guard). כשכולם במשרה מלאה
+  // totalCapacity === active.length וזה בדיוק avgLoad לכולם — אותו חוב
+  // כמו לפני התוספת.
+  const totalCapacity = active.reduce((a, g) => a + capacityOf(g), 0) || 1;
+
   const rows = active
     .map((g) => {
       const carried = past.per[g.id].load;
       const assigned = now[g.id].load;
-      const deficit = avgLoad - (carried + assigned);
+      const target = (total * capacityOf(g)) / totalCapacity;
+      const deficit = target - (carried + assigned);
       return {
         id: g.id,
         name: g.name,
         carried: round1(carried),
         assigned: now[g.id].count,
         nights: past.per[g.id].nights + now[g.id].nights,
+        target: round1(target),
         deficit: round1(deficit),
-        // חוב חיובי = מגיע לו עוד. שלילי = הוא כבר מעל הממוצע.
+        // חוב חיובי = מגיע לו עוד. שלילי = הוא כבר מעל היעד האישי שלו/ה.
         needs: Math.round(deficit / (perShiftLoad || 1)),
       };
     })

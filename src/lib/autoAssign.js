@@ -93,6 +93,23 @@ export function shiftLoad(shift) {
   return shiftHours(shift) * Math.max(base, weekend);
 }
 
+/**
+ * חלק המשרה של השומר/ת, כמכפיל על יעד הנטל — לא אילוץ קשיח. מי שסימן/ה
+ * חצי משרה "מאוזן/ת" כשהיא/הוא נושא/ת כמחצית מהנטל שאדם במשרה מלאה נושא,
+ * לא כמעט אותו נטל. `shiftLoad` הוא היחידה; זה החלק שממנה כל אדם אמור
+ * לקבל — שני חצאים של אותה נוסחה בדיוק (D-01: "shiftLoad הוא יחידת
+ * ההוגנות היחידה במוצר").
+ *
+ * ברירת המחדל (1, משרה מלאה) חלה על כל שומר/ת שהשדה לא הוגדר עבורו/ה —
+ * זה מה שהופך את התוספת הזו לבלתי-מבחינה לכל צוות שלא נגע באפשרות: כשכולם
+ * במשרה מלאה, `capacityOf` תמיד מחזירה 1 לכולם, וכל נוסחה שמכפילה בה
+ * (`stats.loadTargetPerGuard * capacityOf(guard)` וכו') מצטמצמת בדיוק לנוסחה
+ * הישנה בלי חלק המשרה.
+ */
+export function capacityOf(guard) {
+  return guard?.halfTime ? 0.5 : 1;
+}
+
 // ---------- small helpers ----------
 
 const availKey = (guardId, shiftId) => `${guardId}-${shiftId}`;
@@ -328,10 +345,15 @@ function scoreCandidate({ guard, shift, load, availability, rules, stats, check 
     parts.push({ label: "לא הגיש/ה זמינות — שיבוץ ברירת מחדל", points: 5, kind: "availability" });
   }
 
-  // 2. Fairness — the further below the team average, the stronger the pull.
-  // נמדד בנטל ולא בספירת משמרות: מי שעשה שני לילות נשא יותר ממי שעשה שלושה
-  // בקרים, וספירה פשוטה הייתה שולחת אליו את הלילה הבא.
-  const target = Math.max(stats.loadTargetPerGuard, 0.001);
+  // 2. Fairness — the further below the *personal* target, the stronger the
+  // pull. נמדד בנטל ולא בספירת משמרות: מי שעשה שני לילות נשא יותר ממי
+  // שעשה שלושה בקרים, וספירה פשוטה הייתה שולחת אליו את הלילה הבא.
+  //
+  // היעד האישי, לא יעד הצוות: stats.loadTargetPerGuard הוא היעד ליחידת
+  // משרה מלאה אחת; capacityOf(guard) מכווץ אותו לחלק המשרה של השומר/ת
+  // הספציפי/ת הזה/זו. שומר/ת בחצי משרה "מאוזן/ת" בחצי מהנטל של שומר/ת
+  // במשרה מלאה, לא כמעט באותו נטל.
+  const target = Math.max(stats.loadTargetPerGuard * capacityOf(guard), 0.001);
   const fairness = Math.max(0, Math.min(1, 1 - load.load / target));
   const fairnessPts = points(35 * fairness);
   score += fairnessPts;
@@ -339,7 +361,7 @@ function scoreCandidate({ guard, shift, load, availability, rules, stats, check 
     label:
       load.count === 0
         ? "טרם שובץ/ה השבוע"
-        : `נטל נמוך יחסית — ${round(load.load)} מול ממוצע ${round(stats.loadTargetPerGuard)}`,
+        : `נטל נמוך יחסית — ${round(load.load)} מול יעד אישי ${round(target)}`,
     points: fairnessPts,
     kind: "fairness",
   });
@@ -347,7 +369,7 @@ function scoreCandidate({ guard, shift, load, availability, rules, stats, check 
   // 3. Night rotation — measured against the team's expected share of nights,
   //    not against the hard cap, or nights pile onto whoever is free first.
   if (shift.type === "night") {
-    const nightTarget = Math.max(stats.nightTargetPerGuard, 0.001);
+    const nightTarget = Math.max(stats.nightTargetPerGuard * capacityOf(guard), 0.001);
     const nightFair = Math.max(0, Math.min(1, 1 - load.nights / nightTarget));
     const nightPts = points(22 * nightFair);
     score += nightPts;
@@ -355,7 +377,7 @@ function scoreCandidate({ guard, shift, load, availability, rules, stats, check 
       label:
         load.nights === 0
           ? "טרם שובץ/ה ללילה השבוע"
-          : `${load.nights} לילות עד כה מול ממוצע ${round(stats.nightTargetPerGuard)}`,
+          : `${load.nights} לילות עד כה מול יעד אישי ${round(nightTarget)}`,
       points: nightPts,
       kind: "night",
     });
@@ -518,12 +540,21 @@ export function autoAssign({
       .map((g) => g.id)
   );
 
+  // סכום חלקי המשרה של הצוות הפעיל — לא ספירת ראשים. כשכולם במשרה מלאה
+  // (capacityOf תמיד 1) זה בדיוק activeGuards.length, בדיוק כמו קודם.
+  const totalCapacity = activeGuards.reduce((sum, g) => sum + capacityOf(g), 0) || 1;
+
   const stats = {
     targetPerGuard: totalSlots / activeGuards.length,
+    // "יעד ליחידת משרה אחת (מלאה)" — לא יעד סופי לאף שומר/ת בפני עצמו/ה.
+    // scoreCandidate ו-balanceWorkload מכפילים בערך הזה ב-capacityOf(guard)
+    // כדי לקבל את היעד האישי. כש-totalCapacity === activeGuards.length
+    // (כולם במשרה מלאה) זו אותה נוסחה בדיוק כמו לפני התוספת הזו.
     loadTargetPerGuard:
       openShifts.reduce((sum, s) => sum + shiftLoad(s) * Math.max(1, s.requiredGuards || 1), 0) /
-      activeGuards.length,
-    nightTargetPerGuard: nightSlots / activeGuards.length,
+      totalCapacity,
+    nightTargetPerGuard: nightSlots / totalCapacity,
+    totalCapacity,
     // כמה "שווה" משמרת ממוצעת אצל הצוות הזה — אותה גזירה בדיוק כמו
     // fairness.js:85-87, כדי שיהיה נוסחה אחת בכל המוצר, לא שתיים שעלולות
     // להיסחף זו מזו (D-02). מעוגל כאן, במקור: זה מה שהופך את הבדיקה
@@ -656,16 +687,26 @@ function balanceWorkload({ openShifts, activeGuards, availability, rules, stats,
   // משמרת כשבאמת יש מה לתקן.
   const gapThreshold = stats.perShiftLoad;
 
+  // "חוב", לא נטל גולמי: כמה כל שומר/ת חורג/ת מהיעד האישי שלו/ה
+  // (stats.loadTargetPerGuard * capacityOf(guard)). זה מה שהופך את
+  // האיזון ליחסי לחלק המשרה — שומר/ת בחצי משרה עם נטל 20 והיעד שלו/ה 20
+  // אינו/ה "קל/ה" מול שומר/ת במשרה מלאה עם נטל 40 והיעד שלו/ה 40, אף
+  // ששני הנטלים הגולמיים שונים פי שתיים. כשכולם במשרה מלאה כל היעדים
+  // שווים, אז החיסור מוריד את אותו קבוע מכולם — ואינו משנה סדר, פערים, או
+  // את תנאי-העצירה למטה (שונות/הפרש בין שני ערכים אינם משתנים מהזזה
+  // קבועה). זו בדיוק הסיבה שהנוסחה למטה שקולה לישנה כש-D-02 לא רלוונטי.
+  const debtOf = (g) => load.get(g.id).load - stats.loadTargetPerGuard * capacityOf(g);
+
   for (let pass = 0; pass < rules.balancePasses; pass++) {
     const sorted = [...activeGuards].sort((a, b) => {
-      const d = load.get(a.id).load - load.get(b.id).load;
+      const d = debtOf(a) - debtOf(b);
       return d !== 0 ? d : String(a.id).localeCompare(String(b.id));
     });
     const lightest = sorted[0];
     const heaviest = sorted[sorted.length - 1];
     if (!lightest || !heaviest) break;
 
-    const gapLoad = load.get(heaviest.id).load - load.get(lightest.id).load;
+    const gapLoad = debtOf(heaviest) - debtOf(lightest);
     if (gapLoad < gapThreshold) break; // already flat enough, in load units
 
     // Try to hand one of the heaviest guard's shifts to the lightest one.
@@ -777,6 +818,10 @@ function buildResult({ rules, openShifts, activeGuards, assignments, byShift, lo
         nights: l.nights,
         hours: round(l.hours),
         load: round(l.load),
+        // היעד האישי — stats.loadTargetPerGuard (יעד ליחידת משרה מלאה)
+        // כפול חלק המשרה של האדם הזה. שווה לכל השורות רק כשכולם במשרה
+        // מלאה; זה השדה שממנו fairnessScore למטה נגזר, לא מ-load בלבד.
+        target: round(stats.loadTargetPerGuard * capacityOf(g)),
       };
     })
     .sort((a, b) => b.load - a.load || String(a.guardId).localeCompare(String(b.guardId)));
@@ -798,8 +843,17 @@ function buildResult({ rules, openShifts, activeGuards, assignments, byShift, lo
   const loadMax = loads.length ? Math.max(...loads) : 0;
   const loadMin = loads.length ? Math.min(...loads) : 0;
   const loadMean = loads.length ? loads.reduce((a, b) => a + b, 0) / loads.length : 0;
-  const loadVariance = loads.length
-    ? loads.reduce((a, b) => a + (b - loadMean) ** 2, 0) / loads.length
+  // הציון נגזר מ"חוב" (load - target), לא מ-load גולמי: שומר/ת בחצי משרה
+  // *אמור/ה* לשאת פחות נטל, וזה לא צריך להיראות כמו חוסר-הוגנות. כשכולם
+  // במשרה מלאה כל target שווה לאותו קבוע, וההפרש (load-target) הוא הזזה
+  // קבועה של כל הערכים — שונות אינה משתנה מהזזה קבועה (Var(X-c)=Var(X)),
+  // כך שהציון כאן זהה ביט-לביט לנוסחה הישנה בכל רוסטר שלא הגדיר משרה
+  // חלקית. זו הסיבה ש-FAIR-04 (שמשחזר את הציון עצמאית מ-perGuard[].load
+  // בלבד, בלי להכיר target בכלל) ממשיך להתאים בלי לשנות אותה בדיקה.
+  const debts = perGuard.map((p) => p.load - p.target);
+  const debtMean = debts.length ? debts.reduce((a, b) => a + b, 0) / debts.length : 0;
+  const loadVariance = debts.length
+    ? debts.reduce((a, b) => a + (b - debtMean) ** 2, 0) / debts.length
     : 0;
   const fairnessCoefficient = 15 / Math.max(stats.perShiftLoad, 0.001);
   const fairnessScore = Math.max(0, Math.round(100 - Math.sqrt(loadVariance) * fairnessCoefficient));
@@ -982,6 +1036,22 @@ export function teamAverages(guards, shifts) {
     hours: round(sum("hours") / n),
     load: round(sum("load") / n),
   };
+
+  // היעד האישי של כל אדם — לא הממוצע השטוח, אלא החלק שלו/ה מתוך הסך
+  // הכול לפי חלק המשרה (capacityOf). כשכולם במשרה מלאה totalCapacity
+  // === n וזה בדיוק avg בכל שדה, לכל שורה — אותה תוצאה כמו לפני התוספת.
+  const totalCapacity = guards.reduce((a, g) => a + capacityOf(g), 0) || 1;
+  for (const g of guards) {
+    const rec = perGuard[g.id];
+    if (!rec) continue;
+    const share = capacityOf(g) / totalCapacity;
+    rec.target = {
+      count: round(sum("count") * share),
+      nights: round(sum("nights") * share),
+      hours: round(sum("hours") * share),
+      load: round(sum("load") * share),
+    };
+  }
 
   return { perGuard, avg };
 }

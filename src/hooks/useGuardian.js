@@ -742,6 +742,16 @@ export function useGuardian() {
           () => api.setGuardWeekendPreference(id, preference)
         ),
 
+      setGuardHalfTime: (id, halfTime) =>
+        optimistic(
+          (d) => ({
+            ...d,
+            guards: d.guards.map((g) => (g.id === id ? { ...g, halfTime } : g)),
+            members: d.members.map((g) => (g.id === id ? { ...g, halfTime } : g)),
+          }),
+          () => api.setGuardHalfTime(id, halfTime)
+        ),
+
       createSwap: (payload) =>
         run(async () => {
           await api.createSwap({ ...payload, teamCode: dataRef.current.team?.code });

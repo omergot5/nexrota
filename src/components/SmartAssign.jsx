@@ -483,11 +483,18 @@ export default function SmartAssign({
             </p>
             <div className="space-y-3">
               {plan.fairness.perGuard.map((p) => {
+                // מושווה מול היעד האישי (p.target), לא מול הממוצע השטוח של
+                // הצוות: שומר/ת בחצי משרה "מאוזן/ת" בחצי מהנטל, לא כמעט
+                // אותו נטל כמו כולם.
                 const hint = loadShareHint({
                   load: p.load,
-                  meanLoad: plan.fairness.loadMean,
+                  meanLoad: p.target,
                   perShiftLoad: plan.fairness.perShiftLoad,
                 });
+                // מוצג רק כשהיעד האישי שונה מהממוצע הכולל — מי שאין לו/ה
+                // חלק משרה חריג לא צריך/ה שורה נוספת (D-05 quiet-by-default,
+                // אותו עיקרון כמו fairnessHint/loadShareHint עצמם).
+                const showTarget = Math.abs(p.target - plan.fairness.loadMean) >= 0.1;
                 return (
                   <div key={p.guardId}>
                     <div className="flex items-center justify-between mb-1.5 gap-2">
@@ -503,6 +510,7 @@ export default function SmartAssign({
                       <span className="text-xs text-muted flex-shrink-0" data-numeric>
                         {p.load} {t("unit.load")} · {p.shifts} {t("unit.shifts")} · {p.nights}{" "}
                         {t("unit.nights")} · {p.hours} ש'
+                        {showTarget && ` · יעד אישי ${p.target}`}
                       </span>
                     </div>
                     <Meter

@@ -178,7 +178,7 @@ export default function AnalyticsDash({ guards, shifts, tasks = [] }) {
               // *לתצוגה* הוא loadShareHint עצמו — הרכיב מזין אותו אך ורק
               // בשדות שהטבלה כבר חושפת ומציג את מה שהוא מחזיר, בלי שום
               // השוואה מקומית משלו מול הממוצע (D-01, D-02).
-              const hint = loadShareHint({ load: r.load, meanLoad: table.meanLoad, perShiftLoad: table.perShiftLoad });
+              const hint = loadShareHint({ load: r.load, meanLoad: r.target, perShiftLoad: table.perShiftLoad });
               return (
                 <tr key={r.guardId} className="border-b border-hairline last:border-0">
                   <th scope="row" className="py-2.5 px-3 text-right font-normal">

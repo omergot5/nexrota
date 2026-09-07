@@ -911,10 +911,40 @@ export function AvailView({ guards, shifts, availability, weekDates, embedded = 
 // MANUAL ASSIGNMENT
 // ============================================================
 
+/**
+ * הודעה אישית, מוכנה להעתקה, שמסבירה למישהו למה יצא לו/ה פחות או יותר
+ * משמרות השבוע — לא רק תג "+2" בלי הקשר (D-05, אנושי ורגיש לכל מצב). r
+ * הוא שורת fairnessPlan: r.needs חיובי = מגיע לו/ה עוד, שלילי = כבר
+ * קיבל/ה יותר מהחלק ההוגן. מוחזר null כשאין מה לומר (בתוך טווח הרעש) —
+ * אותו עיקרון "שתיקה לגיטימית" ש-fairnessHint כבר נוהג בו.
+ *
+ * לא מבטיחה מספר קונקרטי לשבוע הבא (הוא עוד לא נבנה) — רק מסבירה את
+ * המצב הנוכחי ומרגיעה שהוא ייזקף/יתפנה בהמשך. הבטחה מספרית שלא תתממש
+ * גרועה משתיקה.
+ */
+function personalFairnessMessage(r) {
+  if (!r || Math.abs(r.needs) < 1) return null;
+  const shiftsWord = r.assigned === 1 ? "משמרת אחת" : `${r.assigned} משמרות`;
+  if (r.needs >= 1) {
+    return `היי ${r.name}, השבוע שובצת ל${shiftsWord} — פחות מהחלק ההוגן שלך. זה נרשם, ותקבל/י יותר בשבועות הקרובים כדי לאזן.`;
+  }
+  return `היי ${r.name}, השבוע שובצת ל${shiftsWord} — קצת מעל החלק ההוגן שלך. בשבועות הקרובים ננסה לתת לך פחות, כדי לפנות מקום למי שקיבל פחות.`;
+}
+
 export function AssignView({
   guards, shifts, availability, weekDates, actions, busy, onNavigate, tasks = [], embedded = false,
 }) {
   const [date, setDate] = useState(weekDates[0]);
+  const [copiedId, setCopiedId] = useState(null);
+  const copyMessage = (id, text) => async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      /* clipboard blocked — the text is visible on screen anyway */
+    }
+  };
   useEffect(() => {
     if (!weekDates.includes(date)) setDate(weekDates[0]);
   }, [weekDates, date]);
@@ -944,7 +974,10 @@ export function AssignView({
     return (id) => map.get(id) || null;
   }, [fairness]);
 
-  const under = fairness.rows.filter((r) => r.needs >= 1);
+  // שני הכיוונים, לא רק "מגיע לו/ה עוד": מי שכבר קיבל/ה יותר מהחלק ההוגן
+  // צריך/ה גם הוא/היא הסבר, לא רק מי שמחכה. אותה שורת fairnessPlan
+  // בדיוק, ר' personalFairnessMessage.
+  const notable = fairness.rows.filter((r) => Math.abs(r.needs) >= 1);
 
   return (
     <div className="space-y-6">
@@ -982,7 +1015,7 @@ export function AssignView({
         * נמדדת על שבועיים אחורה ולא על השבוע שעל המסך: מי שנשא שני שבועות
         * רצופים נראה מאוזן לגמרי בשבוע השלישי, וזה בדיוק הקיפוח שאף אחד
         * לא מצליח להצביע עליו. */}
-      {under.length > 0 && (
+      {notable.length > 0 && (
         <div className="glass rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-2.5 flex-wrap">
             <Icon name="scale" size={17} className="text-brand" />
@@ -992,22 +1025,41 @@ export function AssignView({
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
-            {under.map((r) => (
-              <span
-                key={r.id}
-                className="flex items-center gap-2 h-9 pr-1.5 pl-3 rounded-xl
-                  bg-brand/10 ring-1 ring-inset ring-brand/25"
-              >
-                <Avatar id={r.id} name={r.name} size={24} />
-                <span className="text-xs font-semibold text-content">{r.name}</span>
-                <span className="text-xs font-bold text-brand" data-numeric>
-                  +{r.needs}
+            {notable.map((r) => {
+              const over = r.needs <= -1;
+              const msg = personalFairnessMessage(r);
+              return (
+                <span
+                  key={r.id}
+                  className={`flex items-center gap-1.5 h-9 pr-1.5 pl-1.5 rounded-xl ring-1 ring-inset ${
+                    over ? "bg-warn/10 ring-warn/25" : "bg-brand/10 ring-brand/25"
+                  }`}
+                >
+                  <Avatar id={r.id} name={r.name} size={24} />
+                  <span className="text-xs font-semibold text-content">{r.name}</span>
+                  <span className={`text-xs font-bold ${over ? "text-warn" : "text-brand"}`} data-numeric>
+                    {over ? r.needs : `+${r.needs}`}
+                  </span>
+                  {msg && (
+                    <IconBtn
+                      icon={copiedId === r.id ? "check" : "send"}
+                      size="sm"
+                      label={
+                        copiedId === r.id
+                          ? "ההודעה הועתקה"
+                          : `העתק הודעה אישית ל${r.name} על ההוגנות השבוע`
+                      }
+                      className={copiedId === r.id ? "text-info" : ""}
+                      onClick={copyMessage(r.id, msg)}
+                    />
+                  )}
                 </span>
-              </span>
-            ))}
+              );
+            })}
           </div>
           <p className="text-[11px] text-faint mt-2">
-            המספר הוא כמה משמרות עוד מגיעות לו כדי להשתוות לצוות. הוא יורד תוך כדי שיבוץ.
+            המספר הוא כמה משמרות עוד מגיעות לו/לה (או כבר קיבל/ה מעבר לחלק ההוגן) כדי להשתוות
+            לצוות — יורד תוך כדי שיבוץ. סמל השליחה מעתיק הודעה אישית מוכנה להסבר.
           </p>
         </div>
       )}
@@ -2701,6 +2753,11 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts
                           יותר סופ״ש
                         </Badge>
                       )}
+                      {g.halfTime && (
+                        <Badge tone="neutral" icon="scale">
+                          חצי משרה
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2718,6 +2775,16 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts
                     label={`ערוך העדפת סופ״ש של ${g.name}`}
                     className={g.weekendPreference ? "text-info" : ""}
                     onClick={() => setWkndEditing(g)}
+                  />
+                  {/* חלק משרה (0012_guard_half_time.sql): מתג בוליארי ישיר,
+                      לא מודל — בדיוק אותה מוסכמה כמו פטור מהגשה, כי יש רק
+                      שני מצבים ולא שלושה כמו העדפת הסופ"ש. */}
+                  <IconBtn
+                    icon="scale"
+                    size="sm"
+                    label={g.halfTime ? `החזר את ${g.name} למשרה מלאה` : `סמן את ${g.name} כחצי משרה`}
+                    className={g.halfTime ? "text-info" : ""}
+                    onClick={() => actions.setGuardHalfTime(g.id, !g.halfTime)}
                   />
                   {/* Per-guard exception. A deadline with no way to grant one
                       is a deadline that generates phone calls — reservists,

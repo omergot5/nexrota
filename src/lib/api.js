@@ -99,6 +99,10 @@ export const profileFromRow = (row) => ({
     row.weekend_preference === "avoid" || row.weekend_preference === "prefer"
       ? row.weekend_preference
       : null,
+  // חלק משרה — ר' 0012_guard_half_time.sql. ניקוד רך ביעד ההוגנות
+  // (autoAssign.js capacityOf), לא אילוץ קשיח. עמודה חסרה נופלת ל-false,
+  // בדיוק כמו ברירת המחדל של העמודה עצמה.
+  halfTime: row.half_time === true,
 });
 
 export const availKey = (guardId, shiftId) => `${guardId}-${shiftId}`;
@@ -646,6 +650,22 @@ export async function setGuardWeekendPreference(profileId, preference) {
   if (error) throw new Error(error.message);
   if (!data?.length) {
     throw new Error("אין לך הרשאה לשנות את העדפת הסופ״ש של האדם הזה — התחבר מחדש ונסה שוב");
+  }
+}
+
+/**
+ * כותב את חלק המשרה של אדם אחד (0012_guard_half_time.sql). מנרמלת כל
+ * דבר שאינו true בדיוק ל-false — אותה מוסכמה כמו setGuardWeekendPreference.
+ */
+export async function setGuardHalfTime(profileId, halfTime) {
+  const { data, error } = await supabase
+    .from("gs_profiles")
+    .update({ half_time: halfTime === true })
+    .eq("id", profileId)
+    .select("id");
+  if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה לשנות את היקף המשרה של האדם הזה — התחבר מחדש ונסה שוב");
   }
 }
 

@@ -94,20 +94,24 @@ function NextDuty({ shift, mates }) {
  * היא מוצגת פעם אחת, לא תחת כל תורנות: אותם שני מספרים חוזרים מתחת לחמישה
  * כרטיסים הם רעש, והם גם גורמים לקורא לחשוב שהמספר משתנה ביניהם.
  */
-function FairnessLine({ mine, avg }) {
+function FairnessLine({ mine }) {
+  // היעד האישי (mine.target), לא ממוצע הצוות השטוח: מי שסימן/ה חצי משרה
+  // (0012_guard_half_time.sql) רואה כאן חצי מהיעד של מי שבמשרה מלאה, לא
+  // את אותו יעד עם מספר קטן יותר לצידו בלי הסבר.
+  const target = mine.target || { count: 0, nights: 0, load: 0 };
   const rows = [
-    { label: "תורנויות", value: mine.count, avg: avg.count },
-    { label: "לילות", value: mine.nights, avg: avg.nights },
+    { label: "תורנויות", value: mine.count, target: target.count },
+    { label: "לילות", value: mine.nights, target: target.nights },
     // נטל ולא שעות: זו היחידה שהמנוע באמת מחלק לפיה, ולהציג כאן מספר אחר
     // פירושו שורת הוגנות שלא תואמת את ההחלטות שהתקבלו.
-    { label: "נטל", value: Math.round(mine.load), avg: avg.load, hint: "לילה וסופ״ש שוקלים יותר" },
+    { label: "נטל", value: Math.round(mine.load), target: target.load, hint: "לילה וסופ״ש שוקלים יותר" },
   ];
   return (
     <Card className="p-3.5">
       <div className="grid grid-cols-3 divide-x divide-x-reverse divide-hairline">
         {rows.map((r) => {
           // סטייה של פחות מחצי יחידה היא רעש חישובי, לא אי־צדק.
-          const diff = r.value - r.avg;
+          const diff = r.value - r.target;
           const tone =
             diff > 0.5 ? "text-warn" : diff < -0.5 ? "text-accent" : "text-content";
           return (
@@ -119,7 +123,7 @@ function FairnessLine({ mine, avg }) {
                 {r.label}
               </p>
               <p className="text-[10px] text-faint" data-numeric>
-                ממוצע {r.avg}
+                יעד {r.target}
               </p>
             </div>
           );
@@ -142,7 +146,7 @@ function MySchedule({ user, guards, shifts, tasks = [], positions = [] }) {
     () => withEngineTasks(publishedAll, tasks),
     [publishedAll, tasks]
   );
-  const { perGuard, avg } = useMemo(
+  const { perGuard } = useMemo(
     () => teamAverages(guards, withTasks),
     [guards, withTasks]
   );
@@ -210,7 +214,7 @@ function MySchedule({ user, guards, shifts, tasks = [], positions = [] }) {
             shift={next}
             mates={(next.assignedGuards || []).filter((id) => id !== user.id).map(nameOf)}
           />
-          {mine_ && <FairnessLine mine={mine_} avg={avg} />}
+          {mine_ && <FairnessLine mine={mine_} />}
         </>
       )}
 

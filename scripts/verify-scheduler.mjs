@@ -4,8 +4,9 @@
 // Asserts the hard constraints actually hold on a generated week, and prints
 // the coverage/fairness numbers so regressions are obvious.
 
-import { autoAssign, checkAssignment, DEFAULT_RULES, explainUnfilled, shiftLoad, teamAverages } from "../src/lib/autoAssign.js";
+import { autoAssign, capacityOf, checkAssignment, DEFAULT_RULES, explainUnfilled, shiftLoad, teamAverages } from "../src/lib/autoAssign.js";
 import { shiftInterval, weekByOffset, taskAsShiftShape, withEngineTasks } from "../src/lib/dates.js";
+import { fairnessPlan } from "../src/lib/fairness.js";
 // Node stdlib — used only for the QUAL-06 structural coverage test (task 3),
 // which reads the real source text to make sure the next hard-constraint
 // code added to the engine cannot silently be missing from explainUnfilled's
@@ -1226,6 +1227,76 @@ check("WKND · deterministic — הרצה חוזרת על אותו קלט (או�
     Object.fromEntries((autoAssign({ shifts: [wkndSatShift, wkndSunShift], guards: wkndGuards, availability: wkndAvailability })
       .detailByShift["wk-sat"] || []).map((r) => [r.guardId, r.score]))
   ) === JSON.stringify(wkndSatScores));
+
+console.log("\n=== CAP-01 · חצי משרה — יעד הוגנות יחסי לחלק המשרה (0012_guard_half_time.sql) ===");
+
+// יחידה: capacityOf עצמה. מלא/ה כברירת מחדל (גם כש-halfTime חסר לגמרי,
+// לא רק false מפורש) — זה מה שהופך את התוספת הזו לבלתי-מבחינה לכל צוות
+// שלא נגע באפשרות.
+check("CAP-01 · capacityOf מחזירה 1 כשהשדה halfTime חסר לגמרי",
+  capacityOf({ id: "x", name: "כלשהו" }) === 1);
+check("CAP-01 · capacityOf מחזירה 1 כש-halfTime === false במפורש",
+  capacityOf({ id: "x", halfTime: false }) === 1);
+check("CAP-01 · capacityOf מחזירה 0.5 כש-halfTime === true",
+  capacityOf({ id: "x", halfTime: true }) === 0.5);
+
+// פיקסצ'ר סימטרי: שני שומרים, אחד/ת במשרה מלאה ואחד/ת בחצי, שישה ימי-בוקר
+// זהים במשקל (יום חול, 8 שעות = נטל 8), שניהם זמינים לכולם — שום אילוץ
+// קשיח לא מפריע, כל ההבדל בתוצאה נובע אך ורק מ-capacityOf.
+const capDates = ["2026-09-13", "2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18"];
+const capGuards = [
+  { id: "cg1", name: "מלא/ה" },
+  { id: "cg2", name: "חצי", halfTime: true },
+];
+const capShifts = capDates.map((date, i) => ({
+  id: `cap-d${i}`, date, label: "משמרת יום", type: "day",
+  startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: [],
+}));
+const capAvailability = {};
+for (const g of capGuards) for (const s of capShifts) capAvailability[`${g.id}-${s.id}`] = { status: "available" };
+
+const capResult = autoAssign({ shifts: capShifts, guards: capGuards, availability: capAvailability });
+const capByGuard = Object.fromEntries(capResult.fairness.perGuard.map((p) => [p.guardId, p]));
+
+check("CAP-01 · שישה תקנים מאוישים במלואם (100% כיסוי) — חצי משרה לא חוסם שיבוץ",
+  capResult.summary.coverage === 100, JSON.stringify(capResult.summary));
+check("CAP-01 · השומר/ת במשרה מלאה מקבל/ת בדיוק 4 מתוך 6 המשמרות (יחס 2:1 מול חצי המשרה)",
+  capByGuard.cg1.shifts === 4, JSON.stringify(capByGuard));
+check("CAP-01 · השומר/ת בחצי משרה מקבל/ת בדיוק 2 מתוך 6 המשמרות",
+  capByGuard.cg2.shifts === 2, JSON.stringify(capByGuard));
+check("CAP-01 · הנטל של כל אחד/ת שווה בדיוק ליעד האישי שלו/ה (perGuard[].target) — אפס חוב בשני הכיוונים",
+  capByGuard.cg1.load === capByGuard.cg1.target && capByGuard.cg2.load === capByGuard.cg2.target,
+  JSON.stringify(capByGuard));
+check("CAP-01 · היעד האישי של המלא/ה כפול בדיוק מהיעד של חצי המשרה",
+  capByGuard.cg1.target === capByGuard.cg2.target * 2, JSON.stringify(capByGuard));
+check("CAP-01 · ציון ההוגנות 100 — שני הצדדים בדיוק על היעד האישי שלהם, לא רק 'קרוב'",
+  capResult.summary.fairnessScore === 100, JSON.stringify(capResult.summary));
+
+const capAgain = autoAssign({ shifts: capShifts, guards: capGuards, availability: capAvailability });
+check("CAP-01 · deterministic — הרצה חוזרת על אותו קלט מייצרת אותו byShift בדיוק",
+  JSON.stringify(capResult.byShift) === JSON.stringify(capAgain.byShift));
+
+// תאימות לאחור: אותו פיקסצ'ר בדיוק, רק בלי חצי משרה בכלל (השדה חסר, לא
+// false) — חייב להתחלק 3:3 בין שני שומרים שקולים, בדיוק כמו לפני התוספת.
+const capFullGuards = [{ id: "cg1", name: "מלא/ה" }, { id: "cg2", name: "גם/ה מלא/ה" }];
+const capFullResult = autoAssign({ shifts: capShifts, guards: capFullGuards, availability: capAvailability });
+const capFullByGuard = Object.fromEntries(capFullResult.fairness.perGuard.map((p) => [p.guardId, p]));
+check("CAP-01 · תאימות לאחור — בלי חצי משרה בכלל, שני שומרים שקולים מתחלקים 3:3",
+  capFullByGuard.cg1.shifts === 3 && capFullByGuard.cg2.shifts === 3, JSON.stringify(capFullByGuard));
+check("CAP-01 · תאימות לאחור — ציון ההוגנות עדיין 100 באותו פיקסצ'ר סימטרי בלי חצי משרה",
+  capFullResult.summary.fairnessScore === 100, `fairnessScore=${capFullResult.summary.fairnessScore}`);
+
+// fairnessPlan (fairness.js) — אותו עיקרון בחלון המתגלגל הרב-שבועי, לא רק
+// בתכנון החי. מזינים את השיבוץ שהמנוע כבר הפיק למעלה (4:2), כדי ש-total
+// לא יהיה אפס: היעד האישי (לא avgLoad השטוח) חייב לשקף את אותו יחס 2:1.
+const capPlan = fairnessPlan({
+  guards: capGuards, history: [],
+  planned: capShifts.map((s) => ({ ...s, assignedGuards: capResult.byShift[s.id] || [] })),
+  until: capDates[0],
+});
+const capPlanByGuard = Object.fromEntries(capPlan.rows.map((r) => [r.id, r]));
+check("CAP-01 · fairnessPlan — היעד האישי (target) של המלא/ה כפול בדיוק מזה של חצי המשרה",
+  capPlanByGuard.cg1.target === capPlanByGuard.cg2.target * 2, JSON.stringify(capPlanByGuard));
 
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);
