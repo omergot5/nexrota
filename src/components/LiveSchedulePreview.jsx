@@ -4,7 +4,8 @@
 // מסך כניסה שכתוב עליו "שיבוץ חכם" מבקש מהמבקר להאמין למילה. הלוח הזה
 // *מראה* לו: שבעה ימים מתמלאים לנגד עיניו, שם אחרי שם, ובסוף שורת הסיכום
 // היא לא "✓ הכל טוב" גנרי — היא קטע אמיתי מיומן ההחלטות של המנוע, מחושב
-// באמת (לא מוקלד ביד), באותו סגנון מונוספייס בדיוק שרואים אחרי שנכנסים.
+// באמת (לא מוקלד ביד), עם אותה תגית ASSIGN/OK שרואים אחרי שנכנסים — רק
+// כתג ממולא, לא כטקסט מונוספייס על רקע כהה שנקרא כמו קונסולת דיבוג.
 // מי שמסדר משמרות ביד מזהה תוך שנייה מה נחסך לו, ומי שמכיר מוצרי AI
 // אחרים מזהה שזה לא מסך-כניסה גנרי — כי אף אחד לא מראה נימוק אמיתי
 // *לפני* שביקשת להיכנס.
@@ -24,9 +25,10 @@
 //   3. **מכובד ל-`prefers-reduced-motion`.** מי שביקש פחות תנועה מקבל את
 //      הלוח מלא ודומם — לא ריק. המידע הוא העיקר, התנועה היא הקישוט.
 //
-//   4. **אותו שפה חזותית כמו יומן ההחלטות האמיתי** (SmartAssign.jsx):
-//      תגית ASSIGN/BALANCE באנגלית, מונוספייס, לא כתובה מחדש — כדי שהמעבר
-//      מהדגמה להתחברות לא ירגיש כמו שני מוצרים שונים.
+//   4. **אותה שפה חזותית כמו יומן ההחלטות האמיתי** (SmartAssign.jsx):
+//      תגית ASSIGN/BALANCE באנגלית, לא כתובה מחדש — כדי שהמעבר מהדגמה
+//      להתחברות לא ירגיש כמו שני מוצרים שונים. שני המקומות עודכנו יחד
+//      מתגי-טקסט מונוספייס לתגי-badge ממולאים, לא רק כאן.
 // ============================================================
 
 import { useMemo } from "react";
@@ -150,29 +152,35 @@ export default function LiveSchedulePreview() {
 
       {/* השורה התחתונה נדלקת אחרי שכל התאים מלאים — היא הפאנץ' של ההדגמה,
         * ועכשיו היא לא "✓ הכל טוב" גנרי אלא קטע אמיתי מיומן ההחלטות —
-        * אותו פונט מונו ואותה תגית ASSIGN שרואים אחרי שנכנסים (יומן
-        * ההחלטות, SmartAssign.jsx). מה שרשום כאן הוא מה שהמנוע *באמת*
-        * החליט על הפיקסצ'ר הזעיר למעלה, לא טקסט קבוע. */}
+        * אותה תגית ASSIGN שרואים אחרי שנכנסים (יומן ההחלטות, SmartAssign.jsx),
+        * רק כתג ממולא ולא כמילה מונוספייס דלוקה על רקע כהה — הגרסה הישנה
+        * נראתה כמו קונסולת דיבוג שנפלה בטעות לתוך עמוד נחיתה מלוטש. מה
+        * שרשום כאן הוא מה שהמנוע *באמת* החליט על הפיקסצ'ר הזעיר למעלה,
+        * לא טקסט קבוע. */}
       <div
         dir="ltr"
         style={{ animationDelay: "2.2s" }}
-        className="mt-4 rounded-xl bg-surface-sunken ring-1 ring-inset ring-hairline px-3 py-2.5 font-mono
+        className="mt-4 rounded-2xl bg-surface-sunken ring-1 ring-inset ring-hairline p-3.5 space-y-2
           animate-slot-in motion-reduce:animate-none"
       >
         {logLines.map((line, i) => (
-          <div key={i} className="flex items-baseline gap-2 text-[10px] leading-relaxed">
-            <span className="text-accent font-bold flex-shrink-0">{line.tag}</span>
-            <span dir="rtl" className="text-content/80 flex-1 truncate">
+          <div key={i} className="flex items-center gap-2.5">
+            <span className="flex-shrink-0 text-[9px] font-black tracking-wide text-on-accent bg-accent rounded-md px-1.5 py-[3px]">
+              {line.tag}
+            </span>
+            <span dir="rtl" className="text-content/85 text-[12.5px] font-medium flex-1 truncate">
               {line.text}
             </span>
-            <span className="text-faint flex-shrink-0" data-numeric>
+            <span className="text-faint text-[11px] flex-shrink-0" data-numeric>
               {line.detail}
             </span>
           </div>
         ))}
-        <div className="flex items-baseline gap-2 text-[10px] leading-relaxed mt-1 pt-1 border-t border-hairline">
-          <span className="text-brand font-bold flex-shrink-0">OK</span>
-          <span dir="rtl" className="text-content/80 flex-1" data-numeric>
+        <div className="flex items-center gap-2.5 pt-2.5 mt-1 border-t border-hairline">
+          <span className="flex-shrink-0 text-[9px] font-black tracking-wide text-on-brand bg-brand rounded-md px-1.5 py-[3px]">
+            OK
+          </span>
+          <span dir="rtl" className="text-content/85 text-[12.5px] font-semibold flex-1" data-numeric>
             כיסוי {summary.coverage}% · הוגנות {summary.fairnessScore}
           </span>
           <span

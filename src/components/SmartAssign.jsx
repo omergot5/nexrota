@@ -448,19 +448,23 @@ export default function SmartAssign({
               <p className="text-muted text-[11px] font-bold uppercase tracking-wider mb-3">
                 יומן ההחלטות של המנוע
               </p>
-              <div className="space-y-1.5 font-mono text-[11px]">
+              <div className="space-y-2 text-[12px]">
                 {plan.log.map((l, i) => (
-                  <div key={i} className="flex gap-2 text-muted">
-                    <span className="text-faint w-6 flex-shrink-0">
+                  <div key={i} className="flex items-center gap-2.5 text-muted">
+                    <span className="text-faint text-[10px] w-5 flex-shrink-0" data-numeric>
                       {String(i + 1).padStart(2, "0")}
                     </span>
+                    {/* תג ממולא, לא מילה מונוספייס בצבע — אותו תיקון שקיבל
+                      * LiveSchedulePreview.jsx (מסך הכניסה), כדי ששני
+                      * המקומות שמראים את אותו יומן החלטות לא ייראו כמו שתי
+                      * רמות גימור שונות. */}
                     <span
-                      className={`flex-shrink-0 font-bold ${
+                      className={`flex-shrink-0 text-[9px] font-black tracking-wide rounded-md px-1.5 py-[3px] ${
                         l.step === "assign"
-                          ? "text-accent"
+                          ? "text-on-accent bg-accent"
                           : l.step === "balance"
-                          ? "text-brand"
-                          : "text-faint"
+                          ? "text-on-brand bg-brand"
+                          : "text-muted bg-surface-sunken ring-1 ring-inset ring-hairline"
                       }`}
                     >
                       {l.step === "assign" ? "ASSIGN" : l.step === "balance" ? "BALANCE" : "ORDER"}
