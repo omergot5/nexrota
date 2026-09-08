@@ -8,7 +8,7 @@ import {
 } from "../ui.jsx";
 import { Dot, Icon } from "../icons.jsx";
 import {
-  availabilityDeadline, dayName, formatDateHe, fromISODate, isSingleDayTask, isTaskEngineEligible,
+  availabilityDeadline, dayName, DAYS_HE_SHORT, formatDateHe, fromISODate, isSingleDayTask, isTaskEngineEligible,
   rangeLabelHe, rangeTextHe, shiftHours, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
 } from "../../lib/dates.js";
 import { availStatus, checkAssignment, isQualified } from "../../lib/autoAssign.js";
@@ -1924,6 +1924,32 @@ function TaskRow({ task, busy, actions, guards, onEdit }) {
   );
 }
 
+/**
+ * שעות ברירת מחדל לפי קטגוריה, כשבוחרים תבנית מוכנה.
+ *
+ * תבניות (gs_task_templates) לא נושאות שעות בכלל — אין להן עמודה כזו,
+ * ואין סיבה שתהיה: השעות שייכות לאיך שהתבנית מיושמת השבוע, לא לתבנית
+ * עצמה. בלי ברירת מחדל כאן, applyTemplates יצר משימות בלי startTime/
+ * endTime בכלל, מה שהפיל אותן מחוץ ל-isTaskEngineEligible לגמרי —
+ * "מחוץ למנוע 🚫" שמתפרס על כל השבוע, בלי בדיקת התנגשויות ובלי משקל
+ * הוגנות. הטבלה הזו רק *מציעה* טווח סביר; "ללא שעות קבועות" למטה
+ * נשאר פתח יציאה מפורש למי שבאמת רוצה משימה חסרת-שעה.
+ */
+const TEMPLATE_DEFAULT_HOURS = {
+  "תורנות שמירה": { startTime: "07:00", endTime: "19:00" },
+  "סיור": { startTime: "07:00", endTime: "19:00" },
+  "תורנות מטבח": { startTime: "07:00", endTime: "19:00" },
+  "כוננות": { startTime: "19:00", endTime: "07:00" },
+  "מטבח": { startTime: "07:00", endTime: "15:00" },
+  "הגשה": { startTime: "12:00", endTime: "22:00" },
+  "בר": { startTime: "18:00", endTime: "02:00" },
+  "קופה": { startTime: "09:00", endTime: "17:00" },
+  "שמירות": { startTime: "07:00", endTime: "19:00" },
+  "עמדה קבועה": { startTime: "07:00", endTime: "19:00" },
+};
+const DEFAULT_TASK_HOURS = { startTime: "08:00", endTime: "16:00" };
+const hoursForCategory = (category) => TEMPLATE_DEFAULT_HOURS[category] || DEFAULT_TASK_HOURS;
+
 export function TaskMgmt({
   guards, tasks, weekDates, actions, busy,
   templates = [], compatibility = [], mode = "security", shifts = [],
@@ -1932,6 +1958,8 @@ export function TaskMgmt({
   const [editing, setEditing] = useState(null);
   const [openFolder, setOpenFolder] = useState(null); // null = הכול
   const [picked, setPicked] = useState([]); // מפתחות של תבנית+עמדה
+  const [pickedDays, setPickedDays] = useState(() => weekDates.map(() => true)); // ברירת מחדל: כל השבוע
+  const [timeless, setTimeless] = useState(false); // "ללא שעות קבועות" — יציאה מפורשת מ-D-01
   const [override, setOverride] = useState(false);
 
   const blank = {
@@ -2041,20 +2069,43 @@ export function TaskMgmt({
   // תבנית של הפרופיל הנוכחי, או כזו שסומנה כמתאימה לשניהם.
   const visibleTemplates = templates.filter((tpl) => tpl.mode === mode || tpl.mode === "any");
 
+  // בלי שעות קבועות: משימה אחת שפורשת את כל השבוע, כמו קודם — למי שבאמת
+  // רוצה "מטבח פתוח כל השבוע" בלי ציר זמן. עם שעות (ברירת המחדל): משימה
+  // נפרדת *לכל יום שנבחר*, עם startDate=dueDate=אותו יום, כדי ש-
+  // isTaskEngineEligible תחזיר true ומנוע ההתנגשויות/ההוגנות יראה אותה.
   const applyTemplates = async () => {
     const rows = [];
     for (const tpl of templates) {
       const slots = tpl.positions.length ? tpl.positions : [null];
       for (const pos of slots) {
         if (!picked.includes(templateKey(tpl, pos))) continue;
-        rows.push({
-          title: pos ? `${tpl.title} — ${pos}` : tpl.title,
+        const title = pos ? `${tpl.title} — ${pos}` : tpl.title;
+        const base = {
           description: "",
           category: tpl.category,
           assignees: [],
           priority: tpl.priority,
-          startDate: weekDates[0],
-          dueDate: weekDates[6] || weekDates[0],
+        };
+        if (timeless) {
+          rows.push({
+            ...base,
+            title,
+            startDate: weekDates[0],
+            dueDate: weekDates[6] || weekDates[0],
+          });
+          continue;
+        }
+        const { startTime, endTime } = hoursForCategory(tpl.category);
+        weekDates.forEach((date, di) => {
+          if (!pickedDays[di]) return;
+          rows.push({
+            ...base,
+            title,
+            startDate: date,
+            dueDate: date,
+            startTime,
+            endTime,
+          });
         });
       }
     }
@@ -2120,7 +2171,7 @@ export function TaskMgmt({
                 icon="plus"
                 onClick={applyTemplates}
                 loading={busy}
-                disabled={!picked.length}
+                disabled={!picked.length || (!timeless && !pickedDays.some(Boolean))}
               >
                 {picked.length ? `צור ${picked.length}` : "צור"}
               </Btn>
@@ -2155,6 +2206,46 @@ export function TaskMgmt({
               });
             })}
           </div>
+
+          {/* נראה רק אחרי בחירה ראשונה — אין מה להציע יום ושעה למי שעוד
+            * לא סימן שום תבנית. */}
+          {picked.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-hairline/60 mt-1 pt-3">
+              <span className="text-xs text-muted font-semibold ml-1">באילו ימים:</span>
+              {weekDates.map((date, di) => {
+                const on = pickedDays[di];
+                return (
+                  <button
+                    key={date}
+                    type="button"
+                    disabled={timeless}
+                    aria-pressed={on}
+                    onClick={() =>
+                      setPickedDays((p) => p.map((v, i) => (i === di ? !v : v)))
+                    }
+                    className={`h-8 w-9 rounded-lg text-xs font-bold cursor-pointer
+                      ring-1 ring-inset transition-colors duration-200 disabled:opacity-40
+                      disabled:cursor-not-allowed ${
+                        on && !timeless
+                          ? "bg-brand text-on-brand ring-brand"
+                          : "bg-surface-sunken ring-hairline text-muted hover:text-content"
+                      }`}
+                  >
+                    {DAYS_HE_SHORT[fromISODate(date).getDay()]}
+                  </button>
+                );
+              })}
+              <label className="flex items-center gap-1.5 text-xs text-muted mr-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={timeless}
+                  onChange={(e) => setTimeless(e.target.checked)}
+                  className="rounded"
+                />
+                ללא שעות קבועות (משימה אחת לכל השבוע)
+              </label>
+            </div>
+          )}
         </div>
       )}
 
