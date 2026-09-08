@@ -25,7 +25,12 @@ const AnalyticsDash = lazy(() => import("./supervisor/Analytics.jsx"));
 /* פונקציות ולא קבועים: `t()` שנקרא ברמת המודול מקבע את המילה הראשונה,
  * והחלפת פרופיל לא הייתה משנה כלום על המסך. */
 const navItems = () => [
-  { id: "week", label: "השבוע", icon: "calendar", week: true },
+  // לוח הבקרה ראשון, לא בתוך "עוד": זו השאלה שמנהל שואל ברגע שהוא נכנס —
+  // "מה חסר?" — לא "מה יש בשבוע הזה". חמישה פריטים, לא ארבעה כמו קודם;
+  // זו לא חריגה מהעיקרון "מעט פריטים", היא תיקון שלו — הכניסה הראשית
+  // עצמה עברה למקום אחר.
+  { id: "dashboard", label: t("nav.dashboard"), icon: "chart" },
+  { id: "week", label: "בניית שבוע", icon: "calendar", week: true },
   { id: "calendar", label: t("nav.calendar"), icon: "grid" },
   { id: "team", label: t("nav.team"), icon: "users" },
   { id: "more", label: "עוד", icon: "menu", badge: true },
@@ -33,7 +38,6 @@ const navItems = () => [
 
 /** היעדים המשניים. נכנסים אליהם מכוונה, לא בטעות בדרך למשהו אחר. */
 const moreItems = () => [
-  { id: "dashboard", label: t("nav.dashboard"), icon: "chart", hint: "מצב הצוות במבט אחד" },
   { id: "swaps", label: t("nav.swaps"), icon: "swap", hint: "מי ביקש להתחלף ועם מי", badge: true },
   { id: "tasks", label: t("nav.tasks"), icon: "pencil", hint: "משימות שלא קשורות למשמרת" },
   { id: "positions", label: t("nav.positions"), icon: "shield", hint: "עמדה שחוזרת כל שבוע לבד" },
@@ -41,7 +45,8 @@ const moreItems = () => [
 ];
 
 const titles = (more) => ({
-  week: "השבוע",
+  dashboard: t("nav.dashboard"),
+  week: "בניית שבוע",
   more: "עוד",
   ...Object.fromEntries(more.map((m) => [m.id, m.label])),
   calendar: t("nav.calendar"),

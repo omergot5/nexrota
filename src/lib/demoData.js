@@ -12,6 +12,11 @@ import { SHIFT_TONES } from "../design/shiftPalette.js";
 import { weekByOffset } from "./dates.js";
 import { shiftFromRow } from "./api.js";
 
+// 16, לא 6: מפקד עם מחלקה שלמה (14–20 איש) צריך לראות איך המסכים
+// מתנהגים בקנה מידה אמיתי, לא עם שישה אנשים שקל לזכור בעל פה. השישה
+// הראשונים שומרים על הדפוס הידני המקורי (PATTERN למטה); העשרה הנוספים
+// מקבלים זמינות מיוצרת דטרמיניסטית (fallbackStatus) כדי שלא צריך להקליד
+// דפוס יד לכל אחד — עדיין בלי Math.random בשום מקום.
 const DEMO_GUARDS = [
   { name: "גיא לוי", phone: "050-1234567" },
   { name: "מיכל כהן", phone: "052-2345678" },
@@ -19,6 +24,16 @@ const DEMO_GUARDS = [
   { name: "רינה שמיר", phone: "058-4567890" },
   { name: "דן מזרחי", phone: "050-5678901" },
   { name: "נועה ברק", phone: "053-6789012" },
+  { name: "יובל אברהם", phone: "052-1112222" },
+  { name: "עומר פרץ", phone: "054-2223333" },
+  { name: "טל גולן", phone: "050-3334444" },
+  { name: "שירה מזרחי", phone: "053-4445555" },
+  { name: "איתי בן חיים", phone: "058-5556666" },
+  { name: "נטע שלום", phone: "052-6667777" },
+  { name: "רועי כהן", phone: "054-7778888" },
+  { name: "הדר לוי", phone: "050-8889999" },
+  { name: "אלון ברוך", phone: "053-9990000" },
+  { name: "ליאת דהן", phone: "058-0001111" },
 ];
 
 const DAY = { label: "משמרת יום", startTime: "07:00", endTime: "19:00", type: "morning", color: SHIFT_TONES.morning };
@@ -49,6 +64,19 @@ const COMMENTS = {
 };
 
 const STATUS = { a: "available", u: "unavailable", m: "maybe" };
+
+/**
+ * זמינות לשומרי הדגמה מעבר לששת הראשונים (שיש להם PATTERN ידני
+ * למעלה) — דטרמיניסטית וקבועה בין הרצות, לא Math.random. תמהיל גס
+ * (כ-10% לא-זמין, 20% אולי, השאר זמין) שמספיק כדי שהשיבוץ החכם יהיה
+ * לו על מה להתלבט, בלי להקליד דפוס יד לכל שומר/ת נוסף/ת.
+ */
+function fallbackStatus(gi, di, kind) {
+  const seed = (gi * 7 + di * 3 + (kind === "night" ? 1 : 0)) % 10;
+  if (seed === 0) return "u";
+  if (seed === 1 || seed === 2) return "m";
+  return "a";
+}
 
 /**
  * Seeds guards + next week's shifts + availability for a team.
@@ -151,13 +179,12 @@ export async function seedDemoTeam({ teamCode, existingGuards = [], existingShif
   const availRows = [];
   allGuards.forEach((guard, gi) => {
     const pattern = PATTERN[gi];
-    if (!pattern) return;
     dates.forEach((date, di) => {
       const slots = byDate.get(date);
       if (!slots) return;
       for (const kind of ["day", "night"]) {
         const shift = slots[kind];
-        const code = pattern[kind][di];
+        const code = pattern ? pattern[kind][di] : fallbackStatus(gi, di, kind);
         if (!shift || code === "?") continue;
         availRows.push({
           shift_id: shift.id,
