@@ -408,6 +408,11 @@ const compatFromRow = (row) => ({
   b: row.b,
   rule: row.rule,
   note: row.note || "",
+  // null = כלל מובנה (זמין לכל הצוותים, לא נכתב על ידי אף אחד) — ה-RLS
+  // (gs_role_compat_write) לעולם לא מרשה מחיקה של שורה כזו כי team_code
+  // IN (...) אף פעם לא נכון עבור NULL. חשוף כדי שהמסך לא יציע כפתור
+  // מחיקה שתמיד ייכשל.
+  teamCode: row.team_code || null,
 });
 
 /**

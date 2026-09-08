@@ -78,7 +78,10 @@ export default function SupervisorApp({ state }) {
 
   // ברירת המחדל היא העבודה עצמה, לא לוח בקרה. אחמ"ש שנכנס לאפליקציה בא
   // לסדר את השבוע — הוא לא בא לקרוא סטטיסטיקה על עצמו.
-  const [view, setView] = useState("week");
+  // "dashboard" ולא "week": מנהל שנכנס לאפליקציה שואל "מה חסר?" — על פני
+  // משמרות ומשימות יחד — לא "מה יש בשבוע הזה". מסך ה"שבוע" עדיין מרחק
+  // לחיצה אחת (הכרטיס "מה חסר להשלים השבוע" קופץ ישר אליו).
+  const [view, setView] = useState("dashboard");
   const [weekStep, setWeekStep] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -212,6 +215,7 @@ export default function SupervisorApp({ state }) {
         swapRequests={swapRequests}
         tasks={tasks}
         team={team}
+        compatibility={compatibility}
         onSeedDemo={startDemo}
       />
     ),

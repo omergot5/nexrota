@@ -60,7 +60,9 @@ const SHIFT_TEMPLATES = [
 // DASHBOARD
 // ============================================================
 
-export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavigate, onSeedDemo, busy }) {
+export function SupDashboard({
+  guards, shifts, swapRequests, tasks, team, weekDates = [], compatibility = [], onNavigate, onSeedDemo, busy,
+}) {
   const today = todayISO();
   const todayShifts = shifts.filter((s) => s.date === today);
   const pendingSwaps = swapRequests.filter((r) => r.status === "pending").length;
@@ -100,6 +102,50 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
     [guards, shifts, tasks, team]
   );
   const maxLoad = Math.max(1, ...loadRows.map((r) => r.load));
+
+  // ---- מה חסר להשלים השבוע — משמרות ומשימות יחד, לא שני מספרים בשני
+  // מסכים נפרדים. הכניסה הראשית לאפליקציה (D-04) שואלת "מה חסר?", לא
+  // "מה יש בשבוע הזה" — זו בדיוק השאלה שהמשתמש ביקש שהמסך הזה יענה
+  // עליה ראשון.
+  const weekShifts = useMemo(() => shifts.filter((s) => weekDates.includes(s.date)), [shifts, weekDates]);
+  const weekSlots = useMemo(() => {
+    let need = 0;
+    let filled = 0;
+    for (const s of weekShifts) {
+      const req = Math.max(1, s.requiredGuards || 1);
+      need += req;
+      filled += Math.min(req, (s.assignedGuards || []).length);
+    }
+    return { need, filled };
+  }, [weekShifts]);
+  const weekOpenTasks = useMemo(
+    () => tasks.filter((tk) => tk.status !== "done" && weekDates.includes(tk.dueDate || tk.startDate)),
+    [tasks, weekDates]
+  );
+  const weekAllDone =
+    weekShifts.length > 0 && weekSlots.filled >= weekSlots.need && weekOpenTasks.length === 0;
+
+  // ---- התנגשויות פתוחות: אותו מנגנון (conflicts.js, gs_role_compatibility)
+  // שכבר מזהיר בטופס המשימה כשעורכים משימה בודדת — כאן נסרק על כל
+  // השיבוצים הפעילים כדי לתפוס גם התנגשות שנוצרה בלי לעבור דרך הטופס
+  // (שיבוץ ידני, ייבוא). מזהה זוג (אדם, שתי משימות) פעם אחת בלבד, בלי
+  // תלות בכיוון הסריקה.
+  const compat = useMemo(() => compatIndex(compatibility), [compatibility]);
+  const openConflicts = useMemo(() => {
+    const activeTasks = tasks.filter((tk) => tk.status !== "done");
+    const seen = new Set();
+    const out = [];
+    for (const task of activeTasks) {
+      const found = findConflicts({ candidate: task, assignees: task.assignees || [], tasks: activeTasks, compat });
+      for (const c of found) {
+        const key = `${c.personId}::${[task.id, c.taskId].sort().join("|")}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(c);
+      }
+    }
+    return out;
+  }, [tasks, compat]);
 
   return (
     <div className="space-y-6">
@@ -154,6 +200,64 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
               </li>
             ))}
           </ol>
+        </Card>
+      )}
+
+      {/* "מה חסר להשלים השבוע" — משמרות ומשימות יחד, לא שני מסכים נפרדים.
+        * שקטה כשהכול מלא (D-05), אבל מוצגת גם לצוות ותיק כי היא לא שלב
+        * בהקמה — היא השאלה שחוזרת כל שבוע. */}
+      {!isNew && (weekShifts.length > 0 || weekOpenTasks.length > 0) && (
+        <Card className={weekAllDone ? "" : "!ring-warn/30"}>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h2 className="font-bold text-content flex items-center gap-2">
+              <Icon
+                name={weekAllDone ? "check-circle" : "alert"}
+                size={18}
+                className={weekAllDone ? "text-accent" : "text-warn"}
+              />
+              מה חסר להשלים השבוע
+            </h2>
+            <Btn variant="outline" size="sm" icon="left" onClick={() => onNavigate("week")}>
+              לבניית השבוע
+            </Btn>
+          </div>
+          {weekAllDone ? (
+            <p className="text-accent text-sm font-semibold mt-2">הכול מאויש, ואין משימות פתוחות השבוע.</p>
+          ) : (
+            <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-2 text-sm">
+              {weekSlots.need > 0 && (
+                <span className={weekSlots.filled < weekSlots.need ? "text-warn font-semibold" : "text-muted"} data-numeric>
+                  {weekSlots.filled}/{weekSlots.need} מקומות מאוישים במשמרות
+                </span>
+              )}
+              {weekOpenTasks.length > 0 && (
+                <span className="text-warn font-semibold" data-numeric>
+                  {weekOpenTasks.length} משימות פתוחות השבוע
+                </span>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* התנגשויות פתוחות — לא מוצג בכלל כשהמטריצה ריקה (D-05): רוב
+        * הצוותים לא יגדירו אף כלל, ותג ריק לצידם הוא רעש. */}
+      {openConflicts.length > 0 && (
+        <Card className="!ring-danger/30">
+          <h2 className="font-bold text-content mb-1 flex items-center gap-2">
+            <Icon name="alert" size={18} className="text-danger" />
+            התנגשויות פתוחות ({openConflicts.length})
+          </h2>
+          <p className="text-sm text-muted mb-3">
+            אנשים ששובצו לשתי משימות חופפות בזמן, בקטגוריות שהוגדרו כלא-תואמות. יש להחליט מי נשאר איפה.
+          </p>
+          <div className="space-y-1.5">
+            {openConflicts.map((c, i) => (
+              <p key={i} className="text-sm text-content">
+                {explainConflict(c, (id) => guards.find((g) => g.id === id)?.name || id)}
+              </p>
+            ))}
+          </div>
         </Card>
       )}
 
@@ -1551,6 +1655,10 @@ const FOLDERS_BY_MODE = {
     { name: "תורנות שמירה", icon: "shield" },
     { name: "סיור", icon: "target" },
     { name: "תורנות מטבח", icon: "inbox" },
+    // כוננות היא זמינות, לא נוכחות פיזית — יחסי החסימה שלה מול שאר
+    // הקטגוריות (gs_role_compatibility, כללים מובנים) כבר יודעים את זה:
+    // כוננות לא חוסמת מטבח/שמירה כי אפשר להיות בכונן תוך כדי עבודה.
+    { name: "כוננות", icon: "bell" },
     { name: "אימונים", icon: "zap" },
     { name: "ניקיון", icon: "sparkles" },
     { name: "כללי", icon: "clipboard" },
@@ -2494,14 +2602,24 @@ function CategoryConflictSettings({ actions, busy, categories, compatibility }) 
                 <b>{c.a}</b> ↔ <b>{c.b}</b>
                 {c.note && <span className="text-muted"> — {c.note}</span>}
               </span>
-              <IconBtn
-                icon="trash"
-                size="sm"
-                label={`הסר את החסימה בין ${c.a} ל${c.b}`}
-                className="flex-shrink-0 hover:text-danger"
-                onClick={() => actions.removeRoleCompatibility(c.id)}
-                disabled={busy}
-              />
+              {/* כלל מובנה (teamCode null) אף פעם לא ניתן למחיקה — ה-RLS
+                * דוחה את זה תמיד, אז אין טעם להציע כפתור שרק ייכשל.
+                * תג "מובנה" במקומו, לא שתיקה: המנהל צריך לדעת שהכלל הזה
+                * לא הומצא כאן ולא שלו למחוק. */}
+              {c.teamCode ? (
+                <IconBtn
+                  icon="trash"
+                  size="sm"
+                  label={`הסר את החסימה בין ${c.a} ל${c.b}`}
+                  className="flex-shrink-0 hover:text-danger"
+                  onClick={() => actions.removeRoleCompatibility(c.id)}
+                  disabled={busy}
+                />
+              ) : (
+                <Badge tone="neutral" className="flex-shrink-0">
+                  מובנה
+                </Badge>
+              )}
             </div>
           ))}
         </div>
