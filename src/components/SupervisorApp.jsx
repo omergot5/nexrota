@@ -168,7 +168,7 @@ export default function SupervisorApp({ state }) {
     go("smart");
   };
 
-  const common = { guards, shifts, availability, weekDates, actions, busy, onNavigate: go, tasks };
+  const common = { guards, shifts, availability, weekDates, actions, busy, onNavigate: go, tasks, team };
 
   const views = {
     week: <WeekFlow {...common} step={weekStep} setStep={setWeekStep} />,
@@ -247,7 +247,7 @@ export default function SupervisorApp({ state }) {
           </div>
         }
       >
-        <AnalyticsDash guards={guards} shifts={shifts} tasks={tasks} />
+        <AnalyticsDash guards={guards} shifts={shifts} tasks={tasks} team={team} />
       </Suspense>
     ),
     team: (
@@ -260,6 +260,7 @@ export default function SupervisorApp({ state }) {
         onSeedDemo={startDemo}
         shifts={shifts}
         tasks={tasks}
+        compatibility={compatibility}
       />
     ),
     positions: (

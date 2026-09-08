@@ -362,6 +362,14 @@ export async function loadTeam(teamCode) {
           // (מיגרציה 0011) — ערך לא מוכר (שורה ישנה, DB לא מעודכן) נופל
           // ל-security, לא צונח בשקט ל"civil" שכבר לא קיים.
           mode: VALID_MODES.includes(teamRes.data.mode) ? teamRes.data.mode : "security",
+          // {קטגוריה: מכפיל} להוגנות (shiftLoad ב-autoAssign.js) — עמודה
+          // חסרה/null/כל דבר שאינו אובייקט ממשי נופל ל-{}, שקול ל"אין
+          // אף קטגוריה שהוגדרה משקל מיוחד לה" (D-05: היעדר-שורה = ברירת
+          // מחדל, לא איסור).
+          taskWeights:
+            teamRes.data.task_weights && typeof teamRes.data.task_weights === "object"
+              ? teamRes.data.task_weights
+              : {},
         }
       : null,
     members: profiles,
@@ -401,6 +409,35 @@ const compatFromRow = (row) => ({
   rule: row.rule,
   note: row.note || "",
 });
+
+/**
+ * מוסיפה זוג חסום למטריצת ההתנגשויות (conflicts.js) — הכתיבה שהייתה
+ * חסרה: הטבלה, ה-RLS (gs_role_compat_write) והמנוע (findConflicts)
+ * כבר קיימים, ואף מסך לא הציע דרך להכניס שורה. `a`/`b` לא ממוינים
+ * כאן בכוונה — `pairKey` ב-conflicts.js כבר מנרמל את הסדר בצד הקריאה,
+ * ואין טעם לכפול את ההיגיון פעמיים.
+ */
+export async function addRoleCompatibility(teamCode, a, b, note = "") {
+  const { data, error } = await supabase
+    .from("gs_role_compatibility")
+    .insert({ team_code: teamCode, a, b, rule: "block", note: note.trim() || null })
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return compatFromRow(data);
+}
+
+export async function removeRoleCompatibility(id) {
+  const { data, error } = await supabase
+    .from("gs_role_compatibility")
+    .delete()
+    .eq("id", id)
+    .select("id");
+  if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה למחוק את הכלל הזה — התחבר מחדש ונסה שוב");
+  }
+}
 
 // ---------- shifts ----------
 
@@ -571,12 +608,16 @@ export async function addGuard({ name, phone, teamCode }) {
   return profileFromRow(data);
 }
 
-export async function updateTeamSettings(teamCode, { deadlineDays, deadlineHour, reminders, mode }) {
+export async function updateTeamSettings(teamCode, { deadlineDays, deadlineHour, reminders, mode, taskWeights }) {
   const patch = {};
   if (deadlineDays !== undefined) patch.avail_deadline_days = deadlineDays;
   if (deadlineHour !== undefined) patch.avail_deadline_hour = deadlineHour;
   if (reminders !== undefined) patch.avail_reminders = reminders;
   if (mode !== undefined) patch.mode = VALID_MODES.includes(mode) ? mode : "security";
+  // {קטגוריה: מכפיל} — ר' shiftLoad ב-autoAssign.js. אובייקט, לא מערך:
+  // עמודה חסרה/null נופלת ל-{} בכיוון הקריאה (loadTeam), כמו כל שדה אחר
+  // שקדם למיגרציה שהוסיפה אותו.
+  if (taskWeights !== undefined) patch.task_weights = taskWeights;
 
   // `.select()` ולא עדכון עיוור: כש-RLS מסננת את כל השורות, Supabase מחזירה
   // `error: null` ומערך ריק — כלומר "הצלחה" שלא כתבה כלום. בלי הבדיקה הזאת

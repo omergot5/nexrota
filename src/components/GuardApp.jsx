@@ -133,7 +133,7 @@ function FairnessLine({ mine }) {
   );
 }
 
-function MySchedule({ user, guards, shifts, tasks = [], positions = [] }) {
+function MySchedule({ user, guards, shifts, tasks = [], positions = [], team }) {
   const today = todayISO();
   const publishedAll = shifts.filter((s) => s.published);
 
@@ -147,8 +147,8 @@ function MySchedule({ user, guards, shifts, tasks = [], positions = [] }) {
     [publishedAll, tasks]
   );
   const { perGuard } = useMemo(
-    () => teamAverages(guards, withTasks),
-    [guards, withTasks]
+    () => teamAverages(guards, withTasks, team?.taskWeights || {}),
+    [guards, withTasks, team]
   );
   const mine_ = perGuard[user.id];
   const nameOf = (id) => guards.find((g) => g.id === id)?.name || "—";
@@ -773,7 +773,7 @@ export default function GuardApp({ state }) {
 
   const views = {
     schedule: (
-      <MySchedule user={user} guards={guards} shifts={shifts} tasks={tasks} positions={positions} />
+      <MySchedule user={user} guards={guards} shifts={shifts} tasks={tasks} positions={positions} team={team} />
     ),
     availability: (
       <MyAvailability

@@ -712,6 +712,21 @@ export function useGuardian() {
           () => api.updateTeamSettings(dataRef.current.team?.code, patch)
         ),
 
+      // מטריצת ההתנגשויות (conflicts.js) — הכתיבה שהייתה חסרה. refresh
+      // מלא ולא optimistic: השורה צריכה id שהשרת מקצה, וזו פעולת הגדרות
+      // נדירה (לא לחיצה תכופה כמו שיבוץ), אז אין סיבה לסבך.
+      addRoleCompatibility: (a, b, note) =>
+        run(async () => {
+          await api.addRoleCompatibility(dataRef.current.team?.code, a, b, note);
+          await refresh();
+        }),
+
+      removeRoleCompatibility: (id) =>
+        run(async () => {
+          await api.removeRoleCompatibility(id);
+          await refresh();
+        }),
+
       setGuardExempt: (id, exempt) =>
         optimistic(
           (d) => ({

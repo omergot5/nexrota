@@ -38,24 +38,27 @@ const round1 = (n) => Math.round(n * 10) / 10;
  * פלט זהה בלי שום סימן ברגע הקריאה, בדיוק כמו שהאיסור על Math.random()
  * חל על autoAssign.js. הקריאה היחידה כרגע (views.jsx) כבר מעבירה weekStart.
  */
-export function rollingLoad({ guards = [], shifts = [], until, days = 14 }) {
+export function rollingLoad({ guards = [], shifts = [], until, days = 14, taskWeights = {} }) {
   const from = addDays(until, -days);
-  return { from, until, per: tally(guards, shifts, (s) => s.date >= from && s.date < until) };
+  return {
+    from, until,
+    per: tally(guards, shifts, (s) => s.date >= from && s.date < until, taskWeights),
+  };
 }
 
 /** אותו מונה בלי חלון — לשבוע שנבנה עכשיו, שכולו רלוונטי בהגדרה. */
-export function totalLoad(guards = [], shifts = []) {
-  return tally(guards, shifts, () => true);
+export function totalLoad(guards = [], shifts = [], taskWeights = {}) {
+  return tally(guards, shifts, () => true, taskWeights);
 }
 
-function tally(guards, shifts, inWindow) {
+function tally(guards, shifts, inWindow, taskWeights = {}) {
   const per = {};
   for (const g of guards) per[g.id] = { count: 0, nights: 0, hours: 0, load: 0 };
 
   for (const s of shifts) {
     if (!s?.date || !inWindow(s)) continue;
     const hours = shiftHours(s);
-    const weight = shiftLoad(s);
+    const weight = shiftLoad(s, taskWeights);
     for (const id of s.assignedGuards || []) {
       const rec = per[id];
       if (!rec) continue; // שובץ בעבר ואז הוסר מהצוות
@@ -82,23 +85,25 @@ function tally(guards, shifts, inWindow) {
  * שהסף שנמדד נגדו (D-02) יהיה תמיד אותו מספר. רשימה ריקה חוזרת ל-1,
  * בדיוק כמו ברירת המחדל הקודמת של `fairnessPlan`.
  */
-export function meanShiftLoad(shifts = []) {
-  return shifts.length ? shifts.reduce((a, s) => a + shiftLoad(s), 0) / shifts.length : 1;
+export function meanShiftLoad(shifts = [], taskWeights = {}) {
+  return shifts.length
+    ? shifts.reduce((a, s) => a + shiftLoad(s, taskWeights), 0) / shifts.length
+    : 1;
 }
 
-export function fairnessPlan({ guards = [], history = [], planned = [], until, days = 14 }) {
+export function fairnessPlan({ guards = [], history = [], planned = [], until, days = 14, taskWeights = {} }) {
   const active = guards.filter((g) => g.active !== false);
   if (!active.length) return { rows: [], avgLoad: 0, perShiftLoad: 1, window: { days } };
 
-  const past = rollingLoad({ guards: active, shifts: history, until, days });
-  const now = totalLoad(active, planned);
+  const past = rollingLoad({ guards: active, shifts: history, until, days, taskWeights });
+  const now = totalLoad(active, planned, taskWeights);
 
   const total = active.reduce((a, g) => a + past.per[g.id].load + now[g.id].load, 0);
   const avgLoad = total / active.length;
 
   // כמה "שווה" משמרת ממוצעת אצל הצוות הזה. בלי זה החוב היה מתורגם ליחידות
   // מדומות שלא מתאימות לתמהיל האמיתי.
-  const perShiftLoad = meanShiftLoad([...history, ...planned]);
+  const perShiftLoad = meanShiftLoad([...history, ...planned], taskWeights);
 
   // היעד האישי, לא avgLoad השטוח: חלקו/ה של כל אדם מתוך total לפי חלק
   // המשרה (capacityOf) — אותה עקרון בדיוק כמו autoAssign.js's

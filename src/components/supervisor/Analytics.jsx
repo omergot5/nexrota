@@ -29,7 +29,7 @@ const TYPE_LABEL = {
   nights: SHIFT_TYPES.find((d) => d.type === "night").label,
 };
 
-export default function AnalyticsDash({ guards, shifts, tasks = [] }) {
+export default function AnalyticsDash({ guards, shifts, tasks = [], team }) {
   // Recharts styles its axes and tooltips through JS props, not CSS, so it
   // cannot read our custom properties — it has to be told the theme.
   const { resolved } = useTheme();
@@ -46,8 +46,8 @@ export default function AnalyticsDash({ guards, shifts, tasks = [] }) {
   // המשימות עוברות דרך withEngineTasks (Phase 2) לפני loadTable — אותו
   // מיזוג בדיוק שהכרטיס בלוח הבקרה ושורת ההוגנות של המשתתף עוברים דרכו.
   const table = useMemo(
-    () => loadTable(guards, withEngineTasks(shifts, tasks)),
-    [guards, shifts, tasks]
+    () => loadTable(guards, withEngineTasks(shifts, tasks), team?.taskWeights || {}),
+    [guards, shifts, tasks, team]
   );
 
   // העוגה סופרת משימות; העמודה המוערמת לא (Phase 2). `SHIFT_TYPES` עצמו

@@ -96,8 +96,8 @@ export function SupDashboard({ guards, shifts, swapRequests, tasks, team, onNavi
   // (Phase 2) לפני שהן נכנסות ל-loadTable, כדי שהכרטיס הזה ומסך הדוחות
   // לעולם לא יחלקו על אותו שומר.
   const { rows: loadRows } = useMemo(
-    () => loadTable(guards, withEngineTasks(shifts, tasks)),
-    [guards, shifts, tasks]
+    () => loadTable(guards, withEngineTasks(shifts, tasks), team?.taskWeights || {}),
+    [guards, shifts, tasks, team]
   );
   const maxLoad = Math.max(1, ...loadRows.map((r) => r.load));
 
@@ -932,7 +932,7 @@ function personalFairnessMessage(r) {
 }
 
 export function AssignView({
-  guards, shifts, availability, weekDates, actions, busy, onNavigate, tasks = [], embedded = false,
+  guards, shifts, availability, weekDates, actions, busy, onNavigate, tasks = [], team, embedded = false,
 }) {
   const [date, setDate] = useState(weekDates[0]);
   const [copiedId, setCopiedId] = useState(null);
@@ -966,8 +966,8 @@ export function AssignView({
     const merged = withEngineTasks(shifts, tasks);
     const history = merged.filter((s) => s.date < weekStart);
     const planned = merged.filter((s) => s.date >= weekStart && s.date <= weekEnd);
-    return fairnessPlan({ guards, history, planned, until: weekStart, days: 14 });
-  }, [guards, shifts, tasks, weekStart, weekEnd]);
+    return fairnessPlan({ guards, history, planned, until: weekStart, days: 14, taskWeights: team?.taskWeights || {} });
+  }, [guards, shifts, tasks, weekStart, weekEnd, team]);
 
   const hintOf = useMemo(() => {
     const map = new Map(fairness.rows.map((r) => [r.id, fairnessHint(r)]));
@@ -2393,6 +2393,156 @@ export function TaskMgmt({
  * preview line matters more than the inputs: "3 days before at 14:00" is
  * abstract until you see which day and hour that actually lands on.
  */
+/**
+ * משקל הוגנות לפי קטגוריה (gs_teams.task_weights, 0014_category_fairness_
+ * weights.sql). "אף אחד לא רוצה מטבח, כולם רוצים כוננות" — shiftLoad()
+ * (autoAssign.js) מכפיל את הנטל של כל קטגוריה במכפיל שנקבע כאן, ברמת
+ * הצוות כולו — לא פר-אדם, בדיוק כפי שהוגדר. ברירת המחדל 1 לכל קטגוריה
+ * שלא נגעו בה, אז צוות שלא צריך את זה בכלל לא רואה שום שינוי בהתנהגות.
+ *
+ * מוחק את המפתח במקום לשמור 1 מפורש כשמחזירים ערך לברירת המחדל — כך
+ * ש-taskWeights נשאר "רק מה שהוגדר במפורש", לא רשימה מלאה של אחדות
+ * שלא אומרות כלום.
+ */
+function CategoryWeightSettings({ team, actions, busy, categories }) {
+  const weights = team?.taskWeights || {};
+
+  const setWeight = (category, raw) => {
+    const num = Number(raw);
+    const next = { ...weights };
+    if (!Number.isFinite(num) || num <= 0 || Math.abs(num - 1) < 0.001) {
+      delete next[category];
+    } else {
+      next[category] = Math.round(num * 100) / 100;
+    }
+    actions.updateTeamSettings({ taskWeights: next });
+  };
+
+  if (!categories.length) return null;
+
+  return (
+    <Card>
+      <h2 className="font-bold text-content mb-1 flex items-center gap-2">
+        <Icon name="scale" size={18} className="text-brand" />
+        משקל הוגנות לפי קטגוריה
+      </h2>
+      <p className="text-sm text-muted mb-4">
+        קטגוריה פחות רצויה (למשל מטבח) שווה לתת לה מכפיל <b>גבוה</b> מ-1 — מי שעשה אותה נחשב/ת כמי שמילא/ה
+        חלק גדול יותר מהיעד שלו/ה, אז המנוע נמנע מלהעמיס עליו/ה עוד בקרוב. קטגוריה מבוקשת (למשל כוננות)
+        שווה מכפיל <b>נמוך</b> מ-1. 1 = ברירת המחדל, שווה לכולם. השינוי חל על כל הצוות, לא על אדם ספציפי.
+      </p>
+      <div className="grid sm:grid-cols-2 gap-3">
+        {categories.map((c) => (
+          <Field key={c} label={c}>
+            <Input
+              type="number"
+              min="0.1"
+              max="5"
+              step="0.1"
+              defaultValue={weights[c] ?? 1}
+              disabled={busy}
+              onBlur={(e) => setWeight(c, e.target.value)}
+            />
+          </Field>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * מטריצת ההתנגשויות בין קטגוריות (conflicts.js, gs_role_compatibility) —
+ * הכתיבה שהייתה חסרה. הטבלה, ה-RLS (gs_role_compat_write) והמנוע
+ * (findConflicts, כבר מוצג כאזהרה בטופס המשימה) קיימים מזמן; רק לא
+ * הייתה שום דרך למנהל להכניס שורה אליה, אז לכל צוות אמיתי הטבלה הייתה
+ * ריקה ושום זוג לא נחסם בפועל.
+ */
+function CategoryConflictSettings({ actions, busy, categories, compatibility }) {
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+  const [note, setNote] = useState("");
+
+  const add = async () => {
+    if (!a || !b || a === b) return;
+    await actions.addRoleCompatibility(a, b, note);
+    setA("");
+    setB("");
+    setNote("");
+  };
+
+  if (categories.length < 2) return null;
+
+  return (
+    <Card>
+      <h2 className="font-bold text-content mb-1 flex items-center gap-2">
+        <Icon name="alert" size={18} className="text-brand" />
+        התנגשויות בין קטגוריות
+      </h2>
+      <p className="text-sm text-muted mb-4">
+        קבע אילו קטגוריות אסור לאדם אחד לעשות באותו חלון זמן — למשל "מטבח" ו"כוננות". ברירת המחדל: כל
+        שילוב מותר.
+      </p>
+
+      {compatibility.length > 0 && (
+        <div className="space-y-2 mb-4">
+          {compatibility.map((c) => (
+            <div
+              key={c.id}
+              className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-surface-sunken ring-1 ring-inset ring-hairline"
+            >
+              <span className="text-sm text-content min-w-0">
+                <b>{c.a}</b> ↔ <b>{c.b}</b>
+                {c.note && <span className="text-muted"> — {c.note}</span>}
+              </span>
+              <IconBtn
+                icon="trash"
+                size="sm"
+                label={`הסר את החסימה בין ${c.a} ל${c.b}`}
+                className="flex-shrink-0 hover:text-danger"
+                onClick={() => actions.removeRoleCompatibility(c.id)}
+                disabled={busy}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="grid sm:grid-cols-3 gap-2 items-end">
+        <Field label="קטגוריה א'">
+          <Select value={a} onChange={(e) => setA(e.target.value)} disabled={busy}>
+            <option value="">בחר</option>
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="קטגוריה ב'">
+          <Select value={b} onChange={(e) => setB(e.target.value)} disabled={busy}>
+            <option value="">בחר</option>
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Btn variant="outline" icon="plus" onClick={add} disabled={busy || !a || !b || a === b}>
+          חסום זוג
+        </Btn>
+      </div>
+      <Input
+        className="mt-2"
+        placeholder="הסבר (אופציונלי)…"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        disabled={busy}
+      />
+    </Card>
+  );
+}
+
 function DeadlineSettings({ team, actions, busy }) {
   const days = team?.deadlineDays ?? 3;
   const hour = team?.deadlineHour ?? 14;
@@ -2515,7 +2665,9 @@ function ProfilePicker({ team, actions, busy }) {
   );
 }
 
-export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts = [], tasks = [] }) {
+export function TeamView({
+  user, team, guards, actions, busy, onSeedDemo, shifts = [], tasks = [], compatibility = [],
+}) {
   const [copied, setCopied] = useState(null); // 'code' | 'message' | null
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -2610,6 +2762,15 @@ export function TeamView({ user, team, guards, actions, busy, onSeedDemo, shifts
       <ProfilePicker team={team} actions={actions} busy={busy} />
 
       <DeadlineSettings team={team} actions={actions} busy={busy} />
+
+      <CategoryWeightSettings team={team} actions={actions} busy={busy} categories={categories} />
+
+      <CategoryConflictSettings
+        actions={actions}
+        busy={busy}
+        categories={categories}
+        compatibility={compatibility}
+      />
 
       <Card>
         <div className="flex items-center justify-between gap-6 flex-wrap">

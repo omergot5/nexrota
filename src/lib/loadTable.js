@@ -32,8 +32,8 @@ const round1 = (n) => Math.round(n * 10) / 10;
  *   guardCount: number,
  * }}
  */
-export function loadTable(guards = [], shifts = []) {
-  const { perGuard, avg } = teamAverages(guards, shifts);
+export function loadTable(guards = [], shifts = [], taskWeights = {}) {
+  const { perGuard, avg } = teamAverages(guards, shifts, taskWeights);
 
   // ספירת המשבצות לפי סוג — עובדה שקיימת גם ברמת הצוות (לתרשים העוגה,
   // `byType`) וגם ברמת האדם (לתרשים העמודות הערוך, `morning`/`afternoon`
@@ -85,7 +85,7 @@ export function loadTable(guards = [], shifts = []) {
   return {
     rows,
     meanLoad: avg.load,
-    perShiftLoad: round1(meanShiftLoad(shifts)),
+    perShiftLoad: round1(meanShiftLoad(shifts, taskWeights)),
     byType,
     totalAssigned,
     guardCount: guards.length,

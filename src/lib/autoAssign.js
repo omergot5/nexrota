@@ -85,12 +85,29 @@ const isWeekendShift = (shift) => {
  * המוצר, ולכן היא מיוצאת: מסך המשתתף חייב להראות בדיוק את המספר שהמנוע חילק
  * לפיו, אחרת שורת ההוגנות משקרת.
  */
-export function shiftLoad(shift) {
+/**
+ * `weights` הוא מפת {קטגוריה: מכפיל} ברמת הצוות (`gs_teams.task_weights`,
+ * 0014_category_fairness_weights.sql) — לא קבוע גלובלי. תפקידה לבטא
+ * "אף אחד לא רוצה מטבח, כולם רוצים כוננות" — **באותו כיוון בדיוק** שכבר
+ * קיים ל-LOAD_WEIGHTS.night (1.4): מכפיל *גבוה* מ-1 אומר "זה שוקל יותר",
+ * כלומר מי שעשה את זה "מיצה" חלק גדול יותר מיעד ההוגנות שלו/ה ולכן
+ * המנוע נמנע מלהעמיס עליו/ה עוד בקרוב — בדיוק כמו שלילה כבר מגן על מי
+ * שעשה אותו. אז קטגוריה לא-רצויה (מטבח) מקבלת מכפיל *גבוה* מ-1 (מגן),
+ * וקטגוריה מבוקשת (כוננות) מכפיל *נמוך* מ-1 (לא "משלמת" הרבה, כי אף אחד
+ * לא צריך הגנה מפני קבלת עוד ממנה). חסרה/ריקה כברירת מחדל — כל קטגוריה
+ * שלא הוגדרה במפורש מקבלת 1, בדיוק ההתנהגות מלפני התוספת הזו.
+ *
+ * מוכפל, לא מחליף, את מכפיל הסוג/סופ"ש: משמרת לילה בקטגוריה לא-רצויה
+ * (במידה ותהיה כזו) עדיין נושאת גם את משקל הלילה. שני הצירים עצמאיים.
+ */
+export function shiftLoad(shift, weights = {}) {
   const base = LOAD_WEIGHTS[shift.type] ?? LOAD_WEIGHTS.default;
   const weekend = isWeekendShift(shift) ? LOAD_WEIGHTS.weekend : 1;
   // המכפילים לא מוכפלים זה בזה: לילה בשבת אינו פי 1.75 מיום חול. נלקח החמור
   // מביניהם, כדי שהסבב יישאר יציב.
-  return shiftHours(shift) * Math.max(base, weekend);
+  const category = weights?.[shift?.category];
+  const categoryWeight = typeof category === "number" && category > 0 ? category : 1;
+  return shiftHours(shift) * Math.max(base, weekend) * categoryWeight;
 }
 
 /**
@@ -460,9 +477,12 @@ function scoreCandidate({ guard, shift, load, availability, rules, stats, check 
  *   construction (D-01, UNIF-04). Contributes to guard load only, never to
  *   `assignments`/`byShift`: a task is assigned by hand on the tasks screen and
  *   this engine never auto-fills or auto-moves one.
+ * @param {object} [input.taskWeights] team-level {category: multiplier} map
+ *   (`gs_teams.task_weights`) — see `shiftLoad`'s own doc for what this means.
  */
 export function autoAssign({
   shifts, guards, availability = {}, rules: ruleOverrides, keepExisting = false, tasks = [],
+  taskWeights = {},
 }) {
   const rules = { ...DEFAULT_RULES, ...ruleOverrides };
   const log = [];
@@ -496,7 +516,7 @@ export function autoAssign({
     for (const gid of shaped.assignedGuards) {
       const l = load.get(gid);
       if (!l) continue; // assigned to a task, then removed from the team
-      addToLoad(l, shaped);
+      addToLoad(l, shaped, taskWeights);
     }
   }
 
@@ -506,7 +526,7 @@ export function autoAssign({
     l.shifts.push({ ...iv, shiftId: shift.id, type: shift.type, date: shift.date });
     l.count += 1;
     l.hours += shiftHours(shift);
-    l.load += shiftLoad(shift);
+    l.load += shiftLoad(shift, taskWeights);
     l.dates.add(shift.date);
     if (shift.type === "night") l.nights += 1;
     const record = { shiftId: shift.id, guardId: guard.id, score, raw, parts, locked };
@@ -551,7 +571,7 @@ export function autoAssign({
     // כדי לקבל את היעד האישי. כש-totalCapacity === activeGuards.length
     // (כולם במשרה מלאה) זו אותה נוסחה בדיוק כמו לפני התוספת הזו.
     loadTargetPerGuard:
-      openShifts.reduce((sum, s) => sum + shiftLoad(s) * Math.max(1, s.requiredGuards || 1), 0) /
+      openShifts.reduce((sum, s) => sum + shiftLoad(s, taskWeights) * Math.max(1, s.requiredGuards || 1), 0) /
       totalCapacity,
     nightTargetPerGuard: nightSlots / totalCapacity,
     totalCapacity,
@@ -561,7 +581,9 @@ export function autoAssign({
     // המבנית ב-FAIR-04 לאפשרית בכלל — הערך שמשמש לחישוב הציון זהה
     // ביט-לביט לערך שמדווח על result.fairness.perShiftLoad.
     perShiftLoad: round(
-      openShifts.length ? openShifts.reduce((sum, s) => sum + shiftLoad(s), 0) / openShifts.length : 1
+      openShifts.length
+        ? openShifts.reduce((sum, s) => sum + shiftLoad(s, taskWeights), 0) / openShifts.length
+        : 1
     ),
     hasPreference,
   };
@@ -648,7 +670,7 @@ export function autoAssign({
 
   // --- local-search balancing ---
   const balanceMoves = balanceWorkload({
-    openShifts, activeGuards, availability, rules, stats, load, assignments, byShift,
+    openShifts, activeGuards, availability, rules, stats, load, assignments, byShift, weights: taskWeights,
   });
   if (balanceMoves.length) {
     log.push({
@@ -664,7 +686,7 @@ export function autoAssign({
 
 // ---------- balancing ----------
 
-function balanceWorkload({ openShifts, activeGuards, availability, rules, stats, load, assignments, byShift }) {
+function balanceWorkload({ openShifts, activeGuards, availability, rules, stats, load, assignments, byShift, weights = {} }) {
   const moves = [];
   const shiftById = new Map(openShifts.map((s) => [s.id, s]));
 
@@ -738,15 +760,15 @@ function balanceWorkload({ openShifts, activeGuards, availability, rules, stats,
       // between its two guards, so it flip-flopped between them for all
       // `balancePasses`, never once improving anything. `>=`, not `>` — the
       // equal case is the one that was silently passing before.
-      const w = shiftLoad(shift);
+      const w = shiftLoad(shift, weights);
       if (w >= gapLoad) continue;
 
       // Apply the move.
-      removeFromLoad(heavyLoad, shift);
+      removeFromLoad(heavyLoad, shift, weights);
       const { score, raw, parts } = scoreCandidate({
         guard: lightest, shift, load: lightLoad, availability, rules, stats, check,
       });
-      addToLoad(lightLoad, shift);
+      addToLoad(lightLoad, shift, weights);
 
       candidate.guardId = lightest.id;
       candidate.score = score;
@@ -775,23 +797,23 @@ function balanceWorkload({ openShifts, activeGuards, availability, rules, stats,
   return moves;
 }
 
-function removeFromLoad(l, shift) {
+function removeFromLoad(l, shift, weights = {}) {
   const idx = l.shifts.findIndex((s) => s.shiftId === shift.id);
   if (idx === -1) return;
   l.shifts.splice(idx, 1);
   l.count -= 1;
   l.hours -= shiftHours(shift);
-  l.load -= shiftLoad(shift);
+  l.load -= shiftLoad(shift, weights);
   if (shift.type === "night") l.nights -= 1;
   if (!l.shifts.some((s) => s.date === shift.date)) l.dates.delete(shift.date);
 }
 
-function addToLoad(l, shift) {
+function addToLoad(l, shift, weights = {}) {
   const iv = shiftInterval(shift);
   l.shifts.push({ ...iv, shiftId: shift.id, type: shift.type, date: shift.date });
   l.count += 1;
   l.hours += shiftHours(shift);
-  l.load += shiftLoad(shift);
+  l.load += shiftLoad(shift, weights);
   l.dates.add(shift.date);
   if (shift.type === "night") l.nights += 1;
 }
@@ -1011,13 +1033,13 @@ export function explainUnfilled(entry) {
  * הממוצע מחושב על פני כל אנשי הצוות, כולל מי שלא שובץ בכלל: אם שלושה מתוך
  * עשרה נושאים את כל השבוע, זו בדיוק העובדה ששורת ההוגנות אמורה לחשוף.
  */
-export function teamAverages(guards, shifts) {
+export function teamAverages(guards, shifts, taskWeights = {}) {
   const perGuard = {};
   for (const g of guards) perGuard[g.id] = { count: 0, nights: 0, hours: 0, load: 0 };
 
   for (const s of shifts) {
     const hours = shiftHours(s);
-    const weight = shiftLoad(s);
+    const weight = shiftLoad(s, taskWeights);
     for (const id of s.assignedGuards || []) {
       const rec = perGuard[id];
       if (!rec) continue; // שובץ ואז הוסר מהצוות

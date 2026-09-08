@@ -217,7 +217,7 @@ const Kpi = ({ label, value, unit, hint, meter, meterColor, tone = "text-content
 );
 
 export default function SmartAssign({
-  weekDates, shifts, guards, availability, tasks = [], onApply, busy, embedded = false,
+  weekDates, shifts, guards, availability, tasks = [], team, onApply, busy, embedded = false,
 }) {
   const [rules, setRules] = useState(DEFAULT_RULES);
   const [plan, setPlan] = useState(null);
@@ -258,6 +258,7 @@ export default function SmartAssign({
     setPlan(
       autoAssign({
         shifts: weekShifts, guards, availability, rules, keepExisting: keepManual, tasks: weekTasks,
+        taskWeights: team?.taskWeights || {},
       })
     );
     setApplied(false);

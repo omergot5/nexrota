@@ -1298,5 +1298,67 @@ const capPlanByGuard = Object.fromEntries(capPlan.rows.map((r) => [r.id, r]));
 check("CAP-01 · fairnessPlan — היעד האישי (target) של המלא/ה כפול בדיוק מזה של חצי המשרה",
   capPlanByGuard.cg1.target === capPlanByGuard.cg2.target * 2, JSON.stringify(capPlanByGuard));
 
+console.log("\n=== CAT-01 · משקל הוגנות לפי קטגוריה (0014_category_fairness_weights.sql) ===");
+
+// יחידה: shiftLoad עם weights. אותו כיוון בדיוק כמו LOAD_WEIGHTS.night —
+// מכפיל גבוה = "זה שוקל יותר", לא פחות.
+check("CAT-01 · shiftLoad מכפילה בקטגוריה יקרה (מכפיל 1.4 מעל 1) — 8 שעות → 11.2",
+  Math.abs(shiftLoad(
+    { type: "task", date: "2026-09-14", startTime: "07:00", endTime: "15:00", category: "מטבח" },
+    { "מטבח": 1.4 }
+  ) - 11.2) < 1e-9);
+check("CAT-01 · shiftLoad מכפילה בקטגוריה זולה (מכפיל 0.6 מתחת ל-1) — 8 שעות → 4.8",
+  Math.abs(shiftLoad(
+    { type: "task", date: "2026-09-14", startTime: "07:00", endTime: "15:00", category: "כוננות" },
+    { "מטבח": 1.4, "כוננות": 0.6 }
+  ) - 4.8) < 1e-9);
+check("CAT-01 · קטגוריה שלא הוגדרה במפורש מקבלת מכפיל 1",
+  Math.abs(shiftLoad(
+    { type: "task", date: "2026-09-14", startTime: "07:00", endTime: "15:00", category: "סיור" },
+    { "מטבח": 1.4 }
+  ) - 8) < 1e-9);
+check("CAT-01 · תאימות לאחור — בלי weights בכלל, shiftLoad זהה לפני התוספת",
+  Math.abs(shiftLoad({ type: "task", date: "2026-09-14", startTime: "07:00", endTime: "15:00", category: "מטבח" }) - 8) < 1e-9);
+
+// אינטגרציה: מי שכבר עשה קטגוריה "יקרה" (מטבח, מכפיל מעל 1) מוגן מעומס
+// נוסף בקרוב — בדיוק כמו שמי שעשה לילה כבר מוגן היום. שני שומרים, אחד
+// כבר נושא משימת מטבח (משוקללת), שתי משמרות ניטרליות חדשות זמינות
+// לשניהם: השומר/ת שכבר "שילם/ה" יקר לא אמור/ה לקבל אף אחת מהן.
+const catGuards = [{ id: "cw1", name: "אחד" }, { id: "cw2", name: "שתיים" }];
+const catKitchenTask = {
+  id: "cw-kt1", title: "מטבח", category: "מטבח", startDate: "2026-09-13", dueDate: "2026-09-13",
+  startTime: "07:00", endTime: "15:00", assignees: ["cw1"],
+};
+const catShifts = [
+  { id: "cw-s1", date: "2026-09-14", label: "משמרת", type: "day", startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: [] },
+  { id: "cw-s2", date: "2026-09-15", label: "משמרת", type: "day", startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: [] },
+];
+const catAvailability = {};
+for (const g of catGuards) for (const s of catShifts) catAvailability[`${g.id}-${s.id}`] = { status: "available" };
+
+const catResult = autoAssign({
+  shifts: catShifts, guards: catGuards, availability: catAvailability, tasks: [catKitchenTask],
+  taskWeights: { "מטבח": 1.4 },
+});
+const catByGuard = Object.fromEntries(catResult.fairness.perGuard.map((p) => [p.guardId, p]));
+// perGuard[].shifts כולל גם את משימת המטבח שכבר הייתה קיימת (נספרת ב-
+// addToLoad כמו כל פריט אחר) — לכן הבדיקה על מי קיבל את שתי המשמרות
+// החדשות היא ישירות מול byShift, לא מול הספירה המצטברת.
+check("CAT-01 · השומר/ת שכבר עשה/תה מטבח (משוקלל) לא מקבל/ת אף אחת משתי המשמרות החדשות",
+  catResult.byShift["cw-s1"][0] !== "cw1" && catResult.byShift["cw-s2"][0] !== "cw1",
+  JSON.stringify(catResult.byShift));
+check("CAT-01 · שני המשמרות החדשות הולכות לשומר/ת השני/ה",
+  catResult.byShift["cw-s1"][0] === "cw2" && catResult.byShift["cw-s2"][0] === "cw2",
+  JSON.stringify(catResult.byShift));
+check("CAT-01 · הנטל המשוקלל של משימת המטבח (11.2) נשמר בדיוק בדוח",
+  Math.abs(catByGuard.cw1.load - 11.2) < 1e-9, JSON.stringify(catByGuard));
+
+const catAgain = autoAssign({
+  shifts: catShifts, guards: catGuards, availability: catAvailability, tasks: [catKitchenTask],
+  taskWeights: { "מטבח": 1.4 },
+});
+check("CAT-01 · deterministic — הרצה חוזרת מייצרת אותו byShift בדיוק",
+  JSON.stringify(catResult.byShift) === JSON.stringify(catAgain.byShift));
+
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);
