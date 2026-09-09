@@ -42,6 +42,16 @@ export default {
         warn: channel("warn"),
         danger: channel("danger"),
         info: channel("info"),
+
+        // שבעה גוונים נבדלים לזהות קטגוריה (מבט-משאבים, לוח שנה) —
+        // בכוונה לא הסולם היחיד של shiftPalette.js, שמקודד זמן-ביום ולא
+        // זהות. ר' src/design/categoryPalette.js למיפוי קטגוריה→גוון.
+        "cat-red": channel("cat-red"),
+        "cat-blue": channel("cat-blue"),
+        "cat-green": channel("cat-green"),
+        "cat-purple": channel("cat-purple"),
+        "cat-amber": channel("cat-amber"),
+        "cat-cyan": channel("cat-cyan"),
       },
       borderColor: {
         DEFAULT: "var(--hairline)",

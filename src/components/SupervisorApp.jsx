@@ -5,6 +5,7 @@ import { LogoMark } from "./Logo.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 import { SupDashboard, SwapMgmt, TaskMgmt, TeamView } from "./supervisor/views.jsx";
 import PositionsScreen from "./supervisor/PositionsScreen.jsx";
+import ResourceView from "./supervisor/ResourceView.jsx";
 import WeekFlow, { STEP_OF } from "./supervisor/WeekFlow.jsx";
 import CalendarView from "./supervisor/CalendarView.jsx";
 import { rangeLabelHe, weekByOffset } from "../lib/dates.js";
@@ -41,6 +42,7 @@ const moreItems = () => [
   { id: "swaps", label: t("nav.swaps"), icon: "swap", hint: "מי ביקש להתחלף ועם מי", badge: true },
   { id: "tasks", label: t("nav.tasks"), icon: "pencil", hint: "משימות שלא קשורות למשמרת" },
   { id: "positions", label: t("nav.positions"), icon: "shield", hint: "עמדה שחוזרת כל שבוע לבד" },
+  { id: "resources", label: "מבט משאבים", icon: "grid", hint: "מי מאייש כל עמדה, יום־יום, במבט אחד" },
   { id: "analytics", label: t("nav.analytics"), icon: "trending", hint: "עומסים, לילות והוגנות" },
 ];
 
@@ -283,6 +285,7 @@ export default function SupervisorApp({ state }) {
         busy={busy}
       />
     ),
+    resources: <ResourceView guards={guards} shifts={shifts} tasks={tasks} />,
   };
 
   // מסך משני נפתח מתוך "עוד", אז הדרך חזרה חייבת להיות גלויה — בלי להסתמך

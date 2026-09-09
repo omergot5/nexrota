@@ -17,7 +17,7 @@ import {
 import { Icon } from "../icons.jsx";
 import { DAYS_HE_SHORT, addDays, rangeLabelHe, shortDate, weekFrom } from "../../lib/dates.js";
 import { subscribeTerms, t, termProfile } from "../../lib/terms.js";
-import { categoryOptions } from "./views.jsx";
+import { categoryOptions } from "../../lib/categories.js";
 import {
   missingRowsForWeek, plannedRowsForWeek, qualifiedGuardsForPosition, workingGuardIdsForWeek,
 } from "../../lib/positions.js";
