@@ -1,13 +1,17 @@
-import { useMemo, useState } from "react";
-import { Badge, Btn, Card, EmptyState, IconBtn, PageHeader, guardColor, readableInk } from "../ui.jsx";
+import { lazy, Suspense, useMemo, useState } from "react";
+import { Badge, Btn, Card, EmptyState, IconBtn, PageHeader, Spinner, guardColor, readableInk } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import { t } from "../../lib/terms.js";
 import { shiftTone } from "../../design/shiftPalette.js";
-import { DRAG_MIME } from "./UnifiedBoard.jsx";
 import {
-  DAYS_HE, DAYS_HE_SHORT, addDays, boardItemsForDates, dayName, formatDateHe, fromISODate, monthGrid,
+  DAYS_HE, DAYS_HE_SHORT, addDays, boardItemsForDates, formatDateHe, fromISODate, monthGrid,
   monthLabelHe, rangeLabelHe, rangeTextHe, shiftHours, startOfWeek, toISODate, todayISO, weekFrom,
 } from "../../lib/dates.js";
+
+// react-big-calendar (~190KB gzip) עולה רק כשמישהו בפועל פותח תצוגת שבוע —
+// אותו עיקרון בדיוק כמו recharts ב-Analytics.jsx (SupervisorApp.jsx), לא
+// עומס על כל מי שנכנס ליומן בתצוגת חודש/יום ולעולם לא מגיע לשבוע.
+const WeekTimeGrid = lazy(() => import("./WeekTimeGrid.jsx"));
 
 // ============================================================
 // CALENDAR
@@ -46,7 +50,7 @@ const coverageOf = (dayItems) => {
   return { need, got, full: got >= need, empty: got === 0 };
 };
 
-export default function CalendarView({ shifts, tasks = [], guards, onNavigate, onMove }) {
+export default function CalendarView({ shifts, tasks = [], guards, onNavigate, mode: teamMode = "security" }) {
   const today = todayISO();
   // שבוע הוא ברירת המחדל, לא חודש: מי שנכנס ליומן בא לראות מה חסר *עכשיו*,
   // וחור נראה רק על ציר שעות (הועבר לכאן מ-SupervisorApp.jsx, שנהג לעטוף את
@@ -156,8 +160,15 @@ export default function CalendarView({ shifts, tasks = [], guards, onNavigate, o
         )}
 
         {mode === "week" && (
-          <WeekStrip dates={dates} byDate={byDate} guards={guards} today={today} onMove={onMove}
-            onPick={(d) => { setCursor(d); setMode("day"); }} />
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center gap-2 text-muted py-20 text-sm">
+                <Spinner size={18} /> טוען יומן…
+              </div>
+            }
+          >
+            <WeekTimeGrid shifts={shifts} tasks={tasks} guards={guards} dates={dates} mode={teamMode} />
+          </Suspense>
         )}
 
         {mode === "day" && <DayList date={cursor} items={byDate.get(cursor) || []} guards={guards} />}
@@ -256,117 +267,12 @@ function MonthGrid({ dates, month, byDate, today, onPick }) {
   );
 }
 
-function WeekStrip({ dates, byDate, guards, today, onPick, onMove }) {
-  // מזהה המשמרת שמעליה גוררים כרגע — משותף לכל התאים בשבוע, כי בכל רגע
-  // נתון יכולה להיות גרירה מעל תא אחד בלבד (אותו עיקרון פשוט כמו
-  // BoardCard ב-UnifiedBoard, רק ברמת הרכיב האב ולא מקומי לכל כרטיס,
-  // כי כאן הכרטיסים לא מרכיב נפרד משלהם).
-  const [dragOverId, setDragOverId] = useState(null);
-
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-      {dates.map((date) => {
-        const dayItems = byDate.get(date) || [];
-        const isToday = date === today;
-        return (
-          <div key={date}>
-            <button
-              onClick={() => onPick(date)}
-              className={`w-full text-center mb-2 pb-1.5 border-b-2 cursor-pointer ${
-                isToday ? "border-brand" : "border-hairline hover:border-brand/40"
-              }`}
-            >
-              <p className={`text-[11px] ${isToday ? "text-brand font-bold" : "text-muted"}`}>
-                {dayName(date)}
-              </p>
-              <p className={`text-sm font-bold ${isToday ? "text-brand" : "text-content"}`} data-numeric>
-                {fromISODate(date).getDate()}
-              </p>
-            </button>
-            <div className="space-y-1.5">
-              {dayItems.map((s) => {
-                const tone = shiftTone(s.color, s.type);
-                // אותו כלל בדיוק כמו UnifiedBoard.jsx's draggableHere: רק
-                // כשההורה סיפק onMove, ורק למשמרת אמיתית (לא timeless —
-                // משימה בלי שעות או שורת עמדה שבועית לא נכנסות למנוע
-                // בכלל, אז אין להן "העברה" משמעותית).
-                const draggableHere = Boolean(onMove) && !s.timeless;
-                const dragProps = draggableHere
-                  ? {
-                      onDragOver: (e) => {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = "move";
-                      },
-                      onDragEnter: (e) => {
-                        if (e.dataTransfer.types.includes(DRAG_MIME)) setDragOverId(s.id);
-                      },
-                      onDragLeave: () => setDragOverId((id) => (id === s.id ? null : id)),
-                      onDrop: (e) => {
-                        e.preventDefault();
-                        setDragOverId(null);
-                        const raw = e.dataTransfer.getData(DRAG_MIME);
-                        if (!raw) return;
-                        const [guardId, fromShiftId] = raw.split("::");
-                        if (fromShiftId === s.id) return;
-                        onMove(fromShiftId, s.id, guardId);
-                      },
-                    }
-                  : {};
-                return (
-                  <div
-                    key={s.id}
-                    className={`rounded-lg p-2 text-[11px] transition-shadow ${
-                      dragOverId === s.id ? "ring-2 ring-content" : ""
-                    }`}
-                    style={{ background: tone, color: readableInk(tone) }}
-                    {...dragProps}
-                  >
-                    <div className="font-bold truncate">{s.label}</div>
-                    <div className="opacity-90 text-[10px]" data-numeric>
-                      {s.timeless ? rangeTextHe(s) : `${s.startTime}–${s.endTime}`}
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {(s.assignedGuards || []).map((gid) => {
-                        const g = guards.find((x) => x.id === gid);
-                        if (!g) return null;
-                        const c = guardColor(gid);
-                        return (
-                          <span
-                            key={gid}
-                            draggable={draggableHere}
-                            onDragStart={
-                              draggableHere
-                                ? (e) => e.dataTransfer.setData(DRAG_MIME, `${gid}::${s.id}`)
-                                : undefined
-                            }
-                            className={`px-1 py-0.5 rounded text-[9px] font-bold ${
-                              draggableHere ? "cursor-grab active:cursor-grabbing" : ""
-                            }`}
-                            style={{ background: c, color: readableInk(c) }}
-                          >
-                            {g.name.split(" ")[0]}
-                          </span>
-                        );
-                      })}
-                      {(s.assignedGuards || []).length === 0 && (
-                        <span className="bg-black/25 text-white px-1 py-0.5 rounded text-[9px]">
-                          לא משובץ
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-              {dayItems.length === 0 && (
-                <p className="text-center text-[11px] text-faint py-3">—</p>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+// WeekStrip (גרירת-שבב-שומר בין כרטיסי יום) הוסר לטובת WeekTimeGrid
+// (RBC-01): גרירת "מי משובץ איפה" מייצג אינטראקציה שספריית לוח-שנה
+// בסגנון Google Calendar לא בנויה בשבילה מלכתחילה (היא גוררת *אירועים*
+// בזמן, לא שבבי-אדם בין אירועים) — נסיון לכפות אותה על RBC מלמעלה היה
+// שביר. שיבוץ מחדש בגרירה עדיין קיים באפליקציה: UnifiedBoard.jsx, שלב
+// "אסדר בעצמי" בבניית השבוע — אותו DRAG_MIME בדיוק, רק לא כפול כאן.
 
 function DayList({ date, items, guards }) {
   if (!items.length) {

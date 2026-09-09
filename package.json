@@ -8,12 +8,14 @@
     "dev:auto": "vite",
     "build": "vite build",
     "preview": "vite preview --port 3000",
-    "test": "node scripts/verify-scheduler.mjs && node scripts/verify-planning.mjs && node scripts/verify-positions.mjs && node scripts/verify-board.mjs && node scripts/verify-board-signals.mjs && node scripts/verify-resource-view.mjs",
+    "test": "node scripts/verify-scheduler.mjs && node scripts/verify-planning.mjs && node scripts/verify-positions.mjs && node scripts/verify-board.mjs && node scripts/verify-board-signals.mjs && node scripts/verify-resource-view.mjs && node scripts/verify-calendar-events.mjs",
     "test:backend": "node scripts/verify-backend.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.0",
+    "dayjs": "^1.11.23",
     "react": "^18.2.0",
+    "react-big-calendar": "^1.20.0",
     "react-dom": "^18.2.0",
     "recharts": "^2.12.3"
   },

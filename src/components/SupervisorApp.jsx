@@ -192,7 +192,7 @@ export default function SupervisorApp({ state }) {
         tasks={tasks}
         guards={guards}
         onNavigate={go}
-        onMove={actions.moveAssignment}
+        mode={team?.mode || "security"}
       />
     ),
     more: (

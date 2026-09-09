@@ -56,3 +56,19 @@ export const TONE_CLASSES = {
   "cat-cyan": { text: "text-cat-cyan", border: "border-cat-cyan", bg: "bg-cat-cyan/15", dot: "bg-cat-cyan" },
   faint: { text: "text-faint", border: "border-hairline-strong", bg: "bg-surface-sunken", dot: "bg-faint" },
 };
+
+/**
+ * ערך צבע חי ל-style מוטבע (react-big-calendar כותב `backgroundColor`
+ * ישירות על ה-DOM, לא דרך מחלקת Tailwind) — `rgb(var(--x))` ולא hex קבוע,
+ * כדי שהאירוע יתחלף אוטומטית בין מצב בהיר/כהה יחד עם שאר הטוקנים, בלי
+ * קוד נפרד לכל ערכת נושא.
+ */
+export const TONE_VARS = {
+  "cat-red": "rgb(var(--cat-red))",
+  "cat-blue": "rgb(var(--cat-blue))",
+  "cat-green": "rgb(var(--cat-green))",
+  "cat-purple": "rgb(var(--cat-purple))",
+  "cat-amber": "rgb(var(--cat-amber))",
+  "cat-cyan": "rgb(var(--cat-cyan))",
+  faint: "rgb(var(--text-faint))",
+};
