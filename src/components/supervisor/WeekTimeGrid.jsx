@@ -21,6 +21,7 @@ import isSameOrBefore from "dayjs/plugin/isSameOrBefore.js";
 import { Calendar, dayjsLocalizer } from "react-big-calendar";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { toCalendarEvents } from "../../lib/calendarEvents.js";
+import { fromISODate } from "../../lib/dates.js";
 import { categoryTone, TONE_VARS } from "../../design/categoryPalette.js";
 
 dayjs.extend(isBetween);
@@ -93,13 +94,20 @@ export default function WeekTimeGrid({ shifts = [], tasks = [], guards = [], dat
   // לגלגל את קצה משמרת הלילה לעמודה הבאה: משמרת 19:00–07:00 תיחתך
   // ב-23:59 בעמודת ההתחלה שלה — נראה, לא נעלם, וזו המגבלה שהספרייה
   // עצמה כופה על תצוגת שבוע/יום.
-  const { min, max } = useMemo(() => {
-    const base = dates[0] ? new Date(dates[0]) : new Date();
+  // `fromISODate` (dates.js) עוגן בצהריים מקומיים בכוונה, לא `new Date(iso)`
+  // גולמי (חצות UTC) — ב-timezone מאחורי UTC, `new Date("2026-09-13")`
+  // מוצג מקומית כ-12/9 בערב, וה-min/max שלמטה היו מתאפסים ליום הלא נכון
+  // עוד לפני שהגיעו ל-RBC. אותה מוסכמה בדיוק ש-calendarEvents.js כבר
+  // משתמש בה — לא ממציאים כאן עיגון תאריך שני.
+  const { min, max, scrollTo } = useMemo(() => {
+    const base = dates[0] ? fromISODate(dates[0]) : new Date();
     const d = new Date(base);
     d.setHours(0, 0, 0, 0);
     const e = new Date(base);
     e.setHours(23, 59, 59, 999);
-    return { min: d, max: e };
+    const s = new Date(base);
+    s.setHours(6, 0, 0, 0);
+    return { min: d, max: e, scrollTo: s };
   }, [dates]);
 
   return (
@@ -109,13 +117,18 @@ export default function WeekTimeGrid({ shifts = [], tasks = [], guards = [], dat
         events={events}
         view="week"
         views={["week"]}
-        date={dates[0] ? new Date(dates[0]) : new Date()}
+        date={dates[0] ? fromISODate(dates[0]) : new Date()}
         toolbar={false}
         rtl
         culture="he"
         messages={MESSAGES}
         min={min}
         max={max}
+        // ציר 24 שעות מלא (min/max) פותח גלילה בחצות בברירת המחדל — לא
+        // כמו Google Calendar, שנפתח על שעות היום. גלילה ראשונית ל-06:00,
+        // בלי לצמצם את min/max עצמם (שם עדיין חייבים להישאר 24 שעות מלאות
+        // כדי שמשמרת לילה שמתחילה 19:00 לא תיחתך בטרם עת).
+        scrollToTime={scrollTo}
         step={30}
         timeslots={2}
         eventPropGetter={(event) => eventPropGetter(event, mode)}
