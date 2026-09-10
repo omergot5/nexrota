@@ -20,6 +20,7 @@ import isSameOrAfter from "dayjs/plugin/isSameOrAfter.js";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore.js";
 import { Calendar, dayjsLocalizer } from "react-big-calendar";
 import "react-big-calendar/lib/css/react-big-calendar.css";
+import "./WeekTimeGrid.css";
 import { toCalendarEvents } from "../../lib/calendarEvents.js";
 import { fromISODate } from "../../lib/dates.js";
 import { categoryTone, TONE_VARS } from "../../design/categoryPalette.js";
@@ -62,13 +63,23 @@ function eventPropGetter(event, mode) {
   };
 }
 
+// שעה מוצגת כאן ולא דרך rbc-event-label המובנה (מוסתר ב-WeekTimeGrid.css):
+// שליטה מלאה על הפריסה הקומפקטית — שעה⋅כותרת⋅שם בשלוש שורות צמודות, לא
+// שני מקורות טקסט נפרדים שמתחרים על אותו שטח צר.
 function EventContent({ event }) {
   const names = event.resource.assignedGuardNames || [];
+  const hh = String(event.start.getHours()).padStart(2, "0");
+  const mm = String(event.start.getMinutes()).padStart(2, "0");
   return (
-    <div className="text-[11px] leading-tight">
+    <div className="text-[11px] leading-[1.15]">
+      {!event.allDay && (
+        <div className="font-black text-[10px]" data-numeric>
+          {hh}:{mm}
+        </div>
+      )}
       <div className="font-bold truncate">{event.title}</div>
       {names.length === 0 ? (
-        <div className="opacity-80">לא משובץ</div>
+        <div className="opacity-80 truncate">לא משובץ</div>
       ) : (
         <div className="opacity-90 truncate">{names.join(", ")}</div>
       )}
