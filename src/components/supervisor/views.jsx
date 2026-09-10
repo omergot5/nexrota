@@ -15,7 +15,7 @@ import { availStatus, checkAssignment, isQualified } from "../../lib/autoAssign.
 import { PROFILES, subscribeTerms, t, termProfile } from "../../lib/terms.js";
 import { compatIndex, explainConflict, findConflicts } from "../../lib/conflicts.js";
 import { fairnessHint, fairnessPlan } from "../../lib/fairness.js";
-import { folderIcon, foldersFor, UNFILED } from "../../lib/categories.js";
+import { categoryOptions, folderIcon, foldersFor, UNFILED } from "../../lib/categories.js";
 
 /**
  * Whole-week patterns. Two 12-hour shifts is the common security roster, but
