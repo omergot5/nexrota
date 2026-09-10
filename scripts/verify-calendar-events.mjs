@@ -1,8 +1,11 @@
 // Standalone sanity check for the react-big-calendar event adapter.
 //   node scripts/verify-calendar-events.mjs
 //
-// Pure module only — no browser, no database. Covers: overnight shift
-// unwrapping (via shiftInterval), allDay placement for timeless items,
+// Pure module only — no browser, no database. Covers: overnight-shift
+// splitting into two day-bounded segments (RBC promotes any event that
+// crosses a calendar day to the all-day row otherwise — this is the fix
+// for the live-reported bug where night shifts rendered as a banner
+// instead of at their real hour), allDay placement for timeless items,
 // merge-completeness (reuses boardItemsForDates, so nothing silently
 // drops), and determinism.
 
@@ -46,20 +49,31 @@ const tasks = [
 
 const events = toCalendarEvents({ shifts, tasks, dates: weekDates });
 
+// משמרת הלילה חוצה חצות — מתפצלת לשני אירועים, לא אחד. סה"כ האירועים
+// גדול ב-1 מסכום פריטי הקלט בדיוק בגלל הפיצול הזה.
 check(
-  "כל פריט קלט מייצר אירוע אחד — אף אחד לא נעלם",
-  events.length === shifts.length + tasks.length,
-  `events=${events.length} expected=${shifts.length + tasks.length}`
+  "כל פריט קלט מייצר אירוע אחד — חוץ ממשמרת הלילה שמתפצלת לשניים",
+  events.length === shifts.length + tasks.length + 1,
+  `events=${events.length} expected=${shifts.length + tasks.length + 1}`
 );
 
-const nightEvent = events.find((e) => e.id === "s-night");
-check("משמרת לילה: start ו-end הם מופעי Date אמיתיים", nightEvent.start instanceof Date && nightEvent.end instanceof Date);
+const nightEvents = events.filter((e) => e.id === "s-night");
+check("משמרת לילה חוצה חצות מייצרת בדיוק שני אירועים", nightEvents.length === 2, `count=${nightEvents.length}`);
+
+const [beforeMidnight, afterMidnight] = nightEvents.sort((a, b) => a.start - b.start);
 check(
-  "משמרת לילה חוצה חצות: end מאוחר מ-start ביותר מ-12 שעות (לא נקטע בחצות)",
-  nightEvent.end.getTime() - nightEvent.start.getTime() === 12 * 3600 * 1000,
-  `hours=${(nightEvent.end.getTime() - nightEvent.start.getTime()) / 3600000}`
+  "החצי הראשון: 19:00 עד ממש לפני חצות אותו יום",
+  beforeMidnight.start.getHours() === 19 &&
+    beforeMidnight.end.getDate() === beforeMidnight.start.getDate() &&
+    beforeMidnight.end.getHours() === 23 &&
+    beforeMidnight.end.getMinutes() === 59
 );
-check("משמרת לילה אינה allDay", nightEvent.allDay === false);
+check("החצי הראשון מסומן continuesAfter", beforeMidnight.resource.continuesAfter === true);
+check("החצי השני מתחיל בדיוק בחצות (00:00) ביום שאחרי", afterMidnight.start.getHours() === 0 && afterMidnight.start.getMinutes() === 0);
+check("החצי השני נגמר ב-07:00", afterMidnight.end.getHours() === 7);
+check("החצי השני מסומן continuesBefore", afterMidnight.resource.continuesBefore === true);
+check("שני החצאים יחד מכסים בדיוק 12 שעות", afterMidnight.end.getTime() - beforeMidnight.start.getTime() === 12 * 3600 * 1000);
+check("אף חצי אינו allDay", beforeMidnight.allDay === false && afterMidnight.allDay === false);
 
 const dayEvent = events.find((e) => e.id === "s-day");
 check(

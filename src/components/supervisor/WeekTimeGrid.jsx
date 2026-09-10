@@ -50,22 +50,32 @@ const MESSAGES = {
  * ולא `readableInk` מחושב: כל ששת גווני הקטגוריה נבחרו כהים מספיק
  * שלבן מנצח תמיד במצב בהיר, ובהירים מספיק שכהה מנצח תמיד במצב כהה —
  * מחושב פעם אחת ותועד ב-tokens.css, לא בכל רינדור.
+ *
+ * פינות מרובעות בצד שבו האירוע ממשיך (continuesAfter/Before, מ-
+ * calendarEvents.js) — אותו רמז חזותי ש-Google Calendar עצמו נותן למשמרת
+ * שפוצלה על פני חצות: שני חצאים שנראים כמו רצף אחד, לא שני אירועים סתם
+ * שמזדמן להם להיות צמודים.
  */
 function eventPropGetter(event, mode) {
   const tone = categoryTone(event.resource.category, mode);
+  const { continuesAfter, continuesBefore } = event.resource;
   return {
     style: {
       backgroundColor: TONE_VARS[tone],
       color: "rgb(var(--cat-on))",
       border: "none",
       borderRadius: 8,
+      ...(continuesAfter && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }),
+      ...(continuesBefore && { borderTopLeftRadius: 0, borderTopRightRadius: 0 }),
     },
   };
 }
 
 // שעה מוצגת כאן ולא דרך rbc-event-label המובנה (מוסתר ב-WeekTimeGrid.css):
 // שליטה מלאה על הפריסה הקומפקטית — שעה⋅כותרת⋅שם בשלוש שורות צמודות, לא
-// שני מקורות טקסט נפרדים שמתחרים על אותו שטח צר.
+// שני מקורות טקסט נפרדים שמתחרים על אותו שטח צר. בחצי הממשיך (אחרי
+// חצות) מוצגת חץ במקום שעה — "07:00" בראש התא היה קורא כאילו המשמרת
+// *מתחילה* שם, בעוד שהיא רק נגמרת שם.
 function EventContent({ event }) {
   const names = event.resource.assignedGuardNames || [];
   const hh = String(event.start.getHours()).padStart(2, "0");
@@ -74,7 +84,7 @@ function EventContent({ event }) {
     <div className="text-[11px] leading-[1.15]">
       {!event.allDay && (
         <div className="font-black text-[10px]" data-numeric>
-          {hh}:{mm}
+          {event.resource.continuesBefore ? "⋯" : `${hh}:${mm}`}
         </div>
       )}
       <div className="font-bold truncate">{event.title}</div>
