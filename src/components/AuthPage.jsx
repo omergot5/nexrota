@@ -355,6 +355,11 @@ export default function AuthPage({
         password: form.password,
         fullName: form.fullName,
         teamName: form.teamName,
+        // עד כאן הבחירה בשלב "איפה אתה עובד?" רק שינתה תצוגה מקדימה
+        // מקומית (pickProfile → setTermProfile) — בלי השורה הזו היא לא
+        // הייתה מגיעה לשרת בכלל, וכל צוות חדש היה נוצר עם ברירת המחדל
+        // 'security' בלי קשר למה שנבחר כאן.
+        mode: form.profile,
       });
     } catch (e) {
       setLocal(

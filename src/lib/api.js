@@ -204,18 +204,28 @@ const coded = (code, message) => {
   return err;
 };
 
-/** Creates the team + supervisor profile for whoever is signed in right now. */
-export async function createTeamForCurrentUser({ fullName, teamName }) {
-  const { data: rows, error } = await supabase.rpc("gs_create_team", {
+/**
+ * Creates the team + supervisor profile for whoever is signed in right now.
+ *
+ * `mode` ברירת המחדל שלה ב-RPC היא כבר 'security' (ותקף-מאומת שם, לא רק
+ * כאן) — `undefined`/ערך לא-תקין פשוט לא נשלח, ונופל לברירת המחדל של
+ * השרת, לא של הלקוח. `VALID_MODES` (למעלה) נשמר כמקור-אמת יחיד לרשימת
+ * הערכים התקפים; ה-RPC עצמו מכיל את אותה רשימה בדיוק (0016), לא בטעות —
+ * שני מקומות שאסור להם לדרוך.
+ */
+export async function createTeamForCurrentUser({ fullName, teamName, mode }) {
+  const params = {
     p_team_name: teamName?.trim() || `הצוות של ${fullName?.trim() || 'האחמ"ש'}`,
     p_full_name: fullName?.trim() || "מנהל משמרת",
-  });
+  };
+  if (mode && VALID_MODES.includes(mode)) params.p_mode = mode;
+  const { data: rows, error } = await supabase.rpc("gs_create_team", params);
   if (error) throw new Error("לא הצלחנו ליצור את הצוות — נסה שוב");
   const row = Array.isArray(rows) ? rows[0] : rows;
   return { teamCode: row.team_code, profileId: row.profile_id };
 }
 
-export async function registerSupervisor({ email, password, fullName, teamName }) {
+export async function registerSupervisor({ email, password, fullName, teamName, mode }) {
   const { data, error } = await supabase.auth.signUp({
     email: email.trim().toLowerCase(),
     password,
@@ -232,7 +242,7 @@ export async function registerSupervisor({ email, password, fullName, teamName }
 
   if (!data.session) throw coded("EMAIL_CONFIRMATION_REQUIRED");
 
-  return createTeamForCurrentUser({ fullName, teamName });
+  return createTeamForCurrentUser({ fullName, teamName, mode });
 }
 
 export async function loginSupervisor({ email, password }) {
@@ -346,6 +356,11 @@ export async function loadTeam(teamCode) {
   if (firstError) throw new Error(firstError.message);
 
   const profiles = (profilesRes.data || []).map(profileFromRow);
+  // מחושב פעם אחת, לא בתוך אובייקט ה-team: גם מטריצת ההתנגשויות (למטה)
+  // צריכה את אותו ערך בדיוק כדי לסנן כללים מובנים לפי תחום — שני שימושים
+  // באותה נקודת-אמת, לא שני חישובי-נפילה-לברירת-מחדל נפרדים שעלולים
+  // להסתיים בערך שונה.
+  const teamMode = VALID_MODES.includes(teamRes.data?.mode) ? teamRes.data.mode : "security";
 
   return {
     team: teamRes.data
@@ -361,7 +376,7 @@ export async function loadTeam(teamCode) {
           // שלושת הערכים תואמים בדיוק את ה-check constraint על gs_teams.mode
           // (מיגרציה 0011) — ערך לא מוכר (שורה ישנה, DB לא מעודכן) נופל
           // ל-security, לא צונח בשקט ל"civil" שכבר לא קיים.
-          mode: VALID_MODES.includes(teamRes.data.mode) ? teamRes.data.mode : "security",
+          mode: teamMode,
           // {קטגוריה: מכפיל} להוגנות (shiftLoad ב-autoAssign.js) — עמודה
           // חסרה/null/כל דבר שאינו אובייקט ממשי נופל ל-{}, שקול ל"אין
           // אף קטגוריה שהוגדרה משקל מיוחד לה" (D-05: היעדר-שורה = ברירת
@@ -383,7 +398,14 @@ export async function loadTeam(teamCode) {
     // בסיס נתונים שהמיגרציה טרם רצה עליו יחזיר שגיאה כאן, והאפליקציה
     // צריכה להמשיך לעבוד בלי תבניות — לא ליפול על מסך שגיאה.
     taskTemplates: (tplRes.data || []).map(templateFromRow),
-    compatibility: (compatRes.data || []).map(compatFromRow),
+    // כלל מובנה (team_code null) מסונן לפי תחום הצוות — 0016 תייגה את
+    // חמשת הכללים המובנים הקיימים כ-'army', ולכן צוות security/restaurant
+    // כבר לא רואה בכלל את "כוננות ↔ תורנות מטבח" וכדומה. כלל של הצוות
+    // עצמו (team_code לא null) תמיד עובר — הוא כבר משויך לתחום דרך
+    // team_code, לא צריך תיוג mode נפרד.
+    compatibility: (compatRes.data || [])
+      .filter((row) => row.team_code || !row.mode || row.mode === teamMode)
+      .map(compatFromRow),
     // גם היא **לא** נכללת ב-firstError, מאותה סיבה בדיוק: בסיס נתונים
     // שהמיגרציה 0007 טרם רצה עליו חייב להמשיך לטעון בלי עמדות, לא ליפול
     // על מסך שגיאה (Phase 4).

@@ -2547,8 +2547,8 @@ function CategoryWeightSettings({ team, actions, busy, categories }) {
         משקל הוגנות לפי קטגוריה
       </h2>
       <p className="text-sm text-muted mb-4">
-        קטגוריה פחות רצויה (למשל מטבח) שווה לתת לה מכפיל <b>גבוה</b> מ-1 — מי שעשה אותה נחשב/ת כמי שמילא/ה
-        חלק גדול יותר מהיעד שלו/ה, אז המנוע נמנע מלהעמיס עליו/ה עוד בקרוב. קטגוריה מבוקשת (למשל כוננות)
+        קטגוריה פחות רצויה שווה לתת לה מכפיל <b>גבוה</b> מ-1 — מי שעשה אותה נחשב/ת כמי שמילא/ה
+        חלק גדול יותר מהיעד שלו/ה, אז המנוע נמנע מלהעמיס עליו/ה עוד בקרוב. קטגוריה מבוקשת
         שווה מכפיל <b>נמוך</b> מ-1. 1 = ברירת המחדל, שווה לכולם. השינוי חל על כל הצוות, לא על אדם ספציפי.
       </p>
       <div className="grid sm:grid-cols-2 gap-3">
@@ -2599,8 +2599,8 @@ function CategoryConflictSettings({ actions, busy, categories, compatibility }) 
         התנגשויות בין קטגוריות
       </h2>
       <p className="text-sm text-muted mb-4">
-        קבע אילו קטגוריות אסור לאדם אחד לעשות באותו חלון זמן — למשל "מטבח" ו"כוננות". ברירת המחדל: כל
-        שילוב מותר.
+        קבע אילו קטגוריות אסור לאדם אחד לעשות באותו חלון זמן — למשל "{categories[0]}" ו"{categories[1]}".
+        ברירת המחדל: כל שילוב מותר.
       </p>
 
       {compatibility.length > 0 && (
@@ -2742,11 +2742,24 @@ function DeadlineSettings({ team, actions, busy }) {
  * את אותו אוצר מילים. `fallback` (למטה) הוא רק הגשר לרגע שבין טעינת
  * המסך לטעינת הצוות, לא מקור אמת חלופי.
  */
-function ProfilePicker({ team, actions, busy }) {
+function ProfilePicker({ team, actions, busy, shifts = [], tasks = [] }) {
   // מקור האמת הוא הצוות. `termProfile` נשאר כגיבוי לרגע שבין טעינת המסך
   // לטעינת הצוות, כדי שהכרטיס לא יהבהב על ברירת מחדל שגויה.
   const fallback = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
   const active = team?.mode || fallback;
+
+  // מעבר פרופיל לא נוגע בשום משמרת/משימה קיימת (updateTeamSettings כותבת
+  // רק לעמודת mode) — קטגוריה מהפרופיל הקודם ממשיכה להתקיים כ"מותאמת
+  // אישית" (categories.js, categoryOptions). "ביטול במקום אישור" (עיקרון
+  // ברזל #3) אומר שאסור לחסום את הבחירה ב-confirm() — אבל מותר, ואפילו
+  // רצוי, להראות מראש כמה קטגוריות ייעלמו מהרשימה-המוצעת-לפי-תחום ויהפכו
+  // ל"מותאם אישית" לפני שהמנהל לוחץ, לא אחרי.
+  const usedCategories = [...new Set([...shifts, ...tasks].map((x) => x?.category).filter(Boolean))];
+  const leftoverCountFor = (profileId) => {
+    const known = new Set(foldersFor(profileId).map((f) => f.name));
+    return usedCategories.filter((c) => !known.has(c)).length;
+  };
+
   return (
     <Card>
       <h2 className="font-bold text-content mb-1 flex items-center gap-2">
@@ -2763,6 +2776,7 @@ function ProfilePicker({ team, actions, busy }) {
       <div className="grid gap-3 sm:grid-cols-3">
         {PROFILES.map((p) => {
           const on = p.id === active;
+          const leftover = on ? 0 : leftoverCountFor(p.id);
           return (
             <button
               key={p.id}
@@ -2786,6 +2800,11 @@ function ProfilePicker({ team, actions, busy }) {
               <span className="min-w-0">
                 <span className="block font-bold text-content">{p.label}</span>
                 <span className="block text-xs text-muted mt-0.5">{p.hint}</span>
+                {leftover > 0 && (
+                  <span className="block text-[11px] text-warn mt-1">
+                    {leftover} קטגוריות בשימוש יישארו כ"מותאם אישית"
+                  </span>
+                )}
               </span>
             </button>
           );
@@ -2889,7 +2908,7 @@ export function TeamView({
     <div className="space-y-6">
       <PageHeader title={t("nav.team")} subtitle={team?.name || `נהל ${t("noun.memberPlural")} ושתף את קוד הצוות`} />
 
-      <ProfilePicker team={team} actions={actions} busy={busy} />
+      <ProfilePicker team={team} actions={actions} busy={busy} shifts={shifts} tasks={tasks} />
 
       <DeadlineSettings team={team} actions={actions} busy={busy} />
 
