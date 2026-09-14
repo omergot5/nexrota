@@ -4,13 +4,14 @@ import { AVAIL } from "../../design/availability.js";
 import { loadTable } from "../../lib/loadTable.js";
 import {
   Alert, Avatar, Badge, Btn, Card, EmptyState, Field, guardColor, IconBtn, initials, Input, Meter,
-  Modal, PageHeader, readableInk, Select, StatCard, Textarea,
+  Modal, PageHeader, readableInk, Segmented, Select, StatCard, Textarea,
 } from "../ui.jsx";
 import { Dot, Icon } from "../icons.jsx";
 import {
   availabilityDeadline, dayName, DAYS_HE_SHORT, formatDateHe, fromISODate, isSingleDayTask, isTaskEngineEligible,
-  rangeLabelHe, rangeTextHe, shiftHours, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
+  rangeLabelHe, rangeTextHe, recentItems, shiftHours, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
 } from "../../lib/dates.js";
+import { loadWindowMode, RECENT_DAYS, setLoadWindowMode, subscribeLoadWindow } from "../../lib/loadWindow.js";
 import { availStatus, checkAssignment, isQualified } from "../../lib/autoAssign.js";
 import { PROFILES, subscribeTerms, t, termProfile } from "../../lib/terms.js";
 import { compatIndex, explainConflict, findConflicts } from "../../lib/conflicts.js";
@@ -98,9 +99,20 @@ export function SupDashboard({
   // load שכבר הגיע מוכן מ-loadTable. המשימות עוברות דרך withEngineTasks
   // (Phase 2) לפני שהן נכנסות ל-loadTable, כדי שהכרטיס הזה ומסך הדוחות
   // לעולם לא יחלקו על אותו שומר.
+  // חלון-הצגה: "recent" (14 יום, ברירת מחדל) תואם בדיוק את מה שהמנוע
+  // בפועל משתמש בו (rollingLoad, fairness.js) להחלטות הוגנות — לא "כל
+  // הזמן". בלי הסינון הזה, שומר חדש שעוד לא שובץ נראה כמו כישלון הוגנות
+  // (0 נטל) גם כשהמנוע מעולם לא "דילג" עליו — הוא פשוט טרם הגיע לתורו.
+  const loadWindow = useSyncExternalStore(subscribeLoadWindow, loadWindowMode, loadWindowMode);
+  const mergedForLoad = useMemo(() => withEngineTasks(shifts, tasks), [shifts, tasks]);
   const { rows: loadRows } = useMemo(
-    () => loadTable(guards, withEngineTasks(shifts, tasks), team?.taskWeights || {}),
-    [guards, shifts, tasks, team]
+    () =>
+      loadTable(
+        guards,
+        loadWindow === "recent" ? recentItems(mergedForLoad, RECENT_DAYS) : mergedForLoad,
+        team?.taskWeights || {}
+      ),
+    [guards, mergedForLoad, loadWindow, team]
   );
   const maxLoad = Math.max(1, ...loadRows.map((r) => r.load));
 
@@ -324,10 +336,21 @@ export function SupDashboard({
         </Card>
 
         <Card>
-          <h2 className="font-bold text-content mb-4 flex items-center gap-2">
-            <Icon name="users" size={17} className="text-muted" />
-            עומס ה{t("noun.memberPlural")}
-          </h2>
+          <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+            <h2 className="font-bold text-content flex items-center gap-2">
+              <Icon name="users" size={17} className="text-muted" />
+              עומס ה{t("noun.memberPlural")}
+            </h2>
+            <Segmented
+              size="sm"
+              value={loadWindow}
+              onChange={setLoadWindowMode}
+              options={[
+                { value: "recent", label: `${RECENT_DAYS} ימים אחרונים` },
+                { value: "all", label: "מצטבר" },
+              ]}
+            />
+          </div>
           {loadRows.length === 0 ? (
             <p className="text-muted text-sm text-center py-8">אין {t("noun.memberPlural")} עדיין</p>
           ) : (
@@ -1871,6 +1894,16 @@ const TEMPLATE_DEFAULT_HOURS = {
 const DEFAULT_TASK_HOURS = { startTime: "08:00", endTime: "16:00" };
 const hoursForCategory = (category) => TEMPLATE_DEFAULT_HOURS[category] || DEFAULT_TASK_HOURS;
 
+// דוגמאות placeholder לפי תחום — לא נגזרות מ-foldersFor(mode) כי אלה משפטים
+// טבעיים, לא שמות תיקייה. בלי זה placeholder קבוע היה מוצג לכל שלושת
+// התחומים בלי קשר ל-mode בפועל (למשל "המטבח סגור" למנהל אבטחה).
+const TASK_TITLE_EXAMPLE = { security: "בדיקת ציוד אבטחה", restaurant: "בדיקת מלאי", army: "בדיקת ציוד" };
+const OVERRIDE_NOTE_EXAMPLE = {
+  security: "עמדה ריקה באותה שעה, אין בפועל חפיפה",
+  restaurant: "המטבח סגור באותן שעות, אז אין חפיפה בפועל",
+  army: "עמדה ריקה באותה שעה, אין בפועל חפיפה",
+};
+
 export function TaskMgmt({
   guards, tasks, weekDates, actions, busy,
   templates = [], compatibility = [], mode = "security", shifts = [],
@@ -2292,7 +2325,7 @@ export function TaskMgmt({
             <Input
               value={form.title}
               onChange={field("title")}
-              placeholder="בדיקת ציוד אבטחה"
+              placeholder={TASK_TITLE_EXAMPLE[mode] || TASK_TITLE_EXAMPLE.security}
               autoFocus
             />
           </Field>
@@ -2490,7 +2523,7 @@ export function TaskMgmt({
                     rows={2}
                     value={form.overrideNote}
                     onChange={field("overrideNote")}
-                    placeholder="המטבח סגור באותן שעות, אז אין חפיפה בפועל"
+                    placeholder={OVERRIDE_NOTE_EXAMPLE[mode] || OVERRIDE_NOTE_EXAMPLE.security}
                     autoFocus
                   />
                 </Field>

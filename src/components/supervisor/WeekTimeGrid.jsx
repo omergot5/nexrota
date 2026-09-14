@@ -24,6 +24,7 @@ import "./WeekTimeGrid.css";
 import { toCalendarEvents } from "../../lib/calendarEvents.js";
 import { fromISODate } from "../../lib/dates.js";
 import { categoryTone, TONE_VARS } from "../../design/categoryPalette.js";
+import { guardColor } from "../ui.jsx";
 
 dayjs.extend(isBetween);
 dayjs.extend(localeData);
@@ -55,15 +56,24 @@ const MESSAGES = {
  * calendarEvents.js) — אותו רמז חזותי ש-Google Calendar עצמו נותן למשמרת
  * שפוצלה על פני חצות: שני חצאים שנראים כמו רצף אחד, לא שני אירועים סתם
  * שמזדמן להם להיות צמודים.
+ *
+ * פס-שומר: הרקע נשאר לפי קטגוריה (ככה מבדילים "מה" — שמירות מול סיור),
+ * ומעליו פס בצד-התחלה בצבע קבוע לפי guardColor(id) — אותו צבע יציב שכבר
+ * מזהה את השומר בכל מקום אחר באפליקציה — כדי שאפשר יהיה להבדיל גם "מי":
+ * שתי משמרות שמירות של שני שומרים שונים כבר לא נראות זהות. `border-inline-
+ * start` ולא `border-right` בכוונה — מתהפך אוטומטית עם RTL/LTR בלי קוד
+ * נפרד. רק כשיש שומר משובץ בפועל; משמרת ריקה לא "שייכת" לאף אחד.
  */
 function eventPropGetter(event, mode) {
   const tone = categoryTone(event.resource.category, mode);
-  const { continuesAfter, continuesBefore } = event.resource;
+  const { continuesAfter, continuesBefore, assignedGuards } = event.resource;
+  const guardId = assignedGuards?.[0];
   return {
     style: {
       backgroundColor: TONE_VARS[tone],
       color: "rgb(var(--cat-on))",
       border: "none",
+      borderInlineStart: guardId ? `4px solid ${guardColor(guardId)}` : "none",
       borderRadius: 8,
       ...(continuesAfter && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }),
       ...(continuesBefore && { borderTopLeftRadius: 0, borderTopRightRadius: 0 }),
