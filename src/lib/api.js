@@ -24,7 +24,10 @@ const SITE_URL =
 // תואם בדיוק את ה-check constraint על gs_teams.mode (מיגרציה 0011). לא
 // מיובא מ-terms.js בכוונה — זו שכבת הנתונים, וטרמינולוגיית תצוגה שייכת
 // לשכבה שמעליה; שני המקומות משקפים באופן עצמאי את אותו constraint.
-const VALID_MODES = ["army", "security", "restaurant"];
+// מיוצא (לא רק לשימוש פנימי) כדי ש-scripts/verify-categories.mjs יוכל
+// לוודא שהיא לא סוטה מ-FOLDERS_BY_MODE/PROFILE_TERMS — שלושה מקומות
+// עצמאיים שאמורים להסכים על אותה רשימת תחומים בדיוק.
+export const VALID_MODES = ["army", "security", "restaurant"];
 
 // ---------- row <-> app mappers ----------
 
