@@ -104,5 +104,16 @@ check("שלוש קריאות רצופות על אותו קלט מייצרות JS
 const empty = toCalendarEvents({ shifts: [], tasks: [], dates: weekDates });
 check("קלט ריק מחזיר מערך אירועים ריק, לא קורס", Array.isArray(empty) && empty.length === 0);
 
+// ============================================================
+// גבול: משמרת שנגמרת בדיוק בחצות (00:00) — לא "חוצה" חצות במובן שיש לה
+// עוד חצי שעה אחרי, ולכן אמורה להישאר אירוע יחיד, לא להתפצל לחצי-שני
+// באורך אפס. הבדיקה הזו נועדה לתפוס בדיוק את ה-off-by-one שהיה יכול
+// להיכנס אם `<=`/`<` הוחלפו בטעות ב-toCalendarEvents.
+// ============================================================
+const midnightShift = { id: "s-midnight", date: sunday, startTime: "19:00", endTime: "00:00", label: "עד חצות", assignedGuards: ["g1"], category: "שמירות", requiredGuards: 1 };
+const midnightEvents = toCalendarEvents({ shifts: [midnightShift], tasks: [], dates: weekDates });
+check("משמרת שנגמרת בדיוק בחצות מייצרת אירוע יחיד, לא מתפצלת", midnightEvents.length === 1, `count=${midnightEvents.length}`);
+check("האירוע היחיד נגמר בדיוק בחצות", midnightEvents[0]?.end.getHours() === 0 && midnightEvents[0]?.end.getMinutes() === 0);
+
 console.log(failures === 0 ? "\nPASS\n" : `\n${failures} FAILURE(S)\n`);
 process.exit(failures === 0 ? 0 : 1);

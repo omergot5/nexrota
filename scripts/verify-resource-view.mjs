@@ -70,8 +70,35 @@ const generalCell = generalRow.days.find((d) => d.date === sunday);
 check("הפריט הקפוא (כללי) נופל ביום העוגן שלו (dueDate)", generalCell.items.length === 1, `count=${generalCell.items.length}`);
 check("לפריט הקפוא אין startTime (timeless, לא מזוייף)", !generalCell.items[0].startTime);
 
-const emptyCell = guardRow.days.find((d) => d.date === "2026-09-07");
+const emptyCell = generalRow.days.find((d) => d.date === "2026-09-08");
 check("תא בלי אף פריט הוא מערך ריק, לא undefined", Array.isArray(emptyCell.items) && emptyCell.items.length === 0);
+
+// s-guard-2 (19:00–07:00, יום ראשון) חוצה חצות — ההמשך שלו אמור לנחות גם
+// בתא שמירות/שני, כמו שכבר קורה ב-WeekTimeGrid (calendarEvents.js). בלי
+// זה מבט-המשאבים "בולע" את חצי המשמרת שאחרי חצות (הבאג שתוקן כאן).
+const mondayGuardCell = guardRow.days.find((d) => d.date === "2026-09-07");
+check(
+  "משמרת חוצה-חצות ממשיכה גם בתא שמירות/שני",
+  mondayGuardCell.items.length === 1 && mondayGuardCell.items[0].id === "s-guard-2"
+);
+check("המשך המשמרת מסומן continuesBefore", mondayGuardCell.items[0].continuesBefore === true);
+check(
+  "המשך המשמרת מציג startTime=00:00 (לא 19:00 המקורי) — כדי שהתא לא יראה כאילו יש שם משמרת-לילה שלמה נוספת",
+  mondayGuardCell.items[0].startTime === "00:00" && mondayGuardCell.items[0].endTime === "07:00"
+);
+
+// המשך-המשמרת אחרי חצות ממוין ראשון בתא, לא לפי השעה המקורית (19:00) —
+// אחרת משמרת בוקר אמיתית (07:00) הייתה מוצגת "לפני" משמרת-לילה שכבר
+// רצה מאז חצות, בהיפוך לסדר הכרונולוגי האמיתי.
+const mondayMorning = { id: "s-monday-am", date: "2026-09-07", startTime: "07:00", endTime: "15:00", label: "בוקר שני", assignedGuards: [], category: "שמירות" };
+const orderRows = buildResourceRows({ shifts: [...shifts, mondayMorning], tasks, weekDates, mode: "security" });
+const orderMondayCell = orderRows.find((r) => r.category === "שמירות").days.find((d) => d.date === "2026-09-07");
+check(
+  "המשך-משמרת-הלילה (00:00) ממוין לפני משמרת הבוקר האמיתית (07:00) באותו תא",
+  orderMondayCell.items.length === 2 &&
+    orderMondayCell.items[0].id === "s-guard-2" &&
+    orderMondayCell.items[1].id === "s-monday-am"
+);
 
 const customRow = rows.find((r) => r.category === "אבטחת אירוע");
 check("קטגוריה מותאמת-אישית מקבלת אייקון סביר (לא קורס)", typeof customRow.icon === "string" && customRow.icon.length > 0);
@@ -89,6 +116,36 @@ check("קלט ריק מחזיר מערך שורות ריק, לא קורס", Arra
 // mode לא מוכר נופל לברירת המחדל (security) בלי לזרוק.
 const fallback = buildResourceRows({ shifts, tasks, weekDates, mode: "no-such-mode" });
 check("mode לא מוכר לא זורק — נופל לטקסונומיית ברירת המחדל", Array.isArray(fallback) && fallback.length > 0);
+
+// ============================================================
+// גבולות ל-crossesMidnight (הרחבה, אחרי הבאג שתוקן למעלה: חצי-לילה
+// שנבלע). שלושה תרחישים ש-Topic 3 זיהה כבלתי-מכוסים: פריט timeless
+// (בלי startTime בכלל — לא אמור לקרוס), משמרת שנגמרת בדיוק בחצות (לא
+// אמורה "להמשיך" ליום שאחריה, כי אין לה עוד רגע אחרי), ומשמרת חוצה-חצות
+// שהיום-שאחריה נופל מחוץ ל-weekDates (לא אמורה לייצר תא בשום מקום).
+// ============================================================
+const timelessShift = { id: "s-timeless-ish", date: sunday, startTime: null, endTime: null, label: "בלי שעה", assignedGuards: [], category: "שמירות" };
+const timelessRows = buildResourceRows({ shifts: [timelessShift], tasks: [], weekDates, mode: "security" });
+check(
+  "פריט בלי startTime לא קורס ולא 'חוצה חצות' (לא נופל גם ביום שאחריו)",
+  timelessRows.find((r) => r.category === "שמירות")?.days.find((d) => d.date === "2026-09-07")?.items.length === 0
+);
+
+const midnightEndShift = { id: "s-mid-end", date: sunday, startTime: "19:00", endTime: "00:00", label: "עד חצות", assignedGuards: [], category: "שמירות" };
+const midnightEndRows = buildResourceRows({ shifts: [midnightEndShift], tasks: [], weekDates, mode: "security" });
+check(
+  "משמרת שנגמרת בדיוק בחצות לא יוצרת המשך ביום שאחריה",
+  midnightEndRows.find((r) => r.category === "שמירות")?.days.find((d) => d.date === "2026-09-07")?.items.length === 0
+);
+
+const lastDay = weekDates[weekDates.length - 1]; // שבת — היום שאחריה (ראשון הבא) מחוץ לשבוע הזה
+const edgeShift = { id: "s-edge", date: lastDay, startTime: "19:00", endTime: "07:00", label: "לילה בקצה השבוע", assignedGuards: [], category: "שמירות" };
+const edgeRows = buildResourceRows({ shifts: [edgeShift], tasks: [], weekDates, mode: "security" });
+const edgeGuardRow = edgeRows.find((r) => r.category === "שמירות");
+check(
+  "משמרת חוצה-חצות בקצה השבוע לא קורסת כשיום-ההמשך מחוץ ל-weekDates",
+  edgeGuardRow.days.reduce((n, d) => n + d.items.length, 0) === 1
+);
 
 console.log(failures === 0 ? "\nPASS\n" : `\n${failures} FAILURE(S)\n`);
 process.exit(failures === 0 ? 0 : 1);
