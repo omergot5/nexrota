@@ -335,7 +335,7 @@ const W = { availability: 40, fairness: 35, night: 22, rest: 10, continuity: 5 }
 const maxScoreFor = (shift) =>
   W.availability + W.fairness + W.rest + W.continuity + (shift.type === "night" ? W.night : 0);
 
-function scoreCandidate({ guard, shift, load, availability, rules, stats, check }) {
+function scoreCandidate({ guard, shift, load, availability, rules, stats, check, carried }) {
   const parts = [];
   let score = 0;
 
@@ -370,31 +370,46 @@ function scoreCandidate({ guard, shift, load, availability, rules, stats, check 
   // משרה מלאה אחת; capacityOf(guard) מכווץ אותו לחלק המשרה של השומר/ת
   // הספציפי/ת הזה/זו. שומר/ת בחצי משרה "מאוזן/ת" בחצי מהנטל של שומר/ת
   // במשרה מלאה, לא כמעט באותו נטל.
+  //
+  // `carried` (אופציונלי, מ-carriedLoad שהקורא מזין) הוא הנטל שכבר נצבר
+  // *לפני* השבוע הזה — חלון מתגלגל, אותו חישוב בדיוק כמו rollingLoad
+  // ב-fairness.js. הוא נכנס רק לכאן, לנוסחת ההוגנות הרכה — לא ל-load.count/
+  // load.nights/load.shifts/load.dates, שמשמשים את האילוצים הקשיחים
+  // (תקרת-שבוע, מרחק-מנוחה, איסור-חפיפה) ואסור להם "לזכור" משמרת משבוע
+  // קודם כאילו היא מתנגשת עם השבוע הנוכחי. בלי carried, מי שנשא שבועיים
+  // רצופים היה נראה "מאוזן לגמרי" ברגע שמתחילים שבוע שלישי מאפס — בדיוק
+  // הפער ש-fairnessPlan (מסך השיבוץ הידני) כבר חישב נכון, אבל שהמנוע
+  // האוטומטי הזה מעולם לא ראה.
+  const carriedLoad = carried?.load || 0;
+  const carriedNights = carried?.nights || 0;
   const target = Math.max(stats.loadTargetPerGuard * capacityOf(guard), 0.001);
-  const fairness = Math.max(0, Math.min(1, 1 - load.load / target));
+  const fairness = Math.max(0, Math.min(1, 1 - (load.load + carriedLoad) / target));
   const fairnessPts = points(35 * fairness);
   score += fairnessPts;
   parts.push({
     label:
-      load.count === 0
-        ? "טרם שובץ/ה השבוע"
-        : `נטל נמוך יחסית — ${round(load.load)} מול יעד אישי ${round(target)}`,
+      load.count === 0 && !carriedLoad
+        ? "טרם שובץ/ה"
+        : carriedLoad
+          ? `נטל מצטבר (כולל שבועות קודמים) ${round(load.load + carriedLoad)} מול יעד אישי ${round(target)}`
+          : `נטל נמוך יחסית — ${round(load.load)} מול יעד אישי ${round(target)}`,
     points: fairnessPts,
     kind: "fairness",
   });
 
   // 3. Night rotation — measured against the team's expected share of nights,
   //    not against the hard cap, or nights pile onto whoever is free first.
+  //    Same carried-load treatment as fairness above.
   if (shift.type === "night") {
     const nightTarget = Math.max(stats.nightTargetPerGuard * capacityOf(guard), 0.001);
-    const nightFair = Math.max(0, Math.min(1, 1 - load.nights / nightTarget));
+    const nightFair = Math.max(0, Math.min(1, 1 - (load.nights + carriedNights) / nightTarget));
     const nightPts = points(22 * nightFair);
     score += nightPts;
     parts.push({
       label:
-        load.nights === 0
-          ? "טרם שובץ/ה ללילה השבוע"
-          : `${load.nights} לילות עד כה מול יעד אישי ${round(nightTarget)}`,
+        load.nights === 0 && !carriedNights
+          ? "טרם שובץ/ה ללילה"
+          : `${load.nights + carriedNights} לילות (כולל שבועות קודמים) מול יעד אישי ${round(nightTarget)}`,
       points: nightPts,
       kind: "night",
     });
@@ -482,7 +497,7 @@ function scoreCandidate({ guard, shift, load, availability, rules, stats, check 
  */
 export function autoAssign({
   shifts, guards, availability = {}, rules: ruleOverrides, keepExisting = false, tasks = [],
-  taskWeights = {},
+  taskWeights = {}, carriedLoad = {},
 }) {
   const rules = { ...DEFAULT_RULES, ...ruleOverrides };
   const log = [];
@@ -624,7 +639,9 @@ export function autoAssign({
           roundBlockers.push({ guardId: guard.id, name: guard.name, code: check.code, reason: check.reason });
           continue;
         }
-        const { score, raw, parts } = scoreCandidate({ guard, shift, load: l, availability, rules, stats, check });
+        const { score, raw, parts } = scoreCandidate({
+          guard, shift, load: l, availability, rules, stats, check, carried: carriedLoad[guard.id],
+        });
         candidates.push({ guardId: guard.id, guard, score, raw, parts });
       }
 
@@ -671,6 +688,7 @@ export function autoAssign({
   // --- local-search balancing ---
   const balanceMoves = balanceWorkload({
     openShifts, activeGuards, availability, rules, stats, load, assignments, byShift, weights: taskWeights,
+    carriedLoad,
   });
   if (balanceMoves.length) {
     log.push({
@@ -686,7 +704,9 @@ export function autoAssign({
 
 // ---------- balancing ----------
 
-function balanceWorkload({ openShifts, activeGuards, availability, rules, stats, load, assignments, byShift, weights = {} }) {
+function balanceWorkload({
+  openShifts, activeGuards, availability, rules, stats, load, assignments, byShift, weights = {}, carriedLoad = {},
+}) {
   const moves = [];
   const shiftById = new Map(openShifts.map((s) => [s.id, s]));
 
@@ -717,7 +737,11 @@ function balanceWorkload({ openShifts, activeGuards, availability, rules, stats,
   // שווים, אז החיסור מוריד את אותו קבוע מכולם — ואינו משנה סדר, פערים, או
   // את תנאי-העצירה למטה (שונות/הפרש בין שני ערכים אינם משתנים מהזזה
   // קבועה). זו בדיוק הסיבה שהנוסחה למטה שקולה לישנה כש-D-02 לא רלוונטי.
-  const debtOf = (g) => load.get(g.id).load - stats.loadTargetPerGuard * capacityOf(g);
+  // + הנטל שנצבר לפני השבוע הזה (carriedLoad, ר' scoreCandidate) — אותו
+  // עיקרון: מי שנכנס לאיזון הזה כבר עמוס משבועות קודמים לא אמור להיראות
+  // "קל" רק כי השבוע הנוכחי עצמו עדיין ריק לו/ה.
+  const debtOf = (g) =>
+    load.get(g.id).load + (carriedLoad[g.id]?.load || 0) - stats.loadTargetPerGuard * capacityOf(g);
 
   for (let pass = 0; pass < rules.balancePasses; pass++) {
     const sorted = [...activeGuards].sort((a, b) => {
@@ -767,6 +791,7 @@ function balanceWorkload({ openShifts, activeGuards, availability, rules, stats,
       removeFromLoad(heavyLoad, shift, weights);
       const { score, raw, parts } = scoreCandidate({
         guard: lightest, shift, load: lightLoad, availability, rules, stats, check,
+        carried: carriedLoad[lightest.id],
       });
       addToLoad(lightLoad, shift, weights);
 

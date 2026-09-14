@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { autoAssign, availStatus, DEFAULT_RULES, explainUnfilled } from "../lib/autoAssign.js";
-import { formatDateHe, rangeLabelHe, shortDate } from "../lib/dates.js";
-import { loadShareHint } from "../lib/fairness.js";
+import { formatDateHe, rangeLabelHe, shortDate, withEngineTasks } from "../lib/dates.js";
+import { loadShareHint, rollingLoad } from "../lib/fairness.js";
+import { RECENT_DAYS } from "../lib/loadWindow.js";
 import { t } from "../lib/terms.js";
 import { Icon } from "./icons.jsx";
 import {
@@ -242,6 +243,21 @@ export default function SmartAssign({
     [tasks, weekDates]
   );
 
+  // מה שנצבר *לפני* השבוע הזה — חלון מתגלגל של RECENT_DAYS יום, אותו חישוב
+  // בדיוק כמו AssignView (מסך "אסדר בעצמי") וכמו כרטיס ההוגנות בדשבורד.
+  // בלי זה, autoAssign מתחיל כל שבוע מאפס ולא "זוכר" מי נשא עומס בשבועות
+  // הקודמים — שני שבועות רצופים של אותו שומר/ת היו נראים כמו התחלה נקייה
+  // ברגע שהשבוע השלישי מתחיל, בדיוק הפער ש-fairnessPlan (המסך הידני) כבר
+  // סוגר אבל שהמנוע האוטומטי הזה מעולם לא ראה עד עכשיו.
+  const weekStart = weekDates[0];
+  const carriedLoad = useMemo(() => {
+    const merged = withEngineTasks(shifts, tasks);
+    const history = merged.filter((s) => s.date < weekStart);
+    return rollingLoad({
+      guards, shifts: history, until: weekStart, days: RECENT_DAYS, taskWeights: team?.taskWeights || {},
+    }).per;
+  }, [shifts, tasks, guards, weekStart, team]);
+
   const guardById = useMemo(() => new Map(guards.map((g) => [g.id, g])), [guards]);
 
   const submittedCount = useMemo(() => {
@@ -258,7 +274,7 @@ export default function SmartAssign({
     setPlan(
       autoAssign({
         shifts: weekShifts, guards, availability, rules, keepExisting: keepManual, tasks: weekTasks,
-        taskWeights: team?.taskWeights || {},
+        taskWeights: team?.taskWeights || {}, carriedLoad,
       })
     );
     setApplied(false);

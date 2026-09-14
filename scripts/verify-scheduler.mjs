@@ -1360,5 +1360,57 @@ const catAgain = autoAssign({
 check("CAT-01 · deterministic — הרצה חוזרת מייצרת אותו byShift בדיוק",
   JSON.stringify(catResult.byShift) === JSON.stringify(catAgain.byShift));
 
+console.log("\n=== CARRY-01 · נטל שנצבר בשבועות קודמים (carriedLoad) ===");
+
+// הבעיה שהתגלתה חי: autoAssign מתחיל כל שבוע מ-load ריק לגמרי — הוא לא
+// "זוכר" ששומר/ת מסוים/ת נשא/ה עומס כבד בשבועות שקדמו לשבוע הנוכחי.
+// fairnessPlan (מסך "אסדר בעצמי") כבר סוגר את הפער הזה דרך rollingLoad,
+// אבל autoAssign (מסך "תסדר לי") מעולם לא קיבל את אותו מידע. carriedLoad
+// הוא הגשר: מפה guardId -> {load, nights} שהקורא מזין (בפועל: rollingLoad
+// על 14 היום שקדמו לשבוע), ושמשפיעה רק על ניקוד ההוגנות הרכה — לא על שום
+// אילוץ קשיח.
+{
+  const cGuards = [{ id: "cr1", name: "עמוס/ה" }, { id: "cr2", name: "פנוי/ה" }];
+  const cShift = {
+    id: "cr-s1", date: "2026-09-14", label: "משמרת", type: "day",
+    startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: [],
+  };
+  const cAvailability = {};
+  for (const g of cGuards) cAvailability[`${g.id}-cr-s1`] = { status: "available" };
+
+  // 1. שני מועמדים זהים לחלוטין חוץ מההיסטוריה — מי שנשא עומס כבד
+  //    בשבועות קודמים לא אמור לזכות במשמרת הפנויה היחידה.
+  const carried = { cr1: { load: 40, nights: 3 } }; // cr2 בלי היסטוריה בכלל
+  const carryResult = autoAssign({ shifts: [cShift], guards: cGuards, availability: cAvailability, carriedLoad: carried });
+  check("CARRY-01 · השומר/ת עם ההיסטוריה הכבדה לא מקבל/ת את המשמרת הפנויה היחידה",
+    carryResult.byShift["cr-s1"][0] === "cr2", JSON.stringify(carryResult.byShift));
+
+  // 2. בלי carriedLoad בכלל (ברירת מחדל {}), שני המועמדים שווים לגמרי —
+  //    ה-tie-break חוזר להכריע לפי guardId, בדיוק כמו לפני השינוי.
+  const noHistoryResult = autoAssign({ shifts: [cShift], guards: cGuards, availability: cAvailability });
+  check("CARRY-01 · בלי carriedLoad, תיקו מוכרע כמו קודם (guardId א״ב — cr1 לפני cr2)",
+    noHistoryResult.byShift["cr-s1"][0] === "cr1", JSON.stringify(noHistoryResult.byShift));
+
+  // 3. carriedLoad לא זולג לאילוצים קשיחים: שומר/ת עם 6 נטל-לילות "בהיסטוריה"
+  //    (מעל תקרת maxNightsPerWeek) עדיין כשיר/ה למשמרת לילה חדשה השבוע —
+  //    התקרה נמדדת רק מול load.nights האמיתי של השבוע הזה, לא מול carried.
+  const nightShift = {
+    id: "cr-n1", date: "2026-09-14", label: "משמרת לילה", type: "night",
+    startTime: "19:00", endTime: "07:00", requiredGuards: 1, assignedGuards: [],
+  };
+  const heavyNightHistory = { cr1: { load: 100, nights: 6 } }; // מעל DEFAULT_RULES.maxNightsPerWeek
+  const nightAvailability = { "cr1-cr-n1": { status: "available" }, "cr2-cr-n1": { status: "unavailable" } };
+  const nightResult = autoAssign({
+    shifts: [nightShift], guards: cGuards, availability: nightAvailability, carriedLoad: heavyNightHistory,
+  });
+  check("CARRY-01 · תקרת-לילות-שבועית נמדדת רק מול השבוע הנוכחי, לא מול carriedLoad",
+    nightResult.byShift["cr-n1"]?.[0] === "cr1", JSON.stringify(nightResult.byShift));
+
+  // 4. דטרמיניזם: אותו carriedLoad, אותה תוצאה בדיוק בכל הרצה.
+  const carryAgain = autoAssign({ shifts: [cShift], guards: cGuards, availability: cAvailability, carriedLoad: carried });
+  check("CARRY-01 · deterministic — carriedLoad לא פוגע בשחזוריות",
+    JSON.stringify(carryResult.byShift) === JSON.stringify(carryAgain.byShift));
+}
+
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);
