@@ -650,11 +650,27 @@ export function autoAssign({
         break;
       }
 
+      // Spread first, quality second: how many shifts a candidate already
+      // holds *this week* (load.count) now outranks the match score itself,
+      // not just breaks a tie on it. With more guards than shifts (the
+      // common case — 16 guards, 14 slots), sorting by score first let one
+      // guard with a large carried-load debt win shift after shift, since
+      // their debt-driven fairness score stayed the highest candidate in
+      // the pool even after they'd already been assigned once this week —
+      // so the engine caught them up fast by concentrating two shifts on
+      // them while two OTHER guards got zero this same week, on top of the
+      // one guard who was always going to sit out (16 guards, 14 shifts).
+      // Reported live: one guard got 2 shifts while 3 different guards got
+      // 0, when only 2 sitting out is the actual floor. Breadth-first fixes
+      // that: every guard gets a turn before anyone gets a second one, and
+      // the fairness/preference/rest score only decides *within* each
+      // count-tier — it still steers who wins among equally-turned guards,
+      // it just no longer justifies skipping someone's first turn.
       candidates.sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
         const ca = load.get(a.guardId).count;
         const cb = load.get(b.guardId).count;
         if (ca !== cb) return ca - cb;
+        if (b.score !== a.score) return b.score - a.score;
         return tieBreak(a, b);
       });
 

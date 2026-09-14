@@ -1412,5 +1412,48 @@ console.log("\n=== CARRY-01 · נטל שנצבר בשבועות קודמים (ca
     JSON.stringify(carryResult.byShift) === JSON.stringify(carryAgain.byShift));
 }
 
+console.log("\n=== BREADTH-01 · תור לפני עומק — יותר שומרים ממשמרות לא מתרכז באחד/ת ===");
+
+// דווח חי: 16 שומרים, 14 משמרות — שני שומרים חייבים לשבת בחוץ השבוע (חשבון
+// פשוט), אבל 3 ישבו בחוץ בפועל כי שומר/ת אחד/ת ניצח/ה שתי משמרות ברצף
+// (הציון שלו/ה נשאר הגבוה ביותר גם אחרי המשמרת הראשונה — כאן: העדפה
+// מפורשת ("preferred") על שתי המשמרות, ציון שלא יורד בין משמרת למשמרת).
+// מיון לפי תור (load.count) לפני ציון מבטיח שכולם מקבלים משמרת ראשונה
+// לפני שמישהו מקבל שנייה — גם כשהציון הגולמי שלו/ה נשאר הכי גבוה תמיד.
+{
+  const bGuards = [
+    { id: "b1", name: "מועדף/ת" }, // preferred על שתי המשמרות — ציון הכי גבוה בכל תחרות ישירה
+    { id: "b2", name: "רגיל/ה א'" },
+    { id: "b3", name: "רגיל/ה ב'" },
+  ];
+  // שני תאריכים רחוקים מספיק (יומיים) כדי שמרחק-מנוחה לעולם לא יהיה
+  // אילוץ קשיח כאן — הבדיקה על תור-מול-ציון, לא על מרחק מנוחה.
+  const bShifts = [
+    { id: "b-s1", date: "2026-09-14", label: "משמרת", type: "day", startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: [] },
+    { id: "b-s2", date: "2026-09-16", label: "משמרת", type: "day", startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: [] },
+  ];
+  const bAvailability = {};
+  for (const s of bShifts) {
+    bAvailability[`b1-${s.id}`] = { status: "preferred" };
+    bAvailability[`b2-${s.id}`] = { status: "available" };
+    bAvailability[`b3-${s.id}`] = { status: "available" };
+  }
+
+  const bResult = autoAssign({ shifts: bShifts, guards: bGuards, availability: bAvailability });
+  const bAssignees = new Set([bResult.byShift["b-s1"]?.[0], bResult.byShift["b-s2"]?.[0]]);
+
+  check("BREADTH-01 · שתי המשמרות הולכות לשני שומרים שונים, לא לאותו/ה אחד/ת פעמיים",
+    bAssignees.size === 2, JSON.stringify(bResult.byShift));
+  check("BREADTH-01 · השומר/ת המועדף/ת עדיין מקבל/ת משמרת ראשונה (הציון עדיין קובע בתוך התור)",
+    bResult.byShift["b-s1"]?.[0] === "b1", JSON.stringify(bResult.byShift));
+  check("BREADTH-01 · המשמרת השנייה הולכת למישהו/י אחר/ת, למרות שלמועדף/ת עדיין יש הציון הגבוה ביותר",
+    bResult.byShift["b-s2"]?.[0] !== "b1", JSON.stringify(bResult.byShift));
+
+  // דטרמיניזם: אותה תוצאה בדיוק בכל הרצה.
+  const bAgain = autoAssign({ shifts: bShifts, guards: bGuards, availability: bAvailability });
+  check("BREADTH-01 · deterministic — סדר-תור לא פוגע בשחזוריות",
+    JSON.stringify(bResult.byShift) === JSON.stringify(bAgain.byShift));
+}
+
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);
