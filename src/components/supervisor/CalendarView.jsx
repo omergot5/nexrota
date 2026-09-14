@@ -1,8 +1,8 @@
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState, useSyncExternalStore } from "react";
 import { Badge, Btn, Card, EmptyState, IconBtn, PageHeader, Spinner, guardColor, readableInk } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
-import { t } from "../../lib/terms.js";
-import { shiftTone } from "../../design/shiftPalette.js";
+import { subscribeTerms, t, termProfile } from "../../lib/terms.js";
+import { categoryTone, TONE_VARS } from "../../design/categoryPalette.js";
 import {
   DAYS_HE, DAYS_HE_SHORT, addDays, boardItemsForDates, formatDateHe, fromISODate, monthGrid,
   monthLabelHe, rangeLabelHe, rangeTextHe, shiftHours, startOfWeek, toISODate, todayISO, weekFrom,
@@ -50,7 +50,12 @@ const coverageOf = (dayItems) => {
   return { need, got, full: got >= need, empty: got === 0 };
 };
 
-export default function CalendarView({ shifts, tasks = [], guards, onNavigate, mode: teamMode = "security" }) {
+export default function CalendarView({ shifts, tasks = [], guards, onNavigate }) {
+  // תחום הפעילות מוחל מ-useGuardian (setTermProfile) ולא מפרופ — אותה
+  // קריאה בדיוק כמו ResourceView/PositionsScreen, כדי שהצבע-לפי-קטגוריה
+  // לא ייסחף משני מקורות אמת (היה הפער לפני התיקון: הרכיב הזה קיבל mode
+  // כפרופ עם ברירת מחדל "security" קבועה, במקום לקרוא את מצב התחום החי).
+  const teamMode = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
   const today = todayISO();
   // שבוע הוא ברירת המחדל, לא חודש: מי שנכנס ליומן בא לראות מה חסר *עכשיו*,
   // וחור נראה רק על ציר שעות (הועבר לכאן מ-SupervisorApp.jsx, שנהג לעטוף את
@@ -152,6 +157,7 @@ export default function CalendarView({ shifts, tasks = [], guards, onNavigate, m
             month={cur.getMonth()}
             byDate={byDate}
             today={today}
+            teamMode={teamMode}
             onPick={(d) => {
               setCursor(d);
               setMode("day");
@@ -171,7 +177,9 @@ export default function CalendarView({ shifts, tasks = [], guards, onNavigate, m
           </Suspense>
         )}
 
-        {mode === "day" && <DayList date={cursor} items={byDate.get(cursor) || []} guards={guards} />}
+        {mode === "day" && (
+          <DayList date={cursor} items={byDate.get(cursor) || []} guards={guards} teamMode={teamMode} />
+        )}
       </Card>
 
       {shown.length === 0 && mode !== "day" && (
@@ -192,7 +200,7 @@ export default function CalendarView({ shifts, tasks = [], guards, onNavigate, m
   );
 }
 
-function MonthGrid({ dates, month, byDate, today, onPick }) {
+function MonthGrid({ dates, month, byDate, today, onPick, teamMode }) {
   return (
     <div>
       <div className="grid grid-cols-7 gap-1 mb-1">
@@ -233,7 +241,7 @@ function MonthGrid({ dates, month, byDate, today, onPick }) {
                     <span
                       key={s.id}
                       className="w-1.5 h-1.5 rounded-full"
-                      style={{ background: shiftTone(s.color, s.type) }}
+                      style={{ background: TONE_VARS[categoryTone(s.category, teamMode)] }}
                     />
                   ))}
                 </div>
@@ -274,7 +282,7 @@ function MonthGrid({ dates, month, byDate, today, onPick }) {
 // שביר. שיבוץ מחדש בגרירה עדיין קיים באפליקציה: UnifiedBoard.jsx, שלב
 // "אסדר בעצמי" בבניית השבוע — אותו DRAG_MIME בדיוק, רק לא כפול כאן.
 
-function DayList({ date, items, guards }) {
+function DayList({ date, items, guards, teamMode }) {
   if (!items.length) {
     return (
       <EmptyState
@@ -295,7 +303,7 @@ function DayList({ date, items, guards }) {
           >
             <div
               className="w-1.5 self-stretch rounded-full flex-shrink-0"
-              style={{ background: shiftTone(s.color, s.type) }}
+              style={{ background: TONE_VARS[categoryTone(s.category, teamMode)] }}
             />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
