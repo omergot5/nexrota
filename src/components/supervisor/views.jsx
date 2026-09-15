@@ -14,7 +14,7 @@ import {
 import { loadWindowMode, RECENT_DAYS, setLoadWindowMode, subscribeLoadWindow } from "../../lib/loadWindow.js";
 import { availStatus, checkAssignment, isQualified } from "../../lib/autoAssign.js";
 import { PROFILES, subscribeTerms, t, termProfile } from "../../lib/terms.js";
-import { compatIndex, explainConflict, findConflicts } from "../../lib/conflicts.js";
+import { explainConflict, findConflicts } from "../../lib/conflicts.js";
 import { fairnessHint, fairnessPlan } from "../../lib/fairness.js";
 import { categoryOptions, folderIcon, foldersFor, UNFILED } from "../../lib/categories.js";
 
@@ -138,18 +138,16 @@ export function SupDashboard({
   const weekAllDone =
     weekShifts.length > 0 && weekSlots.filled >= weekSlots.need && weekOpenTasks.length === 0;
 
-  // ---- התנגשויות פתוחות: אותו מנגנון (conflicts.js, gs_role_compatibility)
-  // שכבר מזהיר בטופס המשימה כשעורכים משימה בודדת — כאן נסרק על כל
-  // השיבוצים הפעילים כדי לתפוס גם התנגשות שנוצרה בלי לעבור דרך הטופס
-  // (שיבוץ ידני, ייבוא). מזהה זוג (אדם, שתי משימות) פעם אחת בלבד, בלי
-  // תלות בכיוון הסריקה.
-  const compat = useMemo(() => compatIndex(compatibility), [compatibility]);
+  // ---- התנגשויות פתוחות: אותו מנגנון (conflicts.js) שכבר מזהיר בטופס
+  // המשימה כשעורכים משימה בודדת — כאן נסרק על כל השיבוצים הפעילים כדי
+  // לתפוס גם התנגשות שנוצרה בלי לעבור דרך הטופס (שיבוץ ידני, ייבוא).
+  // מזהה זוג (אדם, שני פריטים) פעם אחת בלבד, בלי תלות בכיוון הסריקה.
   const openConflicts = useMemo(() => {
     const activeTasks = tasks.filter((tk) => tk.status !== "done");
     const seen = new Set();
     const out = [];
     for (const task of activeTasks) {
-      const found = findConflicts({ candidate: task, assignees: task.assignees || [], tasks: activeTasks, compat });
+      const found = findConflicts({ candidate: task, assignees: task.assignees || [], tasks: activeTasks, shifts });
       for (const c of found) {
         const key = `${c.personId}::${[task.id, c.taskId].sort().join("|")}`;
         if (seen.has(key)) continue;
@@ -158,7 +156,7 @@ export function SupDashboard({
       }
     }
     return out;
-  }, [tasks, compat]);
+  }, [tasks, shifts]);
 
   return (
     <div className="space-y-6">
@@ -1255,19 +1253,30 @@ export function AssignView({
                         const refusal = !qualified
                           ? `לא מוגדר/ת כשיר/ה לקטגוריית "${shift.category}"`
                           : "";
+                        // החלטה 1: אף אדם לא יכול להיות בשני פריטי-עבודה
+                        // חופפים בזמן. נבדק רק כשעדיין לא משובץ/ת — הסרת
+                        // שיבוץ קיים תמיד מותרת, לא רק הוספה חדשה. אותה
+                        // checkAssignment בדיוק שמסך ההחלפות (SwapMgmt)
+                        // ומסך השומר/ת (GuardApp) כבר קוראים לה — לא בדיקה
+                        // שלישית ונפרדת.
+                        const legality = assigned
+                          ? { ok: true }
+                          : checkAssignment({ guard: g, shift, shifts, availability, tasks });
+                        const overlapRefusal = !legality.ok ? legality.reason : "";
                         const titleParts = [
                           comment ? `הערה: ${comment}` : "",
                           ownCategories && ownCategories.length
                             ? `כשיר/ה ל: ${ownCategories.join(", ")}`
                             : "",
                           refusal,
+                          overlapRefusal,
                         ].filter(Boolean);
                         const title = titleParts.length ? titleParts.join(" · ") : undefined;
                         return (
                           <button
                             key={g.id}
                             onClick={() => actions.toggleAssignment(shift.id, g.id)}
-                            disabled={busy || !qualified}
+                            disabled={busy || !qualified || !legality.ok}
                             aria-pressed={assigned}
                             className={`p-2.5 rounded-xl ring-2 ring-inset text-center cursor-pointer
                               transition-[background,box-shadow,transform] duration-200 active:scale-[0.97]
@@ -1955,17 +1964,16 @@ export function TaskMgmt({
     setShowForm(true);
   };
 
-  // ---- מטריצת ההתנגשויות ----
-  const compat = useMemo(() => compatIndex(compatibility), [compatibility]);
+  // ---- חפיפת זמן מול כל פריט-עבודה אחר (החלטה 1) ----
   const conflicts = useMemo(
     () =>
       findConflicts({
         candidate: { ...form, id: editing },
         assignees: form.assignees,
         tasks,
-        compat,
+        shifts,
       }),
-    [form, editing, tasks, compat]
+    [form, editing, tasks, shifts]
   );
   const nameOf = (id) => guards.find((g) => g.id === id)?.name || "מישהו";
   // חסימה היא ברירת המחדל; עקיפה נפתחת רק אחרי שנכתבה סיבה. הערה ריקה

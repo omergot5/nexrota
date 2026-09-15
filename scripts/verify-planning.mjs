@@ -82,12 +82,16 @@ check("חלון של משימה עם תאריך יחיד נסגר על עצמו"
   taskWindow({ dueDate: mon })?.from === mon && taskWindow({ dueDate: mon })?.to === mon);
 check("משימה בלי תאריכים לא מייצרת חלון", taskWindow({}) === null);
 
+// החלטה 1 (מחזור האיחוד): findConflicts כבר לא קורא מהמטריצה — חפיפת
+// זמן בין שני פריטים של אותו אדם חוסמת תמיד, לא רק כשהזוג מסומן 'block'.
+// index/compat עדיין מועברים כאן כדי לוודא שפרמטר מיותר לא מפיל את
+// הפונקציה (נשארת סובלנית לקורא ישן), אבל אינם משפיעים על התוצאה.
 const hit = findConflicts({ candidate, assignees: ["g1"], tasks: existing, compat: index });
-check("חפיפה בין זוג חסום נתפסת", hit.length === 1 && hit[0].taskId === "t1", JSON.stringify(hit));
-check("הסיבה מהטבלה מגיעה עם הממצא", hit[0]?.note === "עמדה דורשת נוכחות");
+check("חפיפת זמן נתפסת גם בלי להתייעץ עם המטריצה", hit.length === 1 && hit[0].taskId === "t1", JSON.stringify(hit));
+check("אין יותר הערה מהמטריצה — note ריק תמיד", hit[0]?.note === "");
 
-check("זוג מותר לא נחסם",
-  findConflicts({ candidate, assignees: ["g2"], tasks: existing, compat: index }).length === 0);
+check("זוג שהיה 'מותר' במטריצה חסום עכשיו, כי הזמן חופף (החלטה 1)",
+  findConflicts({ candidate, assignees: ["g2"], tasks: existing, compat: index }).length === 1);
 check("חוסר חפיפה בזמן לא נחסם",
   findConflicts({ candidate, assignees: ["g3"], tasks: existing, compat: index }).length === 0);
 check("משימה שהושלמה כבר לא תופסת אף אחד",
@@ -97,9 +101,13 @@ check("עריכת משימה לא מתנגשת עם עצמה",
 check("משימה בלי תאריכים לא חוסמת",
   findConflicts({ candidate: { category: "מטבח" }, assignees: ["g1"], tasks: existing, compat: index }).length === 0);
 
+// g1 ו-g2 חופפים בזמן ל-candidate (t1/t2 שתיהן mon–wed בתוך mon–fri);
+// g3 (t3, נעל 9 ימים) לא חופף בכלל — נשאר בחוץ בלי קשר לקטגוריה.
 const many = findConflicts({ candidate, assignees: ["g1", "g2", "g3"], tasks: existing, compat: index });
 check("שורה אחת לכל אדם מתנגש, לא ספירה מצטברת",
-  many.length === 1 && many[0].personId === "g1", JSON.stringify(many));
+  many.length === 2 && new Set(many.map((m) => m.personId)).size === 2 &&
+    many.every((m) => ["g1", "g2"].includes(m.personId)),
+  JSON.stringify(many));
 
 // ============================================================
 console.log("\nאיחוד משימה ומשמרת — חלון אחד (UNIF-01/03/04/06)\n");
@@ -175,8 +183,8 @@ check("UNIF-06 · שתי משימות באותו יום, שעות לא-חופפ�
 
 const taskMorningMoved = { ...taskMorning, startTime: "20:00", endTime: "22:00" };
 const realHourOverlap = findConflicts({ candidate: taskMorningMoved, assignees: [unifGuard], tasks: [taskEvening], compat: index });
-check("UNIF-06 · אותו זוג בשעות שבאמת חופפות מייצר התנגשות אחת עם ההערה מהמטריצה",
-  realHourOverlap.length === 1 && realHourOverlap[0].note === "עמדה דורשת נוכחות",
+check("UNIF-06 · אותו זוג בשעות שבאמת חופפות מייצר התנגשות אחת, בלי הערה מהמטריצה (החלטה 1)",
+  realHourOverlap.length === 1 && realHourOverlap[0].note === "",
   JSON.stringify(realHourOverlap));
 
 // Test G (degenerate input) — windowsOverlap לעולם לא זורק, ותמיד false על קלט מנוון.
