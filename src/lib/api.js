@@ -51,7 +51,12 @@ export const shiftFromRow = (row) => ({
   category: row.category || "",
   assignedGuards: (row.gs_assignments || []).map((a) => a.guard_id),
   assignmentMeta: Object.fromEntries(
-    (row.gs_assignments || []).map((a) => [a.guard_id, { source: a.source, score: a.score, reason: a.reason }])
+    (row.gs_assignments || []).map((a) => [
+      a.guard_id,
+      // overrideNote (שלב 6): קיים רק על שיבוץ שנכפה ידנית מול "מבוי סתום" —
+      // ר' SmartAssign.jsx. שיבוץ רגיל מקבל "" כמו כל שדה טקסט אופציונלי אחר.
+      { source: a.source, score: a.score, reason: a.reason, overrideNote: a.override_note || "" },
+    ])
   ),
   // עמדה קבועה שהמשמרת הזאת מומשה ממנה (Phase 4, POS-01/POS-03). `null`
   // כברירת מחדל — רוב המשמרות אינן מומשות מעמדה בכלל.
@@ -202,7 +207,7 @@ export const positionToRow = (position, teamCode) => ({
 export const SHIFT_SELECT =
   "id, team_code, date:start_date, label:title, start_time, end_time, location, " +
   "required_guards, type, color, published, category, position_id, created_at, " +
-  "gs_assignments:gs_work_item_assignments(guard_id, source, score, reason)";
+  "gs_assignments:gs_work_item_assignments(guard_id, source, score, reason, override_note)";
 
 // gs_tasks and gs_work_items already share every one of these column names
 // (only shifts renamed anything) — no aliasing needed here. `assignees` is
@@ -608,13 +613,18 @@ export async function setPublished(shiftIds, published) {
 
 // ---------- assignments ----------
 
-export async function assignGuard({ shiftId, guardId, source = "manual", score = null, reason = null }) {
+export async function assignGuard({
+  shiftId, guardId, source = "manual", score = null, reason = null, overrideNote = null,
+}) {
   // .select() + בדיקת שורה חוזרת — בלעדיה שיבוץ ש-RLS חוסם נראה כמו הצלחה:
   // השומר מופיע במשבצת ברגע האופטימי, ונעלם ברענון הבא בלי שום הסבר.
   const { data, error } = await supabase
     .from("gs_work_item_assignments")
     .upsert(
-      { work_item_id: shiftId, guard_id: guardId, source, score, reason },
+      // שלב 6: overrideNote קיים רק כששיבצו במפגיע מול "מבוי סתום"
+      // (SmartAssign.jsx) — null בכל שיבוץ רגיל, לא מחרוזת ריקה, כדי
+      // שיישאר ניתן להבחין מ"נכפה בלי לכתוב סיבה" (שלא אמור לקרות).
+      { work_item_id: shiftId, guard_id: guardId, source, score, reason, override_note: overrideNote },
       { onConflict: "work_item_id,guard_id" }
     )
     .select("work_item_id");

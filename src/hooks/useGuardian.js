@@ -570,7 +570,10 @@ export function useGuardian() {
           () => api.setPublished(shiftIds, published)
         ),
 
-      toggleAssignment: (shiftId, guardId) => {
+      // overrideNote (שלב 6): מועבר רק כשהקריאה מגיעה מכפתור "שבץ בכל זאת"
+      // במסך "מבוי סתום" (SmartAssign.jsx) — כל קריאה רגילה משאירה אותו
+      // undefined, ו-api.assignGuard כבר נופל ל-null בעצמה.
+      toggleAssignment: (shiftId, guardId, overrideNote) => {
         const shift = dataRef.current.shifts.find((s) => s.id === shiftId);
         const guard = dataRef.current.guards.find((g) => g.id === guardId);
         const assigned = Boolean(shift?.assignedGuards.includes(guardId));
@@ -609,7 +612,7 @@ export function useGuardian() {
           () =>
             assigned
               ? api.unassignGuard({ shiftId, guardId })
-              : api.assignGuard({ shiftId, guardId, source: "manual" })
+              : api.assignGuard({ shiftId, guardId, source: "manual", overrideNote })
         );
       },
 

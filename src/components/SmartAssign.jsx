@@ -226,7 +226,7 @@ const Kpi = ({ label, value, unit, hint, meter, meterColor, tone = "text-content
 );
 
 export default function SmartAssign({
-  weekDates, shifts, guards, availability, tasks = [], team, onApply, busy, embedded = false,
+  weekDates, shifts, guards, availability, tasks = [], team, onApply, onOverrideAssign, busy, embedded = false,
 }) {
   const [rules, setRules] = useState(DEFAULT_RULES);
   // שלב 4: מנוחה מינימלית כבר לא שדה בתוך `rules` המקומי — היא הגדרת-צוות
@@ -242,6 +242,58 @@ export default function SmartAssign({
   const [why, setWhy] = useState(null);
   const [showLog, setShowLog] = useState(false);
   const [applied, setApplied] = useState(false);
+  // שלב 6 ("מבוי סתום", החלטה 6): המנוע נשאר דטרמיניסטי — לעולם לא שובר
+  // תיקו אוטומטית. כשמשמרת נשארת ריקה וכל מי שנפסל כבר נושא נימוק
+  // (u.blockers, autoAssign.js), המנהל מכריע ידנית פר-אדם, עם נימוק חובה
+  // משלו. פריט אחד פתוח בכל רגע נתון (shiftId+guardId), לא state-per-row.
+  //
+  // הכרטיס לא מתקן ידנית את plan.unfilled אחרי כפייה: הוא מציג חוסמים
+  // מסוננים מול shifts ה-**חי** (למטה, liveShiftById) — מי שכבר משובץ/ת
+  // בפועל נעלם/ת מרשימת החוסמים ממילא ברגע שהריענון חוזר, ובלי צורך
+  // לנחש הצלחה/כישלון: actions.toggleAssignment (useGuardian.js) כבר
+  // עושה optimistic-with-rollback בעצמה, וכתיבה שנכשלת חוזרת לאותה
+  // רשימת חוסמים באופן טבעי דרך אותו mechanism, לא state נפרד כאן.
+  const [overriding, setOverriding] = useState(null);
+  const [overrideNoteDraft, setOverrideNoteDraft] = useState("");
+  const [overrideBusy, setOverrideBusy] = useState(false);
+
+  const startOverride = (shiftId, guardId) => {
+    setOverriding({ shiftId, guardId });
+    setOverrideNoteDraft("");
+  };
+  const cancelOverride = () => {
+    setOverriding(null);
+    setOverrideNoteDraft("");
+  };
+  const confirmOverride = async () => {
+    const note = overrideNoteDraft.trim();
+    if (!overriding || !note) return;
+    setOverrideBusy(true);
+    try {
+      await onOverrideAssign(overriding.shiftId, overriding.guardId, note);
+    } finally {
+      setOverrideBusy(false);
+      setOverriding(null);
+      setOverrideNoteDraft("");
+    }
+  };
+
+  const liveShiftById = useMemo(() => new Map(shifts.map((s) => [s.id, s])), [shifts]);
+
+  // מסונן מול המשמרת ה-**חיה**, לא תמונת-המצב של הריצה: מי ששובץ/ה בפועל —
+  // כולל דרך "שבץ בכל זאת" ממש עכשיו — נעלם/ת מכאן מעצמו ברגע שהריענון
+  // חוזר, בלי לנחש הצלחה/כישלון (ר' ההערה למעלה על overriding).
+  const liveUnfilled = useMemo(() => {
+    if (!plan) return [];
+    return plan.unfilled
+      .map((u) => {
+        const liveShift = liveShiftById.get(u.shiftId) || u.shift;
+        const liveBlockers = u.blockers.filter((b) => !liveShift.assignedGuards.includes(b.guardId));
+        const liveMissing = Math.max(0, u.needed - liveShift.assignedGuards.length);
+        return { ...u, liveBlockers, liveMissing };
+      })
+      .filter((u) => u.liveMissing > 0);
+  }, [plan, liveShiftById]);
 
   const weekShifts = useMemo(
     () => shifts.filter((s) => weekDates.includes(s.date)),
@@ -654,46 +706,89 @@ export default function SmartAssign({
             </div>
           </div>
 
-          {plan.unfilled.length > 0 && (
+          {liveUnfilled.length > 0 && (
             <Card className="!border-warn/30">
               <h2 className="font-bold text-content mb-1 flex items-center gap-2">
                 <Icon name="alert" size={18} className="text-warn" />
                 {t("unit.shifts")} שלא הצלחנו לאייש
               </h2>
               <p className="text-xs text-muted mb-4">
-                המנוע לא מפר אילוץ קשיח. הנה בדיוק מי נפסל ולמה — כך אפשר להחליט אם לשנות כלל או
-                לדבר עם מישהו.
+                המנוע לא מפר אילוץ קשיח. הנה בדיוק מי נפסל ולמה — כך אפשר להחליט אם לשנות כלל, לדבר
+                עם מישהו, או לשבץ בכל זאת עם נימוק.
               </p>
               <div className="space-y-3">
-                {plan.unfilled.map((u) => (
-                  <div
-                    key={u.shiftId}
-                    className="bg-surface-sunken rounded-xl p-3.5 ring-1 ring-inset ring-hairline"
-                  >
-                    <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-                      <span className="font-semibold text-sm text-content">
-                        {u.shift.label} · {shortDate(u.shift.date)} · {u.shift.startTime}–
-                        {u.shift.endTime}
-                      </span>
-                      <Badge tone="warn">חסרים {u.missing}</Badge>
+                {liveUnfilled.map((u) => {
+                  return (
+                    <div
+                      key={u.shiftId}
+                      className="bg-surface-sunken rounded-xl p-3.5 ring-1 ring-inset ring-hairline"
+                    >
+                      <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                        <span className="font-semibold text-sm text-content">
+                          {u.shift.label} · {shortDate(u.shift.date)} · {u.shift.startTime}–
+                          {u.shift.endTime}
+                        </span>
+                        <Badge tone="warn">חסרים {u.liveMissing}</Badge>
+                      </div>
+                      <div className="space-y-1.5">
+                        {u.liveBlockers.slice(0, 6).map((b) => {
+                          const isOverriding =
+                            overriding?.shiftId === u.shiftId && overriding?.guardId === b.guardId;
+                          // כשירות (code "unqualified") היא לא בת-עקיפה בשום מסך
+                          // במוצר (QUAL-05, ר' TaskMgmt/AssignView) — אין כפתור
+                          // כאן, לא רק כפתור חסום, כדי שלא ייראה כאילו יש דרך.
+                          const overridable = b.code !== "unqualified" && Boolean(onOverrideAssign);
+                          return (
+                            <div key={b.guardId}>
+                              <div className="flex items-center gap-2 text-xs flex-wrap">
+                                <Avatar id={b.guardId} name={b.name} size={20} />
+                                <span className="text-content font-medium">{b.name}</span>
+                                <span className="text-faint">—</span>
+                                <span className="text-muted flex-1">{b.reason}</span>
+                                {overridable && !isOverriding && (
+                                  <button
+                                    type="button"
+                                    onClick={() => startOverride(u.shiftId, b.guardId)}
+                                    className="text-[11px] font-semibold text-brand hover:text-brand-strong cursor-pointer flex-shrink-0"
+                                  >
+                                    שבץ בכל זאת
+                                  </button>
+                                )}
+                              </div>
+                              {isOverriding && (
+                                <div className="mt-1.5 mr-7 flex items-center gap-1.5 flex-wrap">
+                                  <Input
+                                    autoFocus
+                                    placeholder="למה בכל זאת? (חובה)"
+                                    value={overrideNoteDraft}
+                                    onChange={(e) => setOverrideNoteDraft(e.target.value)}
+                                    className="h-8 text-xs flex-1 min-w-[10rem]"
+                                  />
+                                  <Btn
+                                    size="sm"
+                                    onClick={confirmOverride}
+                                    disabled={!overrideNoteDraft.trim() || overrideBusy}
+                                    loading={overrideBusy}
+                                  >
+                                    אשר שיבוץ
+                                  </Btn>
+                                  <Btn size="sm" variant="secondary" onClick={cancelOverride} disabled={overrideBusy}>
+                                    בטל
+                                  </Btn>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {u.liveBlockers.length > 6 && (
+                          <p className="text-[11px] text-faint">
+                            ועוד {u.liveBlockers.length - 6} {t("noun.memberPlural")}…
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      {u.blockers.slice(0, 6).map((b) => (
-                        <div key={b.guardId} className="flex items-center gap-2 text-xs">
-                          <Avatar id={b.guardId} name={b.name} size={20} />
-                          <span className="text-content font-medium">{b.name}</span>
-                          <span className="text-faint">—</span>
-                          <span className="text-muted">{b.reason}</span>
-                        </div>
-                      ))}
-                      {u.blockers.length > 6 && (
-                        <p className="text-[11px] text-faint">
-                          ועוד {u.blockers.length - 6} {t("noun.memberPlural")}…
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </Card>
           )}

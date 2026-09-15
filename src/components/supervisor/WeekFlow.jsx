@@ -175,6 +175,7 @@ export default function WeekFlow({
           busy={busy}
           embedded
           onApply={(ids, assignments) => actions.applyPlan(ids, assignments)}
+          onOverrideAssign={(shiftId, guardId, note) => actions.toggleAssignment(shiftId, guardId, note)}
         />
       ) : (
         <AssignView {...common} onNavigate={() => setAssignMode("auto")} />
