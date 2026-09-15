@@ -233,6 +233,7 @@ function MySchedule({ user, guards, shifts, tasks = [], positions = [], team }) 
         dates={myDates}
         scopeGuardId={user.id}
         empty={myEmpty}
+        mode={team?.mode || "security"}
       />
 
       {(publishedAll.length > 0 || tasks.length > 0) && (
@@ -249,6 +250,7 @@ function MySchedule({ user, guards, shifts, tasks = [], positions = [], team }) 
               ...publishedAll.map((s) => s.date),
               ...tasks.map((t) => t.dueDate || t.startDate).filter(Boolean),
             ])].sort()}
+            mode={team?.mode || "security"}
           />
         </Card>
       )}

@@ -27,12 +27,12 @@
 // ============================================================
 
 import { useState } from "react";
-import { Badge, EmptyState, readableInk } from "../ui.jsx";
+import { Badge, EmptyState } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import {
   DAYS_HE_SHORT, boardItemsForDates, fromISODate, isToday, rangeTextHe, shortDate,
 } from "../../lib/dates.js";
-import { shiftTone } from "../../design/shiftPalette.js";
+import { categoryTone, TONE_VARS } from "../../design/categoryPalette.js";
 import { isQualified } from "../../lib/autoAssign.js";
 import { t } from "../../lib/terms.js";
 import { People } from "./views.jsx";
@@ -64,7 +64,7 @@ const missingOfItem = (item) => {
 };
 
 export default function UnifiedBoard({
-  shifts = [], tasks = [], guards = [], dates = [], scopeGuardId = null, empty, onMove,
+  shifts = [], tasks = [], guards = [], dates = [], scopeGuardId = null, empty, onMove, mode = "security",
 }) {
   const merged = boardItemsForDates(shifts, tasks, dates);
 
@@ -116,14 +116,14 @@ export default function UnifiedBoard({
       )}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
         {days.map((day) => (
-          <DayColumn key={day.date} day={day} guards={guards} onMove={onMove} />
+          <DayColumn key={day.date} day={day} guards={guards} onMove={onMove} mode={mode} />
         ))}
       </div>
     </div>
   );
 }
 
-function DayColumn({ day, guards, onMove }) {
+function DayColumn({ day, guards, onMove, mode }) {
   const iso = day.date;
   const today = isToday(iso);
   return (
@@ -145,6 +145,7 @@ function DayColumn({ day, guards, onMove }) {
             item={item}
             guards={guards}
             onMove={onMove}
+            mode={mode}
           />
         ))}
         {day.items.length === 0 && <p className="text-center text-[11px] text-faint py-3">—</p>}
@@ -161,13 +162,15 @@ function DayColumn({ day, guards, onMove }) {
 // אחת, לא שתיים שעלולות להיסחף.
 export const DRAG_MIME = "application/x-nexrota-guard";
 
-function BoardCard({ item, guards, onMove }) {
+function BoardCard({ item, guards, onMove, mode }) {
   const timeless = Boolean(item.timeless);
   // חוסר איוש הוא מושג שקיים רק לפריט מתוזמן (D-08 — שורת עמדה עתידית אין
   // לה עוד ניצול; פריט timeless אין לו requiredGuards בכלל).
   const missing = timeless ? 0 : missingOfItem(item);
-  const tone = shiftTone(item.color, item.type);
-  const ink = readableInk(tone);
+  // שלב 3 (מחזור האיחוד): צבע לפי קטגוריה ("מה"), לא לפי שעת-יום ("מתי") —
+  // אותו tone שCalendarView/WeekTimeGrid כבר משתמשים בו, כדי שמשמרות
+  // וגם משימות יופיעו באותו צבע בכל מסך שמציג אותן, לא רק בחלקם.
+  const tone = categoryTone(item.category, mode);
   const [dragOver, setDragOver] = useState(false);
 
   // גרירה קיימת רק לכרטיס מתוזמן: משימה מוקצית דרך TaskMgmt (ריבוי-מוקצים,
@@ -203,7 +206,7 @@ function BoardCard({ item, guards, onMove }) {
       className={`rounded-lg p-2 text-[11px] ring-1 ring-inset transition-shadow ${
         dragOver ? "ring-2 ring-content" : missing > 0 ? "ring-warn ring-2" : "ring-transparent"
       }`}
-      style={{ background: tone, color: ink }}
+      style={{ background: TONE_VARS[tone], color: "rgb(var(--cat-on))" }}
       {...dragProps}
     >
       <p className="font-bold truncate">{item.label}</p>

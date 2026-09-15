@@ -151,6 +151,7 @@ export default function WeekFlow({
       // המשתתף — שני המסכים האחרים ממשיכים לקבל את הלוח בלי onMove, כלומר
       // לקריאה בלבד בדיוק כמו קודם.
       onMove={actions.moveAssignment}
+      mode={team?.mode || "security"}
     />,
     <ShiftMgmt key="shifts" {...common} />,
     <AvailView key="avail" {...common} />,
