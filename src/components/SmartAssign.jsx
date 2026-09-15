@@ -38,7 +38,7 @@ const KIND_ICON = {
   turn: "clock",
 };
 
-function RulesPanel({ rules, setRules, open, onClose }) {
+function RulesPanel({ rules, setRules, restHours, open, onClose }) {
   const num = (key, label, min, max, suffix) => (
     <div className="flex items-center justify-between gap-4 py-2.5 border-b border-hairline last:border-0">
       <p className="text-sm font-medium text-content min-w-0">{label}</p>
@@ -92,8 +92,15 @@ function RulesPanel({ rules, setRules, open, onClose }) {
       <p className="text-sm text-muted mb-4">
         שיבוץ שמפר אילוץ קשיח פשוט לא ייווצר — המשמרת תישאר פתוחה עם הסבר למה.
       </p>
+      <div className="flex items-center justify-between gap-4 py-2.5 px-4 mb-4 bg-surface-sunken rounded-xl">
+        <p className="text-sm font-medium text-content min-w-0">
+          מנוחה מינימלית בין {t("unit.shifts")}
+        </p>
+        <p className="text-sm text-muted flex-shrink-0">
+          {restHours} שעות · נקבע בלוח הבקרה הראשי
+        </p>
+      </div>
       <div className="bg-surface-sunken rounded-xl px-4 py-1 mb-4">
-        {num("minRestHours", `מנוחה מינימלית בין ${t("unit.shifts")}`, 0, 24, "שעות")}
         {num("maxConsecutiveHours", "מקסימום שעות רצופות", 4, 24, "שעות")}
         {num("maxShiftsPerWeek", `מקסימום ${t("unit.shifts")} בשבוע`, 1, 14, t("unit.shifts"))}
         {num("maxNightsPerWeek", "מקסימום לילות בשבוע", 0, 7, "לילות")}
@@ -222,6 +229,13 @@ export default function SmartAssign({
   weekDates, shifts, guards, availability, tasks = [], team, onApply, busy, embedded = false,
 }) {
   const [rules, setRules] = useState(DEFAULT_RULES);
+  // שלב 4: מנוחה מינימלית כבר לא שדה בתוך `rules` המקומי — היא הגדרת-צוות
+  // קבועה (gs_teams.rest_hours, 10 או 12 בלבד), ולכן נמזגת כאן בכל שימוש
+  // במקום להישמר ב-state של המסך הזה.
+  const effectiveRules = useMemo(
+    () => ({ ...rules, minRestHours: team?.restHours ?? DEFAULT_RULES.minRestHours }),
+    [rules, team]
+  );
   const [plan, setPlan] = useState(null);
   const [showRules, setShowRules] = useState(false);
   const [keepManual, setKeepManual] = useState(true);
@@ -274,7 +288,7 @@ export default function SmartAssign({
   const run = () => {
     setPlan(
       autoAssign({
-        shifts: weekShifts, guards, availability, rules, keepExisting: keepManual, tasks: weekTasks,
+        shifts: weekShifts, guards, availability, rules: effectiveRules, keepExisting: keepManual, tasks: weekTasks,
         taskWeights: team?.taskWeights || {}, carriedLoad,
       })
     );
@@ -383,7 +397,7 @@ export default function SmartAssign({
         <EmptyState
           icon="zap"
           title="מוכן לשבץ"
-          body={`המנוע יעבור על ${weekShifts.length} ה${t("unit.shifts")}, יפסול כל מי שלא עומד באילוצים (זמינות, ${rules.minRestHours} שעות מנוחה, מקס' ${rules.maxConsecutiveHours} שעות רצוף), וידרג את השאר לפי הוגנות עומס וסבב לילות.`}
+          body={`המנוע יעבור על ${weekShifts.length} ה${t("unit.shifts")}, יפסול כל מי שלא עומד באילוצים (זמינות, ${effectiveRules.minRestHours} שעות מנוחה, מקס' ${rules.maxConsecutiveHours} שעות רצוף), וידרג את השאר לפי הוגנות עומס וסבב לילות.`}
           action={
             <Btn size="lg" icon="zap" onClick={run} loading={busy}>
               {t("nav.smart")}
@@ -685,6 +699,7 @@ export default function SmartAssign({
       <RulesPanel
         rules={rules}
         setRules={setRules}
+        restHours={effectiveRules.minRestHours}
         open={showRules}
         onClose={() => setShowRules(false)}
       />

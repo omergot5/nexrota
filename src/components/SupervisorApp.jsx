@@ -229,6 +229,7 @@ export default function SupervisorApp({ state }) {
         actions={actions}
         busy={busy}
         tasks={tasks}
+        team={team}
       />
     ),
     tasks: (

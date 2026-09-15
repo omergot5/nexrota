@@ -434,6 +434,11 @@ export async function loadTeam(teamCode) {
           // (מיגרציה 0011) — ערך לא מוכר (שורה ישנה, DB לא מעודכן) נופל
           // ל-security, לא צונח בשקט ל"civil" שכבר לא קיים.
           mode: teamMode,
+          // שלב 4 (מחזור האיחוד): מנוחה מינימלית היא הגדרת-צוות קבועה, 10
+          // או 12 בלבד (rest_hours_check ב-0020) — לא שדה חופשי לפי-הרצה
+          // כמו שהיה ב-SmartAssign. ערך לא-תקין (שורה ישנה, DB לא מעודכן)
+          // נופל ל-10, לא צונח בשקט למשהו מחוץ לשתי האפשרויות המוגדרות.
+          restHours: [10, 12].includes(teamRes.data.rest_hours) ? teamRes.data.rest_hours : 10,
           // {קטגוריה: מכפיל} להוגנות (shiftLoad ב-autoAssign.js) — עמודה
           // חסרה/null/כל דבר שאינו אובייקט ממשי נופל ל-{}, שקול ל"אין
           // אף קטגוריה שהוגדרה משקל מיוחד לה" (D-05: היעדר-שורה = ברירת
@@ -698,12 +703,16 @@ export async function addGuard({ name, phone, teamCode }) {
   return profileFromRow(data);
 }
 
-export async function updateTeamSettings(teamCode, { deadlineDays, deadlineHour, reminders, mode, taskWeights }) {
+export async function updateTeamSettings(teamCode, { deadlineDays, deadlineHour, reminders, mode, taskWeights, restHours }) {
   const patch = {};
   if (deadlineDays !== undefined) patch.avail_deadline_days = deadlineDays;
   if (deadlineHour !== undefined) patch.avail_deadline_hour = deadlineHour;
   if (reminders !== undefined) patch.avail_reminders = reminders;
   if (mode !== undefined) patch.mode = VALID_MODES.includes(mode) ? mode : "security";
+  // שלב 4: רק 10 או 12 — ערך אחר נופל ל-10 כאן, לפני שהוא בכלל מגיע
+  // ל-DB constraint (gs_teams_rest_hours_check), כדי שכפתור שנשלח בטעות
+  // עם ערך זר לא ייכשל בשגיאת SQL גולמית.
+  if (restHours !== undefined) patch.rest_hours = [10, 12].includes(restHours) ? restHours : 10;
   // {קטגוריה: מכפיל} — ר' shiftLoad ב-autoAssign.js. אובייקט, לא מערך:
   // עמודה חסרה/null נופלת ל-{} בכיוון הקריאה (loadTeam), כמו כל שדה אחר
   // שקדם למיגרציה שהוסיפה אותו.

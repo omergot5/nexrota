@@ -63,7 +63,7 @@ const SHIFT_TEMPLATES = [
 // ============================================================
 
 export function SupDashboard({
-  guards, shifts, swapRequests, tasks, team, weekDates = [], compatibility = [], onNavigate, onSeedDemo, busy,
+  guards, shifts, swapRequests, tasks, team, weekDates = [], compatibility = [], onNavigate, onSeedDemo, busy, actions,
 }) {
   const today = todayISO();
   const todayShifts = shifts.filter((s) => s.date === today);
@@ -164,6 +164,39 @@ export function SupDashboard({
         title={`שלום${team?.name ? `, ${team.name}` : ""}`}
         subtitle={isNew ? "בוא נסיים את ההקמה — 4 צעדים קצרים" : "סיכום מצב הצוות"}
       />
+
+      {/* שלב 4 (מחזור האיחוד, החלטה 4): מנוחה מינימלית היא הגדרת-צוות
+        * קבועה — 10 או 12 שעות בלבד, בלי שדה חופשי — ולכן חיה כאן, בכרטיס
+        * קבוע בלוח הבקרה הראשי, ולא בתוך מודל "כללי השיבוץ" שנפתח רק
+        * ברגע ההרצה של מסך "שיבוץ חכם". נשמרת על gs_teams עצמו, לא ב-state
+        * או ב-localStorage, כדי שכל בדיקת אילוץ באפליקציה (לא רק המנוע
+        * האוטומטי) תסכים על אותו ערך. */}
+      <Card>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <h2 className="font-bold text-content flex items-center gap-2">
+              <Icon name="bed" size={18} className="text-brand" />
+              מנוחה מינימלית בין {t("unit.shifts")}
+            </h2>
+            <p className="text-xs text-muted mt-0.5">
+              שיבוץ שמפר את המנוחה הזו פשוט לא ייווצר — בכל מסך באפליקציה
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {[10, 12].map((hours) => (
+              <Btn
+                key={hours}
+                size="sm"
+                variant={team?.restHours === hours ? "primary" : "outline"}
+                disabled={busy}
+                onClick={() => actions.updateTeamSettings({ restHours: hours })}
+              >
+                {hours} שעות
+              </Btn>
+            ))}
+          </div>
+        </div>
+      </Card>
 
       {isNew && (
         <Card>
@@ -1261,7 +1294,10 @@ export function AssignView({
                         // שלישית ונפרדת.
                         const legality = assigned
                           ? { ok: true }
-                          : checkAssignment({ guard: g, shift, shifts, availability, tasks });
+                          : checkAssignment({
+                              guard: g, shift, shifts, availability, tasks,
+                              rules: team?.restHours ? { minRestHours: team.restHours } : undefined,
+                            });
                         const overlapRefusal = !legality.ok ? legality.reason : "";
                         const titleParts = [
                           comment ? `הערה: ${comment}` : "",
@@ -1545,7 +1581,7 @@ const SWAP_STATUS = {
   rejected: { label: "נדחה",  tone: "danger" },
 };
 
-export function SwapMgmt({ guards, shifts, availability = {}, swapRequests, actions, busy, tasks = [] }) {
+export function SwapMgmt({ guards, shifts, availability = {}, swapRequests, actions, busy, tasks = [], team }) {
   const gName = (id) => guards.find((g) => g.id === id)?.name || "—";
 
   // A swap the engine would never have produced must not be reachable by
@@ -1560,7 +1596,10 @@ export function SwapMgmt({ guards, shifts, availability = {}, swapRequests, acti
     if (!shift || !guard) {
       return { ok: false, reason: `המשמרת או ה${t("noun.member")} כבר לא קיימים` };
     }
-    return checkAssignment({ guard, shift, shifts, availability, tasks });
+    return checkAssignment({
+      guard, shift, shifts, availability, tasks,
+      rules: team?.restHours ? { minRestHours: team.restHours } : undefined,
+    });
   };
   const pending = swapRequests.filter((r) => r.status === "pending");
   const resolved = swapRequests.filter((r) => r.status !== "pending");

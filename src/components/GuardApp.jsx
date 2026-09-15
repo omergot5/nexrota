@@ -561,7 +561,7 @@ function MyAvailability({ user, team, shifts, tasks = [], availability, actions,
 // SWAPS
 // ============================================================
 
-function MySwaps({ user, guards, shifts, availability = {}, swapRequests, actions, busy, tasks = [] }) {
+function MySwaps({ user, team, guards, shifts, availability = {}, swapRequests, actions, busy, tasks = [] }) {
   // Agreeing to cover a shift runs the same hard constraints the engine runs,
   // so a guard cannot accept a shift that would break their own rest rule.
   // Not narrowed to a week — same reasoning as the supervisor's SwapMgmt.
@@ -580,7 +580,10 @@ function MySwaps({ user, guards, shifts, availability = {}, swapRequests, action
     if (!shift || !guard) {
       return { ok: false, reason: `המשמרת או ה${t("noun.member")} כבר לא קיימים` };
     }
-    return checkAssignment({ guard, shift, shifts, availability, tasks });
+    return checkAssignment({
+      guard, shift, shifts, availability, tasks,
+      rules: team?.restHours ? { minRestHours: team.restHours } : undefined,
+    });
   };
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ shiftId: "", toGuard: "", message: "" });
@@ -824,6 +827,7 @@ export default function GuardApp({ state }) {
     swaps: (
       <MySwaps
         user={user}
+        team={team}
         guards={guards}
         shifts={shifts}
         availability={availability}

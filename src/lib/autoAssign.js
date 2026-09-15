@@ -26,7 +26,9 @@ import {
 } from "./dates.js";
 
 export const DEFAULT_RULES = {
-  minRestHours: 8, // minimum gap between two separate shifts
+  // שלב 4 (מחזור האיחוד): 10 הוא ברירת המחדל של gs_teams.rest_hours
+  // (10 או 12 בלבד) — נשאר כאן רק כנפילה כשלא הועבר team.restHours בפועל.
+  minRestHours: 10, // minimum gap between two separate shifts
   maxConsecutiveHours: 12, // longest unbroken block a guard may work
   maxShiftsPerWeek: 6,
   maxNightsPerWeek: 3,
