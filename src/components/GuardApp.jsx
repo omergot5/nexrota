@@ -290,10 +290,19 @@ function MySchedule({ user, guards, shifts, tasks = [], positions = [], team }) 
 // AVAILABILITY SUBMISSION
 // ============================================================
 
-function MyAvailability({ user, team, shifts, availability, actions, busy }) {
+function MyAvailability({ user, team, shifts, tasks = [], availability, actions, busy }) {
   const [offset, setOffset] = useState(1);
+  const [expanded, setExpanded] = useState(false);
   const weekDates = useMemo(() => weekByOffset(offset), [offset]);
-  const weekShifts = shifts.filter((s) => weekDates.includes(s.date));
+  const weekShiftsOnly = shifts.filter((s) => weekDates.includes(s.date));
+  // שלב 2 (החלטה 7): המסך נבנה סביב gs_work_items המאוחד, לא רק משמרות —
+  // חייל/ת עונה על זמינות גם למשימה שעתית שחופפת אליו/ה (withEngineTasks
+  // כבר מסנן למשימות שנכנסות למנוע, dates.js UNIF-02).
+  const weekTasksRaw = tasks.filter((tk) => weekDates.includes(tk.dueDate || tk.startDate));
+  const weekShifts = useMemo(
+    () => withEngineTasks(weekShiftsOnly, weekTasksRaw),
+    [weekShiftsOnly, weekTasksRaw]
+  );
 
   // The week is only locked once it has actually started — a guard should
   // never be stuck unable to answer for a week that is still in the future.
@@ -307,6 +316,12 @@ function MyAvailability({ user, team, shifts, availability, actions, busy }) {
     (s) => availStatus(availability, user.id, s.id) !== "unknown"
   ).length;
   const remaining = weekShifts.length - answered;
+  // חריג = כל דבר שאינו "אין תשובה" ואינו "זמין/מעדיף" — בדיוק מה שהחלטה 7
+  // מגדירה כ"מה ששונה מברירת המחדל", ולכן היחיד שראוי לתפוס תשומת לב.
+  const exceptions = weekShifts.filter((s) => {
+    const st = availStatus(availability, user.id, s.id);
+    return st === "maybe" || st === "unavailable";
+  });
 
   const setStatus = (shift, status) => {
     const raw = availability[`${user.id}-${shift.id}`];
@@ -398,17 +413,30 @@ function MyAvailability({ user, team, shifts, availability, actions, busy }) {
                   />
                 </div>
               </div>
-              {!weekStarted && answered < weekShifts.length && (
-                <div className="flex gap-2 flex-wrap">
-                  <Btn size="sm" variant="outline" icon="check-circle" onClick={() => markAll("available")} disabled={busy}>
-                    סמן הכל כזמין
-                  </Btn>
-                  <Btn size="sm" variant="outline" icon="x-circle" onClick={() => markAll("unavailable")} disabled={busy}>
-                    סמן הכל כלא זמין
-                  </Btn>
-                </div>
+              {/* החלטה 7: כפתור ברירת-מחדל בולט אחד, לא שני כפתורים שווי-משקל.
+                * רוב השבועות "אני יכול/ה" הוא התשובה הנכונה לרוב הפריטים —
+                * זה מה שהופך אותו לברירת המחדל, לא ל"אפשרות אחת מתוך שתיים". */}
+              {!weekStarted && remaining > 0 && (
+                <Btn size="sm" icon="check-circle" onClick={() => markAll("available")} disabled={busy}>
+                  אני יכול/ה השבוע
+                </Btn>
               )}
             </div>
+            {!weekStarted && (
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="text-xs font-semibold text-brand mt-3 pt-3 border-t border-hairline w-full text-start cursor-pointer hover:underline"
+              >
+                {expanded
+                  ? "כווץ"
+                  : exceptions.length > 0
+                  ? `יכול/ה לרוב הפריטים השבוע · ${exceptions.length} חריגים — ערוך חריגים`
+                  : answered >= weekShifts.length
+                  ? "יכול/ה לכל הפריטים השבוע · ערוך חריגים"
+                  : "או סמן/י פריט-פריט"}
+              </button>
+            )}
             {/* Without this, "מעדיף" reads as a stronger "זמין" and everyone
                 picks it. Saying out loud that it costs nothing and grants no
                 guarantee is what keeps the signal meaningful. */}
@@ -421,7 +449,7 @@ function MyAvailability({ user, team, shifts, availability, actions, busy }) {
             </p>
           </Card>
 
-          <div className="space-y-6">
+          {expanded && <div className="space-y-6">
             {weekDates.map((date) => {
               const day = weekShifts.filter((s) => s.date === date);
               if (!day.length) return null;
@@ -520,7 +548,7 @@ function MyAvailability({ user, team, shifts, availability, actions, busy }) {
                 </div>
               );
             })}
-          </div>
+          </div>}
         </>
       )}
     </div>
@@ -785,6 +813,7 @@ export default function GuardApp({ state }) {
         user={user}
         team={team}
         shifts={shifts}
+        tasks={tasks}
         availability={availability}
         actions={actions}
         busy={busy}
