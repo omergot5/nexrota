@@ -17,6 +17,12 @@ import {
   withEngineTasks,
 } from "../src/lib/dates.js";
 import { shiftLoad, teamAverages, isQualified, checkQualification } from "../src/lib/autoAssign.js";
+import {
+  DEFAULT_FAIRNESS_WINDOW_DAYS,
+  FAIRNESS_WINDOW_OPTIONS,
+  normalizeFairnessWindow,
+  VALID_FAIRNESS_WINDOWS,
+} from "../src/lib/fairnessWindow.js";
 import { loadTable } from "../src/lib/loadTable.js";
 import { chartTheme } from "../src/design/chartTheme.js";
 // api.js imports the Supabase client at module load — that construction is
@@ -921,6 +927,42 @@ check("QUAL-03 · shiftToRow לא מספק fallback string לקטגוריה חס
 const shiftRoundTrip = shiftToRow(shiftWithCategory, "T1");
 check("QUAL-03 · shiftToRow על אובייקט שמופה מ-shiftFromRow משחזר את עמודת הקטגוריה בדיוק (round trip)",
   shiftRoundTrip.category === "מטבח");
+
+// ---------- שלב 5 (מחזור האיחוד) · fairnessWindow.js ----------
+
+check("FAIRNESS-WINDOW · תקרה של 4 חודשים (120 יום) — אין ערך גבוה יותר ברשימה",
+  Math.max(...VALID_FAIRNESS_WINDOWS) === 120);
+
+check("FAIRNESS-WINDOW · חמש אפשרויות בדיוק: 2 שבועות / חודש / 3 חודשים / 4 חודשים / כבוי",
+  VALID_FAIRNESS_WINDOWS.length === 5 &&
+  [0, 14, 30, 90, 120].every((d) => VALID_FAIRNESS_WINDOWS.includes(d)));
+
+check("FAIRNESS-WINDOW · ברירת המחדל (90, '3 חודשים') היא ערך חוקי מהרשימה",
+  VALID_FAIRNESS_WINDOWS.includes(DEFAULT_FAIRNESS_WINDOW_DAYS));
+
+check("FAIRNESS-WINDOW · normalizeFairnessWindow על ערך תקין מחזיר אותו בדיוק",
+  normalizeFairnessWindow(30) === 30 && normalizeFairnessWindow(0) === 0);
+
+check("FAIRNESS-WINDOW · normalizeFairnessWindow על ערך זר/undefined נופל לברירת המחדל, לא לטווח חופשי",
+  normalizeFairnessWindow(45) === DEFAULT_FAIRNESS_WINDOW_DAYS &&
+  normalizeFairnessWindow(undefined) === DEFAULT_FAIRNESS_WINDOW_DAYS &&
+  normalizeFairnessWindow(-1) === DEFAULT_FAIRNESS_WINDOW_DAYS);
+
+check("FAIRNESS-WINDOW · לכל אפשרות יש תווית עברית לא ריקה",
+  FAIRNESS_WINDOW_OPTIONS.every((o) => typeof o.label === "string" && o.label.length > 0));
+
+// FAIRNESS-WINDOW · "כבוי" (0 יום) לא צריך טיפול מיוחד בקוד הקורא: rollingLoad
+// כבר מחזיר חלון ריק מעצמו כש-days=0 (from === until), בדיוק כמו שההערות
+// ב-fairnessWindow.js/SmartAssign.jsx/AssignView מניחות.
+const offWindow = rollingLoad({
+  guards: [{ id: "g1" }],
+  shifts: [{ date: "2026-01-01", assignedGuards: ["g1"], startTime: "07:00", endTime: "19:00" }],
+  until: "2026-01-10",
+  days: 0,
+});
+check('FAIRNESS-WINDOW · rollingLoad עם days=0 ("כבוי") לא סופר שום היסטוריה',
+  offWindow.per.g1.load === 0 && offWindow.per.g1.count === 0,
+  JSON.stringify(offWindow.per.g1));
 
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);

@@ -9,6 +9,7 @@
 
 import { supabase } from "./supabaseClient.js";
 import { shiftTone } from "../design/shiftPalette.js";
+import { normalizeFairnessWindow } from "./fairnessWindow.js";
 
 // A recovery/confirmation email is opened later, often on a different device
 // than the one that requested it — `window.location.origin` at request time
@@ -439,6 +440,10 @@ export async function loadTeam(teamCode) {
           // כמו שהיה ב-SmartAssign. ערך לא-תקין (שורה ישנה, DB לא מעודכן)
           // נופל ל-10, לא צונח בשקט למשהו מחוץ לשתי האפשרויות המוגדרות.
           restHours: [10, 12].includes(teamRes.data.rest_hours) ? teamRes.data.rest_hours : 10,
+          // שלב 5: כמה אחורה rollingLoad/fairnessPlan (fairness.js) מסתכלים
+          // כדי לחשב חוב הוגנות — הגדרת-צוות, לא RECENT_DAYS שרוף בקוד.
+          // מקור-האמת לרשימת הערכים המותרים הוא fairnessWindow.js, לא כאן.
+          fairnessWindowDays: normalizeFairnessWindow(teamRes.data.fairness_window_days),
           // {קטגוריה: מכפיל} להוגנות (shiftLoad ב-autoAssign.js) — עמודה
           // חסרה/null/כל דבר שאינו אובייקט ממשי נופל ל-{}, שקול ל"אין
           // אף קטגוריה שהוגדרה משקל מיוחד לה" (D-05: היעדר-שורה = ברירת
@@ -703,7 +708,10 @@ export async function addGuard({ name, phone, teamCode }) {
   return profileFromRow(data);
 }
 
-export async function updateTeamSettings(teamCode, { deadlineDays, deadlineHour, reminders, mode, taskWeights, restHours }) {
+export async function updateTeamSettings(
+  teamCode,
+  { deadlineDays, deadlineHour, reminders, mode, taskWeights, restHours, fairnessWindowDays }
+) {
   const patch = {};
   if (deadlineDays !== undefined) patch.avail_deadline_days = deadlineDays;
   if (deadlineHour !== undefined) patch.avail_deadline_hour = deadlineHour;
@@ -713,6 +721,10 @@ export async function updateTeamSettings(teamCode, { deadlineDays, deadlineHour,
   // ל-DB constraint (gs_teams_rest_hours_check), כדי שכפתור שנשלח בטעות
   // עם ערך זר לא ייכשל בשגיאת SQL גולמית.
   if (restHours !== undefined) patch.rest_hours = [10, 12].includes(restHours) ? restHours : 10;
+  // שלב 5: אותו עיקרון — נורמליזציה כאן, לפני ה-constraint, לא רק בקריאה.
+  if (fairnessWindowDays !== undefined) {
+    patch.fairness_window_days = normalizeFairnessWindow(fairnessWindowDays);
+  }
   // {קטגוריה: מכפיל} — ר' shiftLoad ב-autoAssign.js. אובייקט, לא מערך:
   // עמודה חסרה/null נופלת ל-{} בכיוון הקריאה (loadTeam), כמו כל שדה אחר
   // שקדם למיגרציה שהוסיפה אותו.

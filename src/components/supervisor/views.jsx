@@ -16,6 +16,7 @@ import { availStatus, checkAssignment, isQualified } from "../../lib/autoAssign.
 import { PROFILES, subscribeTerms, t, termProfile } from "../../lib/terms.js";
 import { explainConflict, findConflicts } from "../../lib/conflicts.js";
 import { fairnessHint, fairnessPlan } from "../../lib/fairness.js";
+import { DEFAULT_FAIRNESS_WINDOW_DAYS, FAIRNESS_WINDOW_OPTIONS } from "../../lib/fairnessWindow.js";
 import { categoryOptions, folderIcon, foldersFor, UNFILED } from "../../lib/categories.js";
 
 /**
@@ -1125,7 +1126,14 @@ export function AssignView({
     const merged = withEngineTasks(shifts, tasks);
     const history = merged.filter((s) => s.date < weekStart);
     const planned = merged.filter((s) => s.date >= weekStart && s.date <= weekEnd);
-    return fairnessPlan({ guards, history, planned, until: weekStart, days: 14, taskWeights: team?.taskWeights || {} });
+    // שלב 5: חלון ההוגנות הוא הגדרת-צוות (gs_teams.fairness_window_days),
+    // לא קבוע 14 שרוף כאן — אותו ערך בדיוק ש-SmartAssign.jsx (carriedLoad)
+    // מזין למנוע האוטומטי, כדי ששני המסכים לעולם לא יחלקו על מי "חייב עוד".
+    return fairnessPlan({
+      guards, history, planned, until: weekStart,
+      days: team?.fairnessWindowDays ?? DEFAULT_FAIRNESS_WINDOW_DAYS,
+      taskWeights: team?.taskWeights || {},
+    });
   }, [guards, shifts, tasks, weekStart, weekEnd, team]);
 
   const hintOf = useMemo(() => {
@@ -2811,6 +2819,42 @@ function DeadlineSettings({ team, actions, busy }) {
 }
 
 /**
+ * שלב 5 (מחזור האיחוד, החלטה 5): חלון ההוגנות שהמנוע (SmartAssign) ומסך
+ * "אסדר בעצמי" (AssignView) מסתכלים אחורה כדי לחשב מי "חייב עוד" — הגדרת-
+ * צוות אחת ב-gs_teams.fairness_window_days, לא 14 שרוף בקוד. חמש אפשרויות
+ * קבועות (fairnessWindow.js), עד 4 חודשים — לא שדה חופשי.
+ */
+function FairnessWindowSettings({ team, actions, busy }) {
+  const days = team?.fairnessWindowDays ?? DEFAULT_FAIRNESS_WINDOW_DAYS;
+  return (
+    <Card>
+      <h2 className="font-bold text-content mb-1 flex items-center gap-2">
+        <Icon name="scale" size={18} className="text-brand" />
+        חלון ההוגנות
+      </h2>
+      <p className="text-sm text-muted mb-4">
+        כמה אחורה המנוע מסתכל כדי לדעת מי כבר נשא עומס — ב"סדר לי את השבוע" וב"אסדר בעצמי" גם יחד.
+      </p>
+      <div className="max-w-xs">
+        <Field label="חלון ההוגנות">
+          <Select
+            value={days}
+            onChange={(e) => actions.updateTeamSettings({ fairnessWindowDays: Number(e.target.value) })}
+            disabled={busy}
+          >
+            {FAIRNESS_WINDOW_OPTIONS.map((opt) => (
+              <option key={opt.days} value={opt.days}>
+                {opt.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </div>
+    </Card>
+  );
+}
+
+/**
  * בחירת תחום הפעילות.
  *
  * זו לא הגדרה טכנית אלא שאלה אחת בשפה של המשתמש — "איפה אתה עובד?" —
@@ -2991,6 +3035,8 @@ export function TeamView({
       <ProfilePicker team={team} actions={actions} busy={busy} shifts={shifts} tasks={tasks} />
 
       <DeadlineSettings team={team} actions={actions} busy={busy} />
+
+      <FairnessWindowSettings team={team} actions={actions} busy={busy} />
 
       <CategoryWeightSettings team={team} actions={actions} busy={busy} categories={categories} />
 
