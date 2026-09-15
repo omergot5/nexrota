@@ -223,7 +223,7 @@ export function useGuardian() {
     const onChange = () => refresh();
     const channel = supabase.channel(`team-${teamCode}`);
     for (const table of [
-      "gs_shifts", "gs_assignments", "gs_availability", "gs_profiles", "gs_swap_requests",
+      "gs_work_items", "gs_work_item_assignments", "gs_availability", "gs_profiles", "gs_swap_requests",
     ]) {
       channel.on("postgres_changes", { event: "*", schema: "public", table }, onChange);
     }
