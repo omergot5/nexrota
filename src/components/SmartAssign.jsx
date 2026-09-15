@@ -35,6 +35,7 @@ const KIND_ICON = {
   continuity: "refresh",
   balance: "shuffle",
   locked: "pin",
+  turn: "clock",
 };
 
 function RulesPanel({ rules, setRules, open, onClose }) {

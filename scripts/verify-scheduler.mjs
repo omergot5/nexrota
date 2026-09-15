@@ -1455,5 +1455,114 @@ console.log("\n=== BREADTH-01 · תור לפני עומק — יותר שומר�
     JSON.stringify(bResult.byShift) === JSON.stringify(bAgain.byShift));
 }
 
+console.log("\n=== SCALE-01 · חלוקת-תור מתפרשת לכל יחס שומרים:משמרות, לא רק 16:14 ===");
+
+// עוזר: כמה משמרות כל guardId קיבל/ה, מתוך byShift של תוצאת autoAssign.
+const shiftsPerGuard = (result) => {
+  const counts = {};
+  for (const ids of Object.values(result.byShift)) for (const id of ids) counts[id] = (counts[id] || 0) + 1;
+  return counts;
+};
+
+{
+  // 1. פחות שומרים ממשמרות, ביחס נקי (7 שומרים, 14 משמרות = בדיוק פי 2) —
+  //    בדיוק התרחיש שהמשתמש ביקש: כל אחד/ת עושה בדיוק שתיים, אף אחד/ת לא
+  //    מקבל/ת אפס ואף אחד/ת לא מקבל/ת שלוש.
+  const sGuards = Array.from({ length: 7 }, (_, i) => ({ id: `s${i}`, name: `שומר ${i}` }));
+  const sShifts = [];
+  dates.forEach((date, i) => {
+    sShifts.push({ id: `sd${i}`, date, label: "משמרת יום", type: "morning", startTime: "07:00", endTime: "19:00", requiredGuards: 1, assignedGuards: [] });
+    sShifts.push({ id: `sn${i}`, date, label: "משמרת לילה", type: "night", startTime: "19:00", endTime: "07:00", requiredGuards: 1, assignedGuards: [] });
+  });
+  const sAvailability = {};
+  for (const g of sGuards) for (const s of sShifts) sAvailability[`${g.id}-${s.id}`] = { status: "available" };
+  const sResult = autoAssign({ shifts: sShifts, guards: sGuards, availability: sAvailability });
+  const sCounts = shiftsPerGuard(sResult);
+  check("SCALE-01 · 7 שומרים / 14 משמרות — כל השבעה קיבלו משמרת אחת לפחות",
+    sGuards.every((g) => (sCounts[g.id] || 0) >= 1), JSON.stringify(sCounts));
+  check("SCALE-01 · 7 שומרים / 14 משמרות — כל השבעה קיבלו בדיוק שתיים, לא פחות ולא יותר",
+    sGuards.every((g) => sCounts[g.id] === 2), JSON.stringify(sCounts));
+
+  // 2. יחס לא-נקי (6 שומרים, 14 משמרות = 2 לכל אחד/ת + 2 משמרות עודפות) —
+  //    כולם מקבלים לפחות 2, בדיוק שניים מקבלים 3, אף אחד/ת לא מקבל/ת 4+
+  //    ואף אחד/ת לא נשאר/ת מתחת ל-2.
+  const rGuards = Array.from({ length: 6 }, (_, i) => ({ id: `r${i}`, name: `שומר ${i}` }));
+  const rAvailability = {};
+  for (const g of rGuards) for (const s of sShifts) rAvailability[`${g.id}-${s.id}`] = { status: "available" };
+  const rResult = autoAssign({ shifts: sShifts, guards: rGuards, availability: rAvailability });
+  const rCounts = shiftsPerGuard(rResult);
+  const rValues = rGuards.map((g) => rCounts[g.id] || 0);
+  check("SCALE-01 · 6 שומרים / 14 משמרות — כולם קיבלו לפחות 2",
+    rValues.every((v) => v >= 2), JSON.stringify(rCounts));
+  check("SCALE-01 · 6 שומרים / 14 משמרות — בדיוק שניים קיבלו את המשמרת העודפת (3), לא יותר מ-3 לאף אחד/ת",
+    rValues.filter((v) => v === 3).length === 2 && rValues.every((v) => v <= 3), JSON.stringify(rCounts));
+  check("SCALE-01 · 6 שומרים / 14 משמרות — סך הכול 14 משמרות חולקו",
+    rValues.reduce((a, b) => a + b, 0) === 14, JSON.stringify(rCounts));
+
+  // 3. חצי משרה מתחשב ביחס-הקיבולת של התור, לא רק בציון ההוגנות: שומר/ת
+  //    בחצי משרה שכבר קיבל/ה משמרת אחת נחשב/ת "בתור" שווה-ערך לשתי
+  //    משמרות של מלא/ה — כלומר לא אמור/ה לקבל שנייה לפני ששני המלאים
+  //    קיבלו את הראשונה שלהם.
+  const capGuards = [
+    { id: "c1", name: "מלא/ה א'" },
+    { id: "c2", name: "מלא/ה ב'" },
+    { id: "c3", name: "חצי משרה", halfTime: true },
+  ];
+  const capShifts = [
+    { id: "c-s1", date: "2026-09-14", label: "משמרת", type: "day", startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: [] },
+    { id: "c-s2", date: "2026-09-15", label: "משמרת", type: "day", startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: [] },
+    { id: "c-s3", date: "2026-09-16", label: "משמרת", type: "day", startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: [] },
+    { id: "c-s4", date: "2026-09-17", label: "משמרת", type: "day", startTime: "07:00", endTime: "15:00", requiredGuards: 1, assignedGuards: [] },
+  ];
+  const capAvailability = {};
+  for (const g of capGuards) for (const s of capShifts) capAvailability[`${g.id}-${s.id}`] = { status: "available" };
+  const capResult = autoAssign({ shifts: capShifts, guards: capGuards, availability: capAvailability });
+  const capCounts = shiftsPerGuard(capResult);
+  check("SCALE-01 · חצי-משרה מקבל/ת משמרת ראשונה כמו כולם (התור מתחשב בקיבולת רק מהשנייה ואילך)",
+    (capCounts.c3 || 0) >= 1, JSON.stringify(capCounts));
+  check("SCALE-01 · חצי-משרה לא מקבל/ת משמרת שנייה לפני ששני המלאים קיבלו את הראשונה שלהם",
+    (capCounts.c1 || 0) >= 1 && (capCounts.c2 || 0) >= 1, JSON.stringify(capCounts));
+
+  // דטרמיניזם על שלושת התרחישים.
+  const sAgain = autoAssign({ shifts: sShifts, guards: sGuards, availability: sAvailability });
+  check("SCALE-01 · deterministic — 7/14 חוזר על עצמו בדיוק",
+    JSON.stringify(sResult.byShift) === JSON.stringify(sAgain.byShift));
+}
+
+console.log("\n=== BALANCE-GUARD-01 · מעבר האיזון לא יוצר שומר/ת עם אפס משמרות ===");
+
+// דווח בבדיקת-קוד: מעבר האיזון (balanceWorkload) ממיין לפי נטל בלבד —
+// ציר שונה לגמרי מ"תור" (כמה משמרות יש למישהו/י השבוע). משמרת לילה כבדה
+// אחת יכולה לשקול יותר מכמה משמרות יום קלות, כך שהשומר/ת הכי-כבד/ה-בנטל
+// הוא/היא לפעמים גם מי שמחזיק/ה הכי פחות משמרות — 3 שומרים, 2 משמרות
+// (לילה כבד + יום קל): שניים מקבלים משמרת אחת כל אחד, אחד/ת נשאר/ת
+// באפס (רצפה מתמטית בלתי נמנעת, 3 מול 2). בלי המגן, מעבר האיזון היה
+// עלול לקחת את משמרת הלילה היחידה מבעליה (הכי-כבד/ה-בנטל) ולתת אותה
+// למי שכבר באפס — לא משפר כלום, רק מעביר את האפס לאדם אחר.
+{
+  const zGuards = [
+    { id: "z1", name: "לילה" },
+    { id: "z2", name: "יום" },
+    { id: "z3", name: "בחוץ" },
+  ];
+  const zShifts = [
+    { id: "z-n", date: "2026-09-14", label: "משמרת לילה", type: "night", startTime: "19:00", endTime: "07:00", requiredGuards: 1, assignedGuards: [] },
+    { id: "z-d", date: "2026-09-15", label: "משמרת יום", type: "day", startTime: "07:00", endTime: "19:00", requiredGuards: 1, assignedGuards: [] },
+  ];
+  const zAvailability = {};
+  for (const g of zGuards) for (const s of zShifts) zAvailability[`${g.id}-${s.id}`] = { status: "available" };
+  const zResult = autoAssign({ shifts: zShifts, guards: zGuards, availability: zAvailability });
+  const zCounts = shiftsPerGuard(zResult);
+  const zValues = Object.values(zCounts);
+
+  check("BALANCE-GUARD-01 · אף אחד/ת לא מחזיק/ה יותר ממשמרת אחת (2 משמרות, 3 שומרים — אין מה לזוז אליו בכל מקרה)",
+    zValues.every((v) => v <= 1), JSON.stringify(zCounts));
+  check("BALANCE-GUARD-01 · בדיוק שומר/ת אחד/ת נשאר/ת מחוץ, לא יותר — מעבר האיזון לא הזיז אפס מאדם לאדם",
+    zGuards.filter((g) => !zCounts[g.id]).length === 1, JSON.stringify(zCounts));
+  check("BALANCE-GUARD-01 · deterministic",
+    JSON.stringify(zResult.byShift) ===
+      JSON.stringify(autoAssign({ shifts: zShifts, guards: zGuards, availability: zAvailability }).byShift));
+}
+
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);

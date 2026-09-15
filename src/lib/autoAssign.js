@@ -650,33 +650,83 @@ export function autoAssign({
         break;
       }
 
-      // Spread first, quality second: how many shifts a candidate already
-      // holds *this week* (load.count) now outranks the match score itself,
-      // not just breaks a tie on it. With more guards than shifts (the
-      // common case — 16 guards, 14 slots), sorting by score first let one
-      // guard with a large carried-load debt win shift after shift, since
-      // their debt-driven fairness score stayed the highest candidate in
-      // the pool even after they'd already been assigned once this week —
-      // so the engine caught them up fast by concentrating two shifts on
-      // them while two OTHER guards got zero this same week, on top of the
-      // one guard who was always going to sit out (16 guards, 14 shifts).
-      // Reported live: one guard got 2 shifts while 3 different guards got
-      // 0, when only 2 sitting out is the actual floor. Breadth-first fixes
-      // that: every guard gets a turn before anyone gets a second one, and
-      // the fairness/preference/rest score only decides *within* each
-      // count-tier — it still steers who wins among equally-turned guards,
-      // it just no longer justifies skipping someone's first turn.
+      // Turn order first, match quality second: how many shifts a candidate
+      // already holds *this week*, scaled by their own capacity (a
+      // half-time guard's first shift already fills half their week, so it
+      // counts as a full "turn" here — not half of one) — outranks the
+      // match score itself, not just breaks a tie on it.
+      //
+      // This is deliberately a *count*, not the continuous carried-load
+      // debt ratio (scoreCandidate's `debt`/`fairness`): an early version of
+      // this fix sorted by that ratio directly and it technically also
+      // spread shifts correctly, but it made every candidate's rank shift
+      // continuously with every fraction of load they'd already absorbed —
+      // which meant a guard's *explicit* "preferred" request routinely lost
+      // to whoever happened to have a fractionally lower debt at that exact
+      // moment in the fill order, even on a team where nobody was remotely
+      // close to sitting out. Caught by the scattered-preferences suite
+      // below: honoured requests dropped from a clean baseline to 1 of 3.
+      // A plain turn count doesn't have that problem — within a turn-tier
+      // everyone is exactly tied, so score (preference, rest, the fairness
+      // points themselves) is what breaks it, exactly as before this fix.
+      //
+      // A turn count still generalizes to any guards:shifts balance without
+      // hard-coding a ratio, because the *tiers themselves* are what adapt:
+      //   - more guards than shifts (16 guards, 14 slots): everyone reaches
+      //     turn-tier 1 before anyone reaches tier 2, so the shortfall lands
+      //     on exactly `guards - shifts` people sitting at tier 0 — the
+      //     actual arithmetic floor, not a number this code ever names.
+      //   - fewer guards than shifts (7 guards, 14 slots): tiers 1 and 2
+      //     each get a full pass before anyone reaches tier 3, converging on
+      //     "everyone gets two" on its own, since two full tiers exactly use
+      //     up 14 slots for 7 guards.
+      //   - a remainder that doesn't split evenly (6 guards, 14 shifts):
+      //     tiers 1 and 2 use 12 of the 14 slots; the last 2 go to whoever's
+      //     fairness score (which already includes carriedLoad) says needs
+      //     them most *within* tier 3 — and because that shift's load now
+      //     counts toward their carried load next week, the extra rotates to
+      //     someone else in a future week on its own, no separate "remember
+      //     whose turn it is" bookkeeping required.
+      // Reported live: with 16 guards and 14 shifts, sorting by score alone
+      // let one guard's carried-load debt stay the highest-scoring candidate
+      // in the pool even after they'd already been assigned once, so they
+      // took a second shift while two OTHER guards got zero — three people
+      // short of a fair share instead of the two the arithmetic requires.
+      const turnsOf = (c) => load.get(c.guardId).count / capacityOf(c.guard);
       candidates.sort((a, b) => {
-        const ca = load.get(a.guardId).count;
-        const cb = load.get(b.guardId).count;
-        if (ca !== cb) return ca - cb;
+        const ta = turnsOf(a);
+        const tb = turnsOf(b);
+        if (ta !== tb) return ta - tb;
         if (b.score !== a.score) return b.score - a.score;
         return tieBreak(a, b);
       });
 
       const winner = candidates[0];
       const runnerUp = candidates[1];
-      addAssignment(shift, winner.guard, winner.score, winner.parts, false, winner.raw);
+      // When turn order was the actual reason the winner beat a
+      // better-scoring runner-up, say so explicitly (CLAUDE.md: every
+      // decision carries a readable reason) — otherwise a supervisor
+      // opening "יומן החלטות" sees a 60% match beat an 80% one with no
+      // explanation, which reads as a bug even though it is working
+      // exactly as designed.
+      //
+      // Deliberately doesn't say "כבר קיבל/ה משמרת" (already got a shift):
+      // load.count (what turnsOf reads) also rises from an hour-bearing
+      // task seeded before the fill even starts (UNIF-02, addToLoad below)
+      // — a guard who only has a task so far, no shift yet, would make that
+      // specific wording false.
+      const winnerParts =
+        runnerUp && runnerUp.score > winner.score
+          ? [
+              ...winner.parts,
+              {
+                label: `תור/ה: ל${runnerUp.guard.name} כבר שובץ יותר השבוע (משמרות ו/או משימות) — התור קודם להתאמה`,
+                points: 0,
+                kind: "turn",
+              },
+            ]
+          : winner.parts;
+      addAssignment(shift, winner.guard, winner.score, winnerParts, false, winner.raw);
 
       log.push({
         step: "assign",
@@ -789,6 +839,20 @@ function balanceWorkload({
       const check = checkHardConstraints({ guard: lightest, shift, load: lightLoad, availability, rules });
       if (!check.ok) continue;
       if (availStatus(availability, lightest.id, shift.id) === "unavailable") continue;
+
+      // Never create a new zero-shift guard while rebalancing *load*: this
+      // pass sorts purely by weighted load, a different axis from the
+      // greedy fill's turn count — a single heavy night shift can outweigh
+      // several light day shifts, so the load-heaviest guard is sometimes
+      // also a guard who only holds that one shift. Taking it away here
+      // would recreate the exact bug the turn-tiering fix exists to
+      // prevent (one guard ends the week with shifts, another with none),
+      // just via the balance pass instead of the fill order. This is
+      // deliberately narrow — it only blocks the specific 1-shift-to-0
+      // case, not ordinary load-smoothing between guards who both keep at
+      // least one shift either way (FAIR-01 below depends on those moves
+      // still happening).
+      if (heavyLoad.count === 1) continue;
 
       // Refuse a move that doesn't strictly shrink the pairwise gap. The
       // post-move gap is `|gapLoad - 2w|`, which beats the pre-move
