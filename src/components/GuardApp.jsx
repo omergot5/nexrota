@@ -7,7 +7,7 @@ import { Icon } from "./icons.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 import {
   availabilityDeadline, boardItemsForDates, countdownHe, dayName, formatDateHe,
-  rangeLabelHe, shiftInterval, shortDate, toISODate, todayISO, weekByOffset,
+  rangeLabelHe, recentItems, shiftInterval, shortDate, toISODate, todayISO, weekByOffset,
   withEngineTasks,
 } from "../lib/dates.js";
 import { availStatus, checkAssignment, teamAverages } from "../lib/autoAssign.js";
@@ -15,6 +15,7 @@ import { qualifiedGuardsForPosition } from "../lib/positions.js";
 import { shiftTone } from "../design/shiftPalette.js";
 import { AVAIL, AVAIL_CHOICES } from "../design/availability.js";
 import { subscribeTerms, t, termProfile } from "../lib/terms.js";
+import { loadWindowMode, RECENT_DAYS, subscribeLoadWindow } from "../lib/loadWindow.js";
 import UnifiedBoard from "./supervisor/UnifiedBoard.jsx";
 
 const navItems = () => [
@@ -146,9 +147,13 @@ function MySchedule({ user, guards, shifts, tasks = [], positions = [], team }) 
     () => withEngineTasks(publishedAll, tasks),
     [publishedAll, tasks]
   );
+  // אותו חלון-הצגה (lib/loadWindow.js) שהמנהל בוחר בדשבורד/דוחות — המשתתף
+  // לא בוחר בעצמו, רק רואה מספר עקבי איתם; "recent" (14 יום) תואם למה
+  // שהמנוע בפועל השתמש בו (rollingLoad, fairness.js).
+  const loadWindow = useSyncExternalStore(subscribeLoadWindow, loadWindowMode, loadWindowMode);
   const { perGuard } = useMemo(
-    () => teamAverages(guards, withTasks, team?.taskWeights || {}),
-    [guards, withTasks, team]
+    () => teamAverages(guards, loadWindow === "recent" ? recentItems(withTasks, RECENT_DAYS) : withTasks, team?.taskWeights || {}),
+    [guards, withTasks, loadWindow, team]
   );
   const mine_ = perGuard[user.id];
   const nameOf = (id) => guards.find((g) => g.id === id)?.name || "—";

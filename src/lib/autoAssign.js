@@ -335,7 +335,7 @@ const W = { availability: 40, fairness: 35, night: 22, rest: 10, continuity: 5 }
 const maxScoreFor = (shift) =>
   W.availability + W.fairness + W.rest + W.continuity + (shift.type === "night" ? W.night : 0);
 
-function scoreCandidate({ guard, shift, load, availability, rules, stats, check }) {
+function scoreCandidate({ guard, shift, load, availability, rules, stats, check, carried }) {
   const parts = [];
   let score = 0;
 
@@ -370,31 +370,46 @@ function scoreCandidate({ guard, shift, load, availability, rules, stats, check 
   // משרה מלאה אחת; capacityOf(guard) מכווץ אותו לחלק המשרה של השומר/ת
   // הספציפי/ת הזה/זו. שומר/ת בחצי משרה "מאוזן/ת" בחצי מהנטל של שומר/ת
   // במשרה מלאה, לא כמעט באותו נטל.
+  //
+  // `carried` (אופציונלי, מ-carriedLoad שהקורא מזין) הוא הנטל שכבר נצבר
+  // *לפני* השבוע הזה — חלון מתגלגל, אותו חישוב בדיוק כמו rollingLoad
+  // ב-fairness.js. הוא נכנס רק לכאן, לנוסחת ההוגנות הרכה — לא ל-load.count/
+  // load.nights/load.shifts/load.dates, שמשמשים את האילוצים הקשיחים
+  // (תקרת-שבוע, מרחק-מנוחה, איסור-חפיפה) ואסור להם "לזכור" משמרת משבוע
+  // קודם כאילו היא מתנגשת עם השבוע הנוכחי. בלי carried, מי שנשא שבועיים
+  // רצופים היה נראה "מאוזן לגמרי" ברגע שמתחילים שבוע שלישי מאפס — בדיוק
+  // הפער ש-fairnessPlan (מסך השיבוץ הידני) כבר חישב נכון, אבל שהמנוע
+  // האוטומטי הזה מעולם לא ראה.
+  const carriedLoad = carried?.load || 0;
+  const carriedNights = carried?.nights || 0;
   const target = Math.max(stats.loadTargetPerGuard * capacityOf(guard), 0.001);
-  const fairness = Math.max(0, Math.min(1, 1 - load.load / target));
+  const fairness = Math.max(0, Math.min(1, 1 - (load.load + carriedLoad) / target));
   const fairnessPts = points(35 * fairness);
   score += fairnessPts;
   parts.push({
     label:
-      load.count === 0
-        ? "טרם שובץ/ה השבוע"
-        : `נטל נמוך יחסית — ${round(load.load)} מול יעד אישי ${round(target)}`,
+      load.count === 0 && !carriedLoad
+        ? "טרם שובץ/ה"
+        : carriedLoad
+          ? `נטל מצטבר (כולל שבועות קודמים) ${round(load.load + carriedLoad)} מול יעד אישי ${round(target)}`
+          : `נטל נמוך יחסית — ${round(load.load)} מול יעד אישי ${round(target)}`,
     points: fairnessPts,
     kind: "fairness",
   });
 
   // 3. Night rotation — measured against the team's expected share of nights,
   //    not against the hard cap, or nights pile onto whoever is free first.
+  //    Same carried-load treatment as fairness above.
   if (shift.type === "night") {
     const nightTarget = Math.max(stats.nightTargetPerGuard * capacityOf(guard), 0.001);
-    const nightFair = Math.max(0, Math.min(1, 1 - load.nights / nightTarget));
+    const nightFair = Math.max(0, Math.min(1, 1 - (load.nights + carriedNights) / nightTarget));
     const nightPts = points(22 * nightFair);
     score += nightPts;
     parts.push({
       label:
-        load.nights === 0
-          ? "טרם שובץ/ה ללילה השבוע"
-          : `${load.nights} לילות עד כה מול יעד אישי ${round(nightTarget)}`,
+        load.nights === 0 && !carriedNights
+          ? "טרם שובץ/ה ללילה"
+          : `${load.nights + carriedNights} לילות (כולל שבועות קודמים) מול יעד אישי ${round(nightTarget)}`,
       points: nightPts,
       kind: "night",
     });
@@ -482,7 +497,7 @@ function scoreCandidate({ guard, shift, load, availability, rules, stats, check 
  */
 export function autoAssign({
   shifts, guards, availability = {}, rules: ruleOverrides, keepExisting = false, tasks = [],
-  taskWeights = {},
+  taskWeights = {}, carriedLoad = {},
 }) {
   const rules = { ...DEFAULT_RULES, ...ruleOverrides };
   const log = [];
@@ -624,7 +639,9 @@ export function autoAssign({
           roundBlockers.push({ guardId: guard.id, name: guard.name, code: check.code, reason: check.reason });
           continue;
         }
-        const { score, raw, parts } = scoreCandidate({ guard, shift, load: l, availability, rules, stats, check });
+        const { score, raw, parts } = scoreCandidate({
+          guard, shift, load: l, availability, rules, stats, check, carried: carriedLoad[guard.id],
+        });
         candidates.push({ guardId: guard.id, guard, score, raw, parts });
       }
 
@@ -633,17 +650,83 @@ export function autoAssign({
         break;
       }
 
+      // Turn order first, match quality second: how many shifts a candidate
+      // already holds *this week*, scaled by their own capacity (a
+      // half-time guard's first shift already fills half their week, so it
+      // counts as a full "turn" here — not half of one) — outranks the
+      // match score itself, not just breaks a tie on it.
+      //
+      // This is deliberately a *count*, not the continuous carried-load
+      // debt ratio (scoreCandidate's `debt`/`fairness`): an early version of
+      // this fix sorted by that ratio directly and it technically also
+      // spread shifts correctly, but it made every candidate's rank shift
+      // continuously with every fraction of load they'd already absorbed —
+      // which meant a guard's *explicit* "preferred" request routinely lost
+      // to whoever happened to have a fractionally lower debt at that exact
+      // moment in the fill order, even on a team where nobody was remotely
+      // close to sitting out. Caught by the scattered-preferences suite
+      // below: honoured requests dropped from a clean baseline to 1 of 3.
+      // A plain turn count doesn't have that problem — within a turn-tier
+      // everyone is exactly tied, so score (preference, rest, the fairness
+      // points themselves) is what breaks it, exactly as before this fix.
+      //
+      // A turn count still generalizes to any guards:shifts balance without
+      // hard-coding a ratio, because the *tiers themselves* are what adapt:
+      //   - more guards than shifts (16 guards, 14 slots): everyone reaches
+      //     turn-tier 1 before anyone reaches tier 2, so the shortfall lands
+      //     on exactly `guards - shifts` people sitting at tier 0 — the
+      //     actual arithmetic floor, not a number this code ever names.
+      //   - fewer guards than shifts (7 guards, 14 slots): tiers 1 and 2
+      //     each get a full pass before anyone reaches tier 3, converging on
+      //     "everyone gets two" on its own, since two full tiers exactly use
+      //     up 14 slots for 7 guards.
+      //   - a remainder that doesn't split evenly (6 guards, 14 shifts):
+      //     tiers 1 and 2 use 12 of the 14 slots; the last 2 go to whoever's
+      //     fairness score (which already includes carriedLoad) says needs
+      //     them most *within* tier 3 — and because that shift's load now
+      //     counts toward their carried load next week, the extra rotates to
+      //     someone else in a future week on its own, no separate "remember
+      //     whose turn it is" bookkeeping required.
+      // Reported live: with 16 guards and 14 shifts, sorting by score alone
+      // let one guard's carried-load debt stay the highest-scoring candidate
+      // in the pool even after they'd already been assigned once, so they
+      // took a second shift while two OTHER guards got zero — three people
+      // short of a fair share instead of the two the arithmetic requires.
+      const turnsOf = (c) => load.get(c.guardId).count / capacityOf(c.guard);
       candidates.sort((a, b) => {
+        const ta = turnsOf(a);
+        const tb = turnsOf(b);
+        if (ta !== tb) return ta - tb;
         if (b.score !== a.score) return b.score - a.score;
-        const ca = load.get(a.guardId).count;
-        const cb = load.get(b.guardId).count;
-        if (ca !== cb) return ca - cb;
         return tieBreak(a, b);
       });
 
       const winner = candidates[0];
       const runnerUp = candidates[1];
-      addAssignment(shift, winner.guard, winner.score, winner.parts, false, winner.raw);
+      // When turn order was the actual reason the winner beat a
+      // better-scoring runner-up, say so explicitly (CLAUDE.md: every
+      // decision carries a readable reason) — otherwise a supervisor
+      // opening "יומן החלטות" sees a 60% match beat an 80% one with no
+      // explanation, which reads as a bug even though it is working
+      // exactly as designed.
+      //
+      // Deliberately doesn't say "כבר קיבל/ה משמרת" (already got a shift):
+      // load.count (what turnsOf reads) also rises from an hour-bearing
+      // task seeded before the fill even starts (UNIF-02, addToLoad below)
+      // — a guard who only has a task so far, no shift yet, would make that
+      // specific wording false.
+      const winnerParts =
+        runnerUp && runnerUp.score > winner.score
+          ? [
+              ...winner.parts,
+              {
+                label: `תור/ה: ל${runnerUp.guard.name} כבר שובץ יותר השבוע (משמרות ו/או משימות) — התור קודם להתאמה`,
+                points: 0,
+                kind: "turn",
+              },
+            ]
+          : winner.parts;
+      addAssignment(shift, winner.guard, winner.score, winnerParts, false, winner.raw);
 
       log.push({
         step: "assign",
@@ -671,6 +754,7 @@ export function autoAssign({
   // --- local-search balancing ---
   const balanceMoves = balanceWorkload({
     openShifts, activeGuards, availability, rules, stats, load, assignments, byShift, weights: taskWeights,
+    carriedLoad,
   });
   if (balanceMoves.length) {
     log.push({
@@ -686,7 +770,9 @@ export function autoAssign({
 
 // ---------- balancing ----------
 
-function balanceWorkload({ openShifts, activeGuards, availability, rules, stats, load, assignments, byShift, weights = {} }) {
+function balanceWorkload({
+  openShifts, activeGuards, availability, rules, stats, load, assignments, byShift, weights = {}, carriedLoad = {},
+}) {
   const moves = [];
   const shiftById = new Map(openShifts.map((s) => [s.id, s]));
 
@@ -717,7 +803,11 @@ function balanceWorkload({ openShifts, activeGuards, availability, rules, stats,
   // שווים, אז החיסור מוריד את אותו קבוע מכולם — ואינו משנה סדר, פערים, או
   // את תנאי-העצירה למטה (שונות/הפרש בין שני ערכים אינם משתנים מהזזה
   // קבועה). זו בדיוק הסיבה שהנוסחה למטה שקולה לישנה כש-D-02 לא רלוונטי.
-  const debtOf = (g) => load.get(g.id).load - stats.loadTargetPerGuard * capacityOf(g);
+  // + הנטל שנצבר לפני השבוע הזה (carriedLoad, ר' scoreCandidate) — אותו
+  // עיקרון: מי שנכנס לאיזון הזה כבר עמוס משבועות קודמים לא אמור להיראות
+  // "קל" רק כי השבוע הנוכחי עצמו עדיין ריק לו/ה.
+  const debtOf = (g) =>
+    load.get(g.id).load + (carriedLoad[g.id]?.load || 0) - stats.loadTargetPerGuard * capacityOf(g);
 
   for (let pass = 0; pass < rules.balancePasses; pass++) {
     const sorted = [...activeGuards].sort((a, b) => {
@@ -750,6 +840,20 @@ function balanceWorkload({ openShifts, activeGuards, availability, rules, stats,
       if (!check.ok) continue;
       if (availStatus(availability, lightest.id, shift.id) === "unavailable") continue;
 
+      // Never create a new zero-shift guard while rebalancing *load*: this
+      // pass sorts purely by weighted load, a different axis from the
+      // greedy fill's turn count — a single heavy night shift can outweigh
+      // several light day shifts, so the load-heaviest guard is sometimes
+      // also a guard who only holds that one shift. Taking it away here
+      // would recreate the exact bug the turn-tiering fix exists to
+      // prevent (one guard ends the week with shifts, another with none),
+      // just via the balance pass instead of the fill order. This is
+      // deliberately narrow — it only blocks the specific 1-shift-to-0
+      // case, not ordinary load-smoothing between guards who both keep at
+      // least one shift either way (FAIR-01 below depends on those moves
+      // still happening).
+      if (heavyLoad.count === 1) continue;
+
       // Refuse a move that doesn't strictly shrink the pairwise gap. The
       // post-move gap is `|gapLoad - 2w|`, which beats the pre-move
       // `gapLoad` only for `0 < w < gapLoad` — at `w === gapLoad` the trade
@@ -767,6 +871,7 @@ function balanceWorkload({ openShifts, activeGuards, availability, rules, stats,
       removeFromLoad(heavyLoad, shift, weights);
       const { score, raw, parts } = scoreCandidate({
         guard: lightest, shift, load: lightLoad, availability, rules, stats, check,
+        carried: carriedLoad[lightest.id],
       });
       addToLoad(lightLoad, shift, weights);
 

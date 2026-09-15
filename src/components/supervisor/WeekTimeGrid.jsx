@@ -24,6 +24,7 @@ import "./WeekTimeGrid.css";
 import { toCalendarEvents } from "../../lib/calendarEvents.js";
 import { fromISODate } from "../../lib/dates.js";
 import { categoryTone, TONE_VARS } from "../../design/categoryPalette.js";
+import { guardColor } from "../ui.jsx";
 
 dayjs.extend(isBetween);
 dayjs.extend(localeData);
@@ -55,15 +56,24 @@ const MESSAGES = {
  * calendarEvents.js) — אותו רמז חזותי ש-Google Calendar עצמו נותן למשמרת
  * שפוצלה על פני חצות: שני חצאים שנראים כמו רצף אחד, לא שני אירועים סתם
  * שמזדמן להם להיות צמודים.
+ *
+ * פס-שומר: הרקע נשאר לפי קטגוריה (ככה מבדילים "מה" — שמירות מול סיור),
+ * ומעליו פס בצד-התחלה בצבע קבוע לפי guardColor(id) — אותו צבע יציב שכבר
+ * מזהה את השומר בכל מקום אחר באפליקציה — כדי שאפשר יהיה להבדיל גם "מי":
+ * שתי משמרות שמירות של שני שומרים שונים כבר לא נראות זהות. `border-inline-
+ * start` ולא `border-right` בכוונה — מתהפך אוטומטית עם RTL/LTR בלי קוד
+ * נפרד. רק כשיש שומר משובץ בפועל; משמרת ריקה לא "שייכת" לאף אחד.
  */
 function eventPropGetter(event, mode) {
   const tone = categoryTone(event.resource.category, mode);
-  const { continuesAfter, continuesBefore } = event.resource;
+  const { continuesAfter, continuesBefore, assignedGuards } = event.resource;
+  const guardId = assignedGuards?.[0];
   return {
     style: {
       backgroundColor: TONE_VARS[tone],
       color: "rgb(var(--cat-on))",
       border: "none",
+      borderInlineStart: guardId ? `4px solid ${guardColor(guardId)}` : "none",
       borderRadius: 8,
       ...(continuesAfter && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }),
       ...(continuesBefore && { borderTopLeftRadius: 0, borderTopRightRadius: 0 }),
@@ -76,15 +86,37 @@ function eventPropGetter(event, mode) {
 // שני מקורות טקסט נפרדים שמתחרים על אותו שטח צר. בחצי הממשיך (אחרי
 // חצות) מוצגת חץ במקום שעה — "07:00" בראש התא היה קורא כאילו המשמרת
 // *מתחילה* שם, בעוד שהיא רק נגמרת שם.
+// חסר-איוש: אותו מושג בדיוק כמו `coverageOf` ב-CalendarView.jsx (MonthGrid/
+// DayList) — נספר רק לפריט שיש לו בכלל מושג "כמה צריך" (requiredGuards !=
+// null). בלי זה משמרת חלקית-מאוישת נראתה זהה למאוישת במלואה בתצוגת השבוע,
+// בעוד שתי התצוגות האחרות כבר מציגות את הפער הזה.
 function EventContent({ event }) {
   const names = event.resource.assignedGuardNames || [];
+  const need = event.resource.requiredGuards;
   const hh = String(event.start.getHours()).padStart(2, "0");
   const mm = String(event.start.getMinutes()).padStart(2, "0");
+  const short = need != null && names.length < need;
   return (
     <div className="text-[11px] leading-[1.15]">
       {!event.allDay && (
-        <div className="font-black text-[10px]" data-numeric>
-          {event.resource.continuesBefore ? "⋯" : `${hh}:${mm}`}
+        <div className="flex items-center justify-between gap-1">
+          <span className="font-black text-[10px]" data-numeric>
+            {event.resource.continuesBefore ? "⋯" : `${hh}:${mm}`}
+          </span>
+          {short && (
+            // רקע `bg-bg` אטום (לא `bg-surface` — הוא כבר rgba עם אלפא
+            // אפויה, ובמצב כהה כמעט שקוף) מאחורי התג: `text-danger`/`text-warn`
+            // מחושבים בכוונה מול `--bg` בדיוק (יחסי הניגודיות בתיעוד ה-tokens),
+            // לא מול צבע-הקטגוריה הדינמי של אריח האירוע — משמרת בקטגוריה
+            // cat-red הייתה מציגה טקסט אדום על רקע אדום בלי הרקע הזה.
+            <span
+              className={`font-black text-[9px] px-1 rounded bg-bg ${names.length === 0 ? "text-danger" : "text-warn"}`}
+              data-numeric
+              aria-label={`חסרים ${need - names.length}`}
+            >
+              {names.length}/{need}
+            </span>
+          )}
         </div>
       )}
       <div className="font-bold truncate">{event.title}</div>

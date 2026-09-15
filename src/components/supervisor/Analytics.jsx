@@ -1,15 +1,16 @@
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { SHIFT_TONES } from "../../design/shiftPalette.js";
 import {
   Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { Avatar, Badge, Card, EmptyState, PageHeader } from "../ui.jsx";
+import { Avatar, Badge, Card, EmptyState, PageHeader, Segmented } from "../ui.jsx";
 import { useTheme } from "../../hooks/useTheme.js";
 import { loadTable } from "../../lib/loadTable.js";
 import { chartTheme } from "../../design/chartTheme.js";
 import { loadShareHint } from "../../lib/fairness.js";
 import { t } from "../../lib/terms.js";
-import { withEngineTasks } from "../../lib/dates.js";
+import { recentItems, withEngineTasks } from "../../lib/dates.js";
+import { loadWindowMode, RECENT_DAYS, setLoadWindowMode, subscribeLoadWindow } from "../../lib/loadWindow.js";
 
 // Kept in its own module and loaded lazily — recharts is roughly half the
 // bundle, and reports are never the first screen a supervisor opens.
@@ -45,9 +46,20 @@ export default function AnalyticsDash({ guards, shifts, tasks = [], team }) {
   // לא מחושב כאן — כולו מגיע דרך teamAverages() בתוך loadTable (01-03).
   // המשימות עוברות דרך withEngineTasks (Phase 2) לפני loadTable — אותו
   // מיזוג בדיוק שהכרטיס בלוח הבקרה ושורת ההוגנות של המשתתף עוברים דרכו.
+  //
+  // חלון-הצגה משותף (lib/loadWindow.js) עם הכרטיס בדשבורד ועם "הנטל שלי":
+  // "recent" (14 יום, ברירת מחדל) תואם למה שהמנוע בפועל משתמש בו
+  // (rollingLoad, fairness.js) — לא "כל הזמן".
+  const loadWindow = useSyncExternalStore(subscribeLoadWindow, loadWindowMode, loadWindowMode);
+  const mergedForLoad = useMemo(() => withEngineTasks(shifts, tasks), [shifts, tasks]);
   const table = useMemo(
-    () => loadTable(guards, withEngineTasks(shifts, tasks), team?.taskWeights || {}),
-    [guards, shifts, tasks, team]
+    () =>
+      loadTable(
+        guards,
+        loadWindow === "recent" ? recentItems(mergedForLoad, RECENT_DAYS) : mergedForLoad,
+        team?.taskWeights || {}
+      ),
+    [guards, mergedForLoad, loadWindow, team]
   );
 
   // העוגה סופרת משימות; העמודה המוערמת לא (Phase 2). `SHIFT_TYPES` עצמו
@@ -80,6 +92,17 @@ export default function AnalyticsDash({ guards, shifts, tasks = [], team }) {
       <PageHeader
         title={t("nav.analytics")}
         subtitle={`${table.totalAssigned} שיבוצים · ${table.guardCount} ${t("noun.memberPlural")} · ${t("unit.load")} ממוצע ${table.meanLoad}`}
+        actions={
+          <Segmented
+            size="sm"
+            value={loadWindow}
+            onChange={setLoadWindowMode}
+            options={[
+              { value: "recent", label: `${RECENT_DAYS} ימים אחרונים` },
+              { value: "all", label: "מצטבר" },
+            ]}
+          />
+        }
       />
 
       <div className="grid lg:grid-cols-2 gap-5">

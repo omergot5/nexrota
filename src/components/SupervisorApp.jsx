@@ -187,13 +187,7 @@ export default function SupervisorApp({ state }) {
     // המחדל של CalendarView עצמו היא "שבוע" בדיוק מהסיבה שהייתה כתובה כאן:
     // מי שנכנס ליומן בא לראות מה חסר *עכשיו*, וחור נראה רק על ציר שעות.
     calendar: (
-      <CalendarView
-        shifts={shifts}
-        tasks={tasks}
-        guards={guards}
-        onNavigate={go}
-        mode={team?.mode || "security"}
-      />
+      <CalendarView shifts={shifts} tasks={tasks} guards={guards} onNavigate={go} />
     ),
     more: (
       <div className="grid gap-3 sm:grid-cols-2">

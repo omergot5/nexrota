@@ -12,7 +12,7 @@ import {
   qualifiedGuardsForPosition,
   workingGuardIdsForWeek,
 } from "../src/lib/positions.js";
-import { addDays, startOfWeek, diffInDays } from "../src/lib/dates.js";
+import { addDays, startOfWeek, diffInDays, recentItems } from "../src/lib/dates.js";
 import { autoAssign, isQualified } from "../src/lib/autoAssign.js";
 import {
   shiftFromRow,
@@ -415,6 +415,27 @@ check(
   JSON.stringify(pastOffsets) === JSON.stringify(futureOffsets),
   `past=${JSON.stringify(pastOffsets)} future=${JSON.stringify(futureOffsets)}`
 );
+
+// ============================================================
+// recentItems — חלון תצוגת-עומס (lib/loadWindow.js). אותה נוסחה בדיוק
+// כמו rollingLoad (fairness.js: from = addDays(until, -days), and
+// s.date >= from && s.date < until) — כאן רק על מערך שטוח, לא per-guard.
+// ============================================================
+const untilR = "2026-09-14";
+const itemsR = [
+  { id: "outside-before", date: "2026-08-29" }, // לפני from (2026-08-31) בדיוק
+  { id: "edge-from", date: "2026-08-31" }, // from בדיוק — כלול
+  { id: "middle", date: "2026-09-05" },
+  { id: "edge-until", date: "2026-09-14" }, // until בדיוק — לא כלול (בלעדי)
+  { id: "no-date" }, // בלי date בכלל — לא קורס
+];
+const recentR = recentItems(itemsR, 14, untilR);
+check(
+  "recentItems: from כלול, until לא כלול, בלי date מוחרג",
+  JSON.stringify(recentR.map((i) => i.id)) === JSON.stringify(["edge-from", "middle"]),
+  `got=${recentR.map((i) => i.id).join(",")}`
+);
+check("recentItems: קלט ריק לא קורס", Array.isArray(recentItems([], 14, untilR)) && recentItems([], 14, untilR).length === 0);
 
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);

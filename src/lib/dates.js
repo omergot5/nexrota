@@ -32,6 +32,21 @@ export const fromISODate = (iso) => new Date(`${iso}T12:00:00`);
 export const todayISO = () => toISODate(new Date());
 
 /**
+ * מחזיר רק פריטים (משמרת/משימה, אחרי withEngineTasks — כל אחד עם `.date`)
+ * בחלון של `days` הימים שמסתיימים (לא כולל) ב-`untilISO` — אותה נוסחת
+ * חלון בדיוק כמו `rollingLoad` (fairness.js), שהמנוע עצמו כבר משתמש בה
+ * להחלטות הוגנות בפועל (14 יום, לא "כל הזמן"). קיים כדי שתצוגות עומס
+ * (כרטיס "עומס השומרים", מסך הדוחות, "הנטל שלי" של המשתתף) יוכלו להראות
+ * את אותו חלון שהמנוע בפועל מסתכל עליו — בלי זה הן קוראות teamAverages
+ * עם כל היסטוריית הצוות אי-פעם, ומספר שרואה מנהל לא תואם למה שקרה בפועל.
+ * `untilISO` ברירת מחדל `todayISO()`: זו תצוגה חיה, לא קלט למנוע טהור.
+ */
+export const recentItems = (items = [], days = 14, untilISO = todayISO()) => {
+  const from = addDays(untilISO, -days);
+  return items.filter((it) => it?.date && it.date >= from && it.date < untilISO);
+};
+
+/**
  * When availability for a week closes. Stored on the team as an offset rather
  * than a date so it recurs every week with nobody maintaining it.
  *

@@ -13,8 +13,21 @@
 // בדיוק הסיכון שדטרמיניזם ייסחף (03-RESEARCH.md, Pitfall 8).
 // ============================================================
 
-import { boardItemsForDates } from "./dates.js";
+import { addDays, boardItemsForDates, shiftInterval } from "./dates.js";
 import { folderIcon, foldersFor, UNFILED } from "./categories.js";
+
+/**
+ * האם פריט timed חוצה חצות (למשל 23:00–07:00) — אותו חישוב בדיוק
+ * ש-`calendarEvents.js` מפעיל כדי לפצל אירוע ל-RBC. כאן התוצאה לא
+ * מפוצלת לשני אירועים אלא רק קובעת אם להוסיף עותק-המשך בעמודת היום שאחרי.
+ */
+function crossesMidnight(item) {
+  if (!item.startTime) return false; // timeless — אין חצייה
+  const { start, end } = shiftInterval(item);
+  const midnight = new Date(start);
+  midnight.setHours(24, 0, 0, 0);
+  return new Date(end).getTime() > midnight.getTime();
+}
 
 /**
  * `{ category, icon, days: [{ date, items: [...] }] }[]` — שורה אחת לכל
@@ -33,15 +46,32 @@ import { folderIcon, foldersFor, UNFILED } from "./categories.js";
 export function buildResourceRows({ shifts = [], tasks = [], weekDates = [], mode = "security" } = {}) {
   const { days } = boardItemsForDates(shifts, tasks, weekDates);
 
+  const dateSet = new Set(weekDates);
   const byCategory = new Map();
+  const place = (category, date, item) => {
+    if (!byCategory.has(category)) byCategory.set(category, new Map());
+    const byDate = byCategory.get(category);
+    if (!byDate.has(date)) byDate.set(date, []);
+    byDate.get(date).push(item);
+  };
   for (const day of days) {
     const pool = [...day.timed, ...day.timeless];
     for (const item of pool) {
       const category = item.category || UNFILED;
-      if (!byCategory.has(category)) byCategory.set(category, new Map());
-      const byDate = byCategory.get(category);
-      if (!byDate.has(day.date)) byDate.set(day.date, []);
-      byDate.get(day.date).push(item);
+      place(category, day.date, item);
+      // משמרת חוצה-חצות (19:00–07:00) ממשיכה גם בעמודת היום שאחריה —
+      // אותה תפיסה ש-`calendarEvents.js` מיישם בפיצול ל-RBC, כדי
+      // שמבט-המשאבים לא "יבלע" את חצי המשמרת שאחרי חצות.
+      if (crossesMidnight(item)) {
+        const nextDate = addDays(day.date, 1);
+        // startTime מוחלף ל-00:00: העותק הזה מייצג רק את חצי-שאחרי-חצות
+        // (endTime המקורי כבר נכון — המשמרת עדיין נגמרת באותה שעה). בלי
+        // זה התא היה מציג את השעה המקורית (למשל "19:00–07:00") גם ביום
+        // שאחרי, כאילו יש שם משמרת-לילה שלמה נוספת — ומתמיין בטעות בין
+        // הפריטים המאוחרים של אותו יום במקום ראשון (00:00), כי המיון
+        // למטה ממוין לפי startTime.
+        if (dateSet.has(nextDate)) place(category, nextDate, { ...item, startTime: "00:00", continuesBefore: true });
+      }
     }
   }
 
