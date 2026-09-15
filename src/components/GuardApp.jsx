@@ -588,6 +588,10 @@ function MySwaps({ user, team, guards, shifts, availability = {}, swapRequests, 
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ shiftId: "", toGuard: "", message: "" });
   const field = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  // שלב 8 (מחזור האיחוד): מחליף משמרת חדשה מאפסת את היעד — אחרת בחירה קודמת
+  // שהייתה חוקית למשמרת אחרת יכולה להישאר בשקט על משמרת חדשה שהיא כבר
+  // לא חוקית לה (ר' selectedShiftLegality למטה).
+  const setShiftId = (e) => setForm((f) => ({ ...f, shiftId: e.target.value, toGuard: "" }));
 
   const myShifts = shifts.filter((s) => s.assignedGuards.includes(user.id) && s.date >= todayISO());
   const sent = swapRequests.filter((r) => r.fromGuard === user.id);
@@ -595,6 +599,20 @@ function MySwaps({ user, team, guards, shifts, availability = {}, swapRequests, 
 
   const nameOf = (id) => guards.find((g) => g.id === id)?.name || "—";
   const shiftOf = (id) => shifts.find((s) => s.id === id);
+
+  // שלב 8 (מחזור האיחוד): רשימת "למי לשלוח" מסוננת מראש נגד אותה
+  // checkAssignment בדיוק שמחליטה אם לאשר בקשה קיימת (legality, למעלה) —
+  // אחרת המבקש/ת רואה כל אדם בצוות כאפשרות תקינה, ומגלה שהיא חסומה רק אחרי
+  // שהצד השני מנסה (ולא יכול) לאשר. בלי משמרת נבחרת עדיין אין נגד מה לבדוק,
+  // אז הרשימה פתוחה עד שנבחרת אחת.
+  const selectedShift = shiftOf(form.shiftId);
+  const toGuardLegality = (g) =>
+    selectedShift
+      ? checkAssignment({
+          guard: g, shift: selectedShift, shifts, availability, tasks,
+          rules: team?.restHours ? { minRestHours: team.restHours } : undefined,
+        })
+      : { ok: true };
 
   const submit = async () => {
     if (!form.shiftId || !form.toGuard) return;
@@ -754,7 +772,7 @@ function MySwaps({ user, team, guards, shifts, availability = {}, swapRequests, 
       >
         <div className="space-y-3">
           <Field label="המשמרת שלי">
-            <Select value={form.shiftId} onChange={field("shiftId")}>
+            <Select value={form.shiftId} onChange={setShiftId}>
               <option value="">בחר משמרת</option>
               {myShifts.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -763,16 +781,23 @@ function MySwaps({ user, team, guards, shifts, availability = {}, swapRequests, 
               ))}
             </Select>
           </Field>
-          <Field label="למי לשלוח את הבקשה">
+          <Field
+            label="למי לשלוח את הבקשה"
+            hint={selectedShift ? "מי שלא יכול/ה לקבל את המשמרת הזו מסומן/ת" : undefined}
+          >
             <Select value={form.toGuard} onChange={field("toGuard")}>
               <option value="">בחר {t("noun.member")}</option>
               {guards
                 .filter((g) => g.id !== user.id)
-                .map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
+                .map((g) => {
+                  const legal = toGuardLegality(g);
+                  return (
+                    <option key={g.id} value={g.id} disabled={!legal.ok} title={legal.ok ? undefined : legal.reason}>
+                      {g.name}
+                      {legal.ok ? "" : ` — ${legal.reason}`}
+                    </option>
+                  );
+                })}
             </Select>
           </Field>
           <Field label="סיבה (אופציונלי)">
