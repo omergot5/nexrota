@@ -4,12 +4,12 @@ import { AVAIL } from "../../design/availability.js";
 import { loadTable } from "../../lib/loadTable.js";
 import {
   Alert, Avatar, Badge, Btn, Card, EmptyState, Field, guardColor, IconBtn, initials, Input, Meter,
-  Modal, PageHeader, readableInk, Segmented, Select, StatCard, Textarea,
+  Modal, PageHeader, readableInk, Segmented, Select, StatCard,
 } from "../ui.jsx";
 import { Dot, Icon } from "../icons.jsx";
 import {
-  availabilityDeadline, dayName, DAYS_HE_SHORT, formatDateHe, fromISODate, isSingleDayTask, isTaskEngineEligible,
-  rangeLabelHe, rangeTextHe, recentItems, shiftHours, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
+  availabilityDeadline, dayName, DAYS_HE_SHORT, formatDateHe, fromISODate, isTaskEngineEligible,
+  rangeLabelHe, rangeTextHe, recentItems, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
 } from "../../lib/dates.js";
 import { loadWindowMode, RECENT_DAYS, setLoadWindowMode, subscribeLoadWindow } from "../../lib/loadWindow.js";
 import { availStatus, checkAssignment, isQualified } from "../../lib/autoAssign.js";
@@ -18,6 +18,7 @@ import { explainConflict, findConflicts } from "../../lib/conflicts.js";
 import { fairnessHint, fairnessPlan } from "../../lib/fairness.js";
 import { DEFAULT_FAIRNESS_WINDOW_DAYS, FAIRNESS_WINDOW_OPTIONS } from "../../lib/fairnessWindow.js";
 import { categoryOptions, folderIcon, foldersFor, UNFILED } from "../../lib/categories.js";
+import WorkItemForm from "./WorkItemForm.jsx";
 
 /**
  * Whole-week patterns. Two 12-hour shifts is the common security roster, but
@@ -49,14 +50,6 @@ const WEEK_PATTERNS = [
       { label: "לילה", startTime: "00:00", endTime: "06:00", type: "night", color: SHIFT_TONES.night },
     ],
   },
-];
-
-const SHIFT_TEMPLATES = [
-  { key: "day12",   label: "יום 07:00–19:00",    startTime: "07:00", endTime: "19:00", type: "morning",   color: SHIFT_TONES.morning },
-  { key: "night12", label: "לילה 19:00–07:00",   startTime: "19:00", endTime: "07:00", type: "night",     color: SHIFT_TONES.night },
-  { key: "morning", label: "בוקר 07:00–15:00",   startTime: "07:00", endTime: "15:00", type: "morning",   color: SHIFT_TONES.morning },
-  { key: "noon",    label: "צהריים 15:00–23:00", startTime: "15:00", endTime: "23:00", type: "afternoon", color: SHIFT_TONES.afternoon },
-  { key: "night8",  label: "לילה 23:00–07:00",   startTime: "23:00", endTime: "07:00", type: "night",     color: SHIFT_TONES.night },
 ];
 
 // ============================================================
@@ -422,44 +415,34 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
   // תחום הפעילות מוחל מ-useGuardian (setTermProfile), לא מפרופ שהמסך הזה
   // לא מקבל — אותה קריאה בדיוק ש-ProfilePicker כבר משתמש בה.
   const mode = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
+  // שלב 7 (מחזור האיחוד): טופס היצירה/עריכה עצמו עבר ל-WorkItemForm
+  // (משותף עם TaskMgmt) — כאן נשאר רק "מה פתוח ועל איזה פריט", לא איך
+  // בונים שורת משמרת. `editing` מחזיק את המשמרת השלמה (לא רק id), כי
+  // WorkItemForm בונה ממנה את ה-form הפנימי שלו.
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [newDate, setNewDate] = useState(null);
   const [spreadFrom, setSpreadFrom] = useState(null); // date whose layout is being copied
   const [spreadTo, setSpreadTo] = useState([]);
   const [showFill, setShowFill] = useState(false);
-  const blank = {
-    date: weekDates[0], startTime: "07:00", endTime: "19:00", label: "משמרת יום",
-    location: "כניסה ראשית", requiredGuards: 1, type: "morning", color: SHIFT_TONES.morning,
-    // ריק בכוונה, לא ניחוש (D-03): משמרת בלי קטגוריה פתוחה לכולם, וברירת
-    // מחדל מנוחשת הייתה מגבילה אנשים מול קטגוריה שאף מנהל לא בחר.
-    category: "",
-  };
-  const [form, setForm] = useState(blank);
-
-  useEffect(() => {
-    setForm((f) => ({ ...f, date: weekDates.includes(f.date) ? f.date : weekDates[0] }));
-  }, [weekDates]);
 
   const weekShifts = shifts.filter((s) => weekDates.includes(s.date));
-  const field = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const openNew = (date) => {
-    setForm({ ...blank, date: date || weekDates[0] });
+    setNewDate(date || null);
     setEditing(null);
     setShowForm(true);
   };
 
   const openEdit = (s) => {
-    setForm({ ...s });
-    setEditing(s.id);
+    setEditing(s);
     setShowForm(true);
   };
 
-  const save = async () => {
-    if (editing) await actions.updateShift(editing, form);
-    else await actions.addShifts([form]);
+  const closeForm = () => {
     setShowForm(false);
     setEditing(null);
+    setNewDate(null);
   };
 
   /**
@@ -544,14 +527,6 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
     setSpreadFrom(null);
   };
 
-  const applyTemplate = (tpl) =>
-    setForm((f) => ({
-      ...f,
-      startTime: tpl.startTime, endTime: tpl.endTime, type: tpl.type, color: tpl.color,
-      label:
-        tpl.type === "night" ? "משמרת לילה" : tpl.type === "afternoon" ? "משמרת צהריים" : "משמרת יום",
-    }));
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -572,6 +547,21 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
             </Btn>
           </>
         }
+      />
+
+      <WorkItemForm
+        open={showForm}
+        onClose={closeForm}
+        kind="shift"
+        editing={editing}
+        weekDates={weekDates}
+        guards={guards}
+        shifts={shifts}
+        tasks={tasks}
+        mode={mode}
+        actions={actions}
+        busy={busy}
+        defaultDate={newDate}
       />
 
       {weekShifts.length === 0 ? (
@@ -843,121 +833,6 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
         </div>
       </Modal>
 
-      <Modal
-        open={showForm}
-        onClose={() => setShowForm(false)}
-        title={editing ? "עריכת משמרת" : "משמרת חדשה"}
-        footer={
-          <>
-            <Btn onClick={save} loading={busy} className="flex-1">
-              {editing ? "שמור" : "צור משמרת"}
-            </Btn>
-            {editing && (
-              <Btn
-                variant="danger"
-                icon="trash"
-                onClick={async () => {
-                  await actions.deleteShift(editing);
-                  setShowForm(false);
-                }}
-              >
-                מחק
-              </Btn>
-            )}
-            <Btn variant="secondary" onClick={() => setShowForm(false)}>
-              ביטול
-            </Btn>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <p className="text-sm font-medium text-content mb-2">תבניות מהירות</p>
-            <div className="flex flex-wrap gap-2">
-              {SHIFT_TEMPLATES.map((tpl) => {
-                const active = form.startTime === tpl.startTime && form.endTime === tpl.endTime;
-                return (
-                  <button
-                    key={tpl.key}
-                    onClick={() => applyTemplate(tpl)}
-                    aria-pressed={active}
-                    className={`px-3 h-9 rounded-lg text-xs font-medium ring-1 ring-inset cursor-pointer transition-colors duration-200 ${
-                      active
-                        ? "bg-brand text-on-brand ring-brand"
-                        : "bg-surface-sunken ring-hairline text-muted hover:text-content hover:ring-brand/40"
-                    }`}
-                  >
-                    {tpl.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="תאריך">
-              <Select value={form.date} onChange={field("date")}>
-                {weekDates.map((d) => (
-                  <option key={d} value={d}>
-                    {formatDateHe(d)}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="תווית">
-              <Input value={form.label} onChange={field("label")} />
-            </Field>
-            <Field label="שעת התחלה">
-              <Input type="time" value={form.startTime} onChange={field("startTime")} />
-            </Field>
-            <Field label="שעת סיום">
-              <Input type="time" value={form.endTime} onChange={field("endTime")} />
-            </Field>
-            <Field label="מיקום">
-              <Input value={form.location} onChange={field("location")} />
-            </Field>
-            <Field label={`${t("noun.memberPlural")} נדרשים`}>
-              <Input
-                type="number"
-                min="1"
-                max="10"
-                value={form.requiredGuards}
-                onChange={(e) => setForm((f) => ({ ...f, requiredGuards: Number(e.target.value) }))}
-              />
-            </Field>
-          </div>
-
-          <Field
-            label="סוג עבודה"
-            hint='זה מה שכשירות נבדקת מולו. משמרת בלי סוג עבודה פתוחה לכולם — לא צריך למלא "כדי להיות בטוח".'
-            htmlFor="shift-category"
-          >
-            <Input
-              id="shift-category"
-              list="shift-categories"
-              value={form.category || ""}
-              onChange={field("category")}
-              placeholder="לא הוגדר — פתוח לכולם"
-            />
-            {/* datalist ולא select: קטגוריה מוכרת מוצעת, ושם חדש עדיין
-              * מותר — אותו דפוס הקלט של תיקיית המשימה. קריאה יחידה:
-              * `categoryOptions(shifts, tasks, mode)`, הטקסונומיה המשותפת. */}
-            <datalist id="shift-categories">
-              {categoryOptions(shifts, tasks, mode).map((n) => (
-                <option key={n} value={n} />
-              ))}
-            </datalist>
-          </Field>
-          {/* הקטגוריה מזינה שני מנגנונים נפרדים שחולקים אוצר מילים ותו לא:
-            * כשירות (isQualified — מי מותר לו/ה בכלל) ומטריצת ההתנגשויות
-            * (compatIndex/pairRule/findConflicts — מה אסור לחפוף אצל אותו
-            * אדם). השדה הזה לא מוזן לשום פונקציה מהמטריצה. */}
-
-          <p className="text-xs text-muted">
-            אורך המשמרת:{" "}
-            {shiftHours({ date: form.date, startTime: form.startTime, endTime: form.endTime })} שעות
-          </p>
-        </div>
-      </Modal>
     </div>
   );
 }
@@ -1950,119 +1825,31 @@ const TEMPLATE_DEFAULT_HOURS = {
 const DEFAULT_TASK_HOURS = { startTime: "08:00", endTime: "16:00" };
 const hoursForCategory = (category) => TEMPLATE_DEFAULT_HOURS[category] || DEFAULT_TASK_HOURS;
 
-// דוגמאות placeholder לפי תחום — לא נגזרות מ-foldersFor(mode) כי אלה משפטים
-// טבעיים, לא שמות תיקייה. בלי זה placeholder קבוע היה מוצג לכל שלושת
-// התחומים בלי קשר ל-mode בפועל (למשל "המטבח סגור" למנהל אבטחה).
-const TASK_TITLE_EXAMPLE = { security: "בדיקת ציוד אבטחה", restaurant: "בדיקת מלאי", army: "בדיקת ציוד" };
-const OVERRIDE_NOTE_EXAMPLE = {
-  security: "עמדה ריקה באותה שעה, אין בפועל חפיפה",
-  restaurant: "המטבח סגור באותן שעות, אז אין חפיפה בפועל",
-  army: "עמדה ריקה באותה שעה, אין בפועל חפיפה",
-};
-
 export function TaskMgmt({
   guards, tasks, weekDates, actions, busy,
   templates = [], compatibility = [], mode = "security", shifts = [],
 }) {
+  // שלב 7 (מחזור האיחוד): טופס היצירה/עריכה עצמו עבר ל-WorkItemForm
+  // (משותף עם ShiftMgmt) — כאן נשאר רק "מה פתוח ועל איזו משימה", לא איך
+  // בונים שורת משימה. `editing` מחזיק את המשימה השלמה (לא רק id).
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [openFolder, setOpenFolder] = useState(null); // null = הכול
   const [picked, setPicked] = useState([]); // מפתחות של תבנית+עמדה
   const [pickedDays, setPickedDays] = useState(() => weekDates.map(() => true)); // ברירת מחדל: כל השבוע
   const [timeless, setTimeless] = useState(false); // "ללא שעות קבועות" — יציאה מפורשת מ-D-01
-  const [override, setOverride] = useState(false);
-
-  const blank = {
-    title: "", description: "", category: UNFILED, assignees: [],
-    priority: "medium", startDate: weekDates[0], dueDate: weekDates[6] || weekDates[0],
-    overrideNote: "",
-    // ריקות בכוונה, בלי ברירת מחדל (D-05): שעה שמישהו לא הקליד בעצמו לא
-    // נכנסת למנוע בשקט.
-    startTime: "", endTime: "",
-  };
-  const [form, setForm] = useState(blank);
-  const field = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
-
-  const toggleAssignee = (id) =>
-    setForm((f) => ({
-      ...f,
-      assignees: f.assignees.includes(id)
-        ? f.assignees.filter((x) => x !== id)
-        : [...f.assignees, id],
-    }));
 
   const openNew = () => {
-    setForm({ ...blank, category: openFolder || UNFILED });
     setEditing(null);
-    setOverride(false);
     setShowForm(true);
   };
 
   const openEdit = (task) => {
-    setForm({
-      title: task.title, description: task.description, category: task.category || UNFILED,
-      assignees: task.assignees || [], priority: task.priority,
-      startDate: task.startDate || "", dueDate: task.dueDate || "",
-      overrideNote: task.overrideNote || "",
-      startTime: task.startTime || "", endTime: task.endTime || "",
-    });
-    setEditing(task.id);
-    setOverride(Boolean(task.overrideNote));
+    setEditing(task);
     setShowForm(true);
   };
 
-  // ---- חפיפת זמן מול כל פריט-עבודה אחר (החלטה 1) ----
-  const conflicts = useMemo(
-    () =>
-      findConflicts({
-        candidate: { ...form, id: editing },
-        assignees: form.assignees,
-        tasks,
-        shifts,
-      }),
-    [form, editing, tasks, shifts]
-  );
-  const nameOf = (id) => guards.find((g) => g.id === id)?.name || "מישהו";
-  // חסימה היא ברירת המחדל; עקיפה נפתחת רק אחרי שנכתבה סיבה. הערה ריקה
-  // הופכת את המתג לכפתור "המשך" — וזה בדיוק מה שהוא לא אמור להיות.
-  const blocked = conflicts.length > 0 && (!override || !form.overrideNote.trim());
-
-  // שם נפרד מ-`blocked` בכוונה (P-03, D-02): זו לא התנגשות, וכפתור עם
-  // התווית שהתנגשות מייצרת היה מטעה כאן. אין דלת אחורית לחסימה הזאת —
-  // בניגוד ל-`blocked` שלמעלה, שנפתחת עם תיבת "שבץ בכל זאת" ונימוק,
-  // כשירות (QUAL-05) לא ניתנת לעקיפה בשום צורה, לא כאן ולא בשום מקום
-  // אחר במוצר.
-  const unqualifiedAssignees = form.assignees
-    .map((id) => guards.find((g) => g.id === id))
-    .filter((g) => g && !isQualified(g, form.category));
-  const qualBlocked = unqualifiedAssignees.length > 0;
-
-  // שדות השעה נראים רק למשימה חד-יומית (D-01) — אותה פונקציה בדיוק שהמנוע
-  // עצמו נשען עליה, כדי שלא ייווצר מצב שבו הטופס "רואה" יום אחד והמנוע רואה
-  // אחרת. שם נפרד מ-`blocked`: זה לא מתנגשות, וכפתור עם התווית שהתנגשות
-  // מייצרת (`blocked`) היה מטעה כאן.
-  const showHours = isSingleDayTask(form);
-  const hoursInvalid = showHours && Boolean(form.startTime) !== Boolean(form.endTime);
-
-  const save = async () => {
-    if (!form.title.trim() || blocked || hoursInvalid || qualBlocked) return;
-    // חלון הפוך הוא שגיאת הקלדה, לא כוונה — מיישרים אותו במקום לחסום.
-    const clean =
-      form.startDate && form.dueDate && form.startDate > form.dueDate
-        ? { ...form, startDate: form.dueDate, dueDate: form.startDate }
-        : form;
-    // אכיפת D-01 בזמן השמירה, לא רק בזמן התצוגה: מנהל שממלא שעות למשימה
-    // חד-יומית ואז מרחיב את הטווח לפני שמירה חייב שהשעות יתנקו — אחרת
-    // השורה הייתה נושאת שעות שהמנוע לעולם לא היה קורא (isTaskEngineEligible
-    // דורש יום בודד), וזה בדיוק הפער ש-D-01 סוגר.
-    const withHours = isSingleDayTask(clean)
-      ? clean
-      : { ...clean, startTime: "", endTime: "" };
-    // ההצדקה שייכת להתנגשות. אין התנגשות — אין מה להצדיק, והשדה מתנקה
-    // כדי שלא תישאר בשורה סיבה לדבר שכבר לא קורה.
-    const withNote = { ...withHours, overrideNote: conflicts.length ? withHours.overrideNote : "" };
-    if (editing) await actions.editTask(editing, withNote);
-    else await actions.createTask(withNote);
+  const closeForm = () => {
     setShowForm(false);
     setEditing(null);
   };
@@ -2163,6 +1950,21 @@ export function TaskMgmt({
             משימה
           </Btn>
         }
+      />
+
+      <WorkItemForm
+        open={showForm}
+        onClose={closeForm}
+        kind="task"
+        editing={editing}
+        weekDates={weekDates}
+        guards={guards}
+        shifts={shifts}
+        tasks={tasks}
+        mode={mode}
+        actions={actions}
+        busy={busy}
+        defaultCategory={openFolder}
       />
 
       {/* ---- תבניות. רק כשיש מה להציע — שורה ריקה היא רעש ---- */}
@@ -2354,239 +2156,6 @@ export function TaskMgmt({
           </div>
         </>
       )}
-
-      <Modal
-        open={showForm}
-        onClose={() => setShowForm(false)}
-        title={editing ? "עריכת משימה" : "משימה חדשה"}
-        footer={
-          <>
-            <Btn
-              onClick={save}
-              loading={busy}
-              disabled={!form.title.trim() || blocked || hoursInvalid || qualBlocked}
-              className="flex-1"
-            >
-              {qualBlocked ? "יש חוסר כשירות" : blocked ? "יש התנגשות" : "שמור"}
-            </Btn>
-            <Btn variant="secondary" onClick={() => setShowForm(false)}>
-              ביטול
-            </Btn>
-          </>
-        }
-      >
-        <div className="space-y-3">
-          <Field label="כותרת">
-            <Input
-              value={form.title}
-              onChange={field("title")}
-              placeholder={TASK_TITLE_EXAMPLE[mode] || TASK_TITLE_EXAMPLE.security}
-              autoFocus
-            />
-          </Field>
-
-          <Field label="תיאור" hint="אופציונלי">
-            <Input value={form.description} onChange={field("description")} />
-          </Field>
-
-          <Field
-            label="תיקייה"
-            hint="אפשר להקליד שם חדש — הוא ייפתח כתיקייה"
-            htmlFor="task-folder"
-          >
-            <Input
-              id="task-folder"
-              list="task-folders"
-              value={form.category}
-              onChange={field("category")}
-              placeholder={UNFILED}
-            />
-            {/* datalist ולא select: השמות המוכרים מוצעים, ושם חדש עדיין מותר.
-              * `categoryOptions` ולא איחוד מקומי (D-01): קטגוריה שהומצאה
-              * על משמרת חייבת להיות מוצעת כאן, כדי שהטקסונומיה שממנה
-              * מנהל מצמצם כשירות תהיה בדיוק זו שממנה הוא משבץ. */}
-            <datalist id="task-folders">
-              {categoryOptions(shifts, tasks, mode).map((n) => (
-                <option key={n} value={n} />
-              ))}
-            </datalist>
-          </Field>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="מתאריך">
-              <Input type="date" value={form.startDate || ""} onChange={field("startDate")} />
-            </Field>
-            <Field label="עד תאריך">
-              <Input type="date" value={form.dueDate || ""} onChange={field("dueDate")} />
-            </Field>
-          </div>
-
-          {/* ---- שעות משימה (UNIF-01, D-01, D-05) ----
-            * נראות רק למשימה חד-יומית — אותה `isSingleDayTask` שהמנוע נשען
-            * עליה, כדי שהטופס לא "יבטיח" שעות שהמנוע לעולם לא יקרא. ריקות
-            * כברירת מחדל: שום שעה לא מנוחשת עבור המנהל (D-05). */}
-          {showHours ? (
-            <div>
-              <div className="grid grid-cols-2 gap-3">
-                <Field
-                  label="משעה"
-                  error={hoursInvalid && !form.startTime ? "חסרה שעת התחלה" : undefined}
-                >
-                  <Input type="time" value={form.startTime} onChange={field("startTime")} />
-                </Field>
-                <Field
-                  label="עד שעה"
-                  error={hoursInvalid && !form.endTime ? "חסרה שעת סיום" : undefined}
-                >
-                  <Input type="time" value={form.endTime} onChange={field("endTime")} />
-                </Field>
-              </div>
-              <p className="text-xs text-faint mt-1.5">
-                משימה עם שעות נספרת במנוחה, ברצף, בתקרה השבועית ובנטל — בדיוק כמו משמרת.
-              </p>
-            </div>
-          ) : (
-            <p className="text-xs text-faint">
-              שדות שעה זמינים כשתאריך ההתחלה ותאריך הסיום של המשימה זהים.
-            </p>
-          )}
-
-          <Field label="עדיפות">
-            <Select value={form.priority} onChange={field("priority")}>
-              <option value="high">גבוהה</option>
-              <option value="medium">בינונית</option>
-              <option value="low">נמוכה</option>
-            </Select>
-          </Field>
-
-          <Field
-            label="מי מבצע"
-            hint={form.assignees.length ? `${form.assignees.length} נבחרו` : "אפשר לבחור כמה"}
-          >
-            <div className="flex flex-wrap gap-2">
-              {guards.map((g) => {
-                const on = form.assignees.includes(g.id);
-                // אותה isQualified בדיוק שהמנוע ורשת השיבוץ הידני קוראות
-                // (03-01, 03-03) — כדי שהתמונה כאן והקליק שהיא מתארת לעולם
-                // לא יסתרו זה את זה (D-02, P-03).
-                const qualified = isQualified(g, form.category);
-                return (
-                  <button
-                    key={g.id}
-                    type="button"
-                    onClick={() => toggleAssignee(g.id)}
-                    disabled={!qualified}
-                    aria-pressed={on}
-                    title={
-                      qualified
-                        ? undefined
-                        : `לא מוגדר/ת כשיר/ה לקטגוריית "${form.category}"`
-                    }
-                    className={`flex items-center gap-2 h-11 pr-1.5 pl-3 rounded-xl cursor-pointer
-                      ring-1 ring-inset transition-colors duration-200
-                      disabled:opacity-70 disabled:cursor-not-allowed ${
-                        on
-                          ? "bg-brand/12 ring-brand/45 text-content"
-                          : !qualified
-                          ? "ring-hairline-strong bg-surface-sunken text-muted"
-                          : "bg-surface-sunken ring-hairline text-muted hover:text-content"
-                      }`}
-                  >
-                    <Avatar id={g.id} name={g.name} size={26} />
-                    <span className="text-sm font-medium">{g.name}</span>
-                    {/* מנעול ומילה, לא רק צבע, למי שלא כשיר/ה — אותו טיפול
-                      * בדיוק שרשת השיבוץ הידני נותנת לאותו מצב (03-03), כדי
-                      * ששני המסכים יראו כמו אותו מצב. וי, לא רק צבע, למי
-                      * שכשיר/ה ונבחר/ה. */}
-                    {!qualified ? (
-                      <span className="flex items-center gap-1 text-[11px]">
-                        <Icon name="lock" size={13} strokeWidth={2.5} />
-                        לא כשיר/ה
-                      </span>
-                    ) : (
-                      on && <Icon name="check" size={14} className="text-brand" strokeWidth={3} />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </Field>
-
-          {/* ---- כשירות (QUAL-04, QUAL-05, D-02, P-03) ----
-            * חסימה קשיחה, בלי דלת אחורית — לא ניתן לעקוף אותה עם תיבת
-            * סימון או נימוק, בניגוד לאזהרת ההתנגשות הסמוכה למטה. */}
-          {qualBlocked && (
-            <div className="rounded-2xl ring-1 ring-inset ring-danger/40 bg-danger/10 p-3.5">
-              <div className="flex items-start gap-2">
-                <Icon name="lock" size={17} className="text-danger flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-content">
-                  <span className="font-bold">
-                    {unqualifiedAssignees.map((g) => g.name).join(", ")}
-                  </span>{" "}
-                  לא כשירים לקטגוריית "{form.category}" — אי אפשר לשמור את המשימה עד שהם יוסרו
-                  מרשימת המבצעים. אין דרך לעקוף את זה.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* ---- התנגשות ----
-            * מופיע מתחת לבוחר האנשים ולא בראש הטופס, כי זה המקום שבו נוצרה
-            * הבעיה — ומנהל שקורא אזהרה רחוק מהסיבה שלה לא יודע מה לשנות.
-            * בכוונה סמוך לאזהרת הכשירות שלמעלה, ובכוונה *לא* אותו כלל: זו
-            * ניתנת לעקיפה עם נימוק, וכשירות לא — אל תאחד את השתיים לניסוח
-            * אחד רק כי הן שכנות על המסך. */}
-          {conflicts.length > 0 && (
-            <div className="rounded-2xl ring-1 ring-inset ring-warn/40 bg-warn/10 p-3.5 space-y-3">
-              <div className="flex items-start gap-2">
-                <Icon name="alert" size={17} className="text-warn flex-shrink-0 mt-0.5" />
-                <div className="min-w-0">
-                  <p className="font-bold text-content text-sm">
-                    {conflicts.length === 1
-                      ? "שיבוץ אחד מתנגש"
-                      : `${conflicts.length} שיבוצים מתנגשים`}
-                  </p>
-                  <ul className="mt-1 space-y-0.5">
-                    {conflicts.map((c) => (
-                      <li key={`${c.personId}-${c.taskId}`} className="text-xs text-muted">
-                        {explainConflict(c, nameOf)}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={override}
-                  onChange={(e) => setOverride(e.target.checked)}
-                  className="w-4 h-4 accent-[rgb(var(--warn))] cursor-pointer"
-                />
-                <span className="text-sm font-semibold text-content">
-                  אני יודע — שבץ בכל זאת
-                </span>
-              </label>
-
-              {override && (
-                <Field
-                  label="למה"
-                  hint="חובה. ההסבר נשמר, ומגיע גם לאנשים המשובצים"
-                  error={form.overrideNote.trim() ? undefined : "בלי סיבה אי אפשר לעקוף"}
-                >
-                  <Textarea
-                    rows={2}
-                    value={form.overrideNote}
-                    onChange={field("overrideNote")}
-                    placeholder={OVERRIDE_NOTE_EXAMPLE[mode] || OVERRIDE_NOTE_EXAMPLE.security}
-                    autoFocus
-                  />
-                </Field>
-              )}
-            </div>
-          )}
-        </div>
-      </Modal>
     </div>
   );
 }
