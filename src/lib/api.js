@@ -181,6 +181,59 @@ export const positionToRow = (position, teamCode) => ({
   active: position.active !== false,
 });
 
+// ---------- gs_work_items adapters (DB unification, stage 0) ----------
+//
+// The table underneath is now gs_work_items (kind='shift'|'task') instead of
+// separate gs_shifts/gs_tasks, but shiftFromRow/shiftToRow/taskFromRow/
+// taskColumns above still speak the *old* column names on purpose —
+// scripts/verify-planning.mjs and scripts/verify-positions.mjs assert those
+// pure functions directly against gs_shifts/gs_tasks-shaped objects. These
+// two constants translate at the query boundary instead, so every function
+// below them is the only thing that needs to know gs_work_items exists.
+
+// PostgREST column aliases (`appName:dbName`) make a gs_work_items row look
+// exactly like a gs_shifts row to shiftFromRow — same trick applied to the
+// embedded assignment resource, renamed back to the `gs_assignments` key
+// shiftFromRow already reads.
+// Exported so demoData.js — the one other module that inserts shifts
+// directly for bulk/perf reasons instead of going through createShifts —
+// can stay pointed at gs_work_items too, instead of duplicating this string.
+export const SHIFT_SELECT =
+  "id, team_code, date:start_date, label:title, start_time, end_time, location, " +
+  "required_guards, type, color, published, category, position_id, created_at, " +
+  "gs_assignments:gs_work_item_assignments(guard_id, source, score, reason)";
+
+// gs_tasks and gs_work_items already share every one of these column names
+// (only shifts renamed anything) — no aliasing needed here. `assignees` is
+// requested as its own embedded resource and stitched onto the row in JS
+// (see loadTeam/createTask/etc.), since PostgREST can't flatten a joined
+// table into a plain id array the way taskFromRow expects.
+const TASK_SELECT =
+  "id, team_code, title, description, category, status, priority, start_date, " +
+  "due_date, start_time, end_time, override_note, position_id, created_at, " +
+  "gs_work_item_assignments(guard_id)";
+
+/** shiftToRow(shift, teamCode)'s output, reshaped for gs_work_items. */
+export const shiftRowToWorkItem = ({ date, label, ...rest }) => ({
+  ...rest,
+  kind: "shift",
+  title: label,
+  start_date: date,
+  due_date: date,
+});
+
+/** Splits taskColumns(task)'s output into the item row and its assignee ids. */
+const taskRowToWorkItem = (cols) => {
+  const { assignees, assigned_to, ...itemRow } = cols;
+  return { itemRow, assignees: assignees || [] };
+};
+
+/** Row fetched via TASK_SELECT doesn't carry `assignees` yet — attach it. */
+const withAssigneesFromEmbed = (row) => ({
+  ...row,
+  assignees: (row.gs_work_item_assignments || []).map((a) => a.guard_id),
+});
+
 // ---------- auth ----------
 
 export async function getSession() {
@@ -341,11 +394,12 @@ export async function loadTeam(teamCode) {
   const [teamRes, profilesRes, shiftsRes, availRes, swapsRes, tasksRes, tplRes, compatRes, posRes] = await Promise.all([
     supabase.from("gs_teams").select("*").eq("code", teamCode).maybeSingle(),
     supabase.from("gs_profiles").select("*").eq("team_code", teamCode).order("created_at"),
-    supabase.from("gs_shifts").select("*, gs_assignments(guard_id, source, score, reason)")
-      .eq("team_code", teamCode).order("date"),
+    supabase.from("gs_work_items").select(SHIFT_SELECT)
+      .eq("team_code", teamCode).eq("kind", "shift").order("start_date"),
     supabase.from("gs_availability").select("*"),
     supabase.from("gs_swap_requests").select("*").eq("team_code", teamCode).order("created_at", { ascending: false }),
-    supabase.from("gs_tasks").select("*").eq("team_code", teamCode).order("created_at", { ascending: false }),
+    supabase.from("gs_work_items").select(TASK_SELECT)
+      .eq("team_code", teamCode).eq("kind", "task").order("created_at", { ascending: false }),
     supabase.from("gs_task_templates").select("*")
       .or(`team_code.is.null,team_code.eq.${teamCode}`).order("sort"),
     supabase.from("gs_role_compatibility").select("*")
@@ -396,7 +450,7 @@ export async function loadTeam(teamCode) {
     shifts: (shiftsRes.data || []).map(shiftFromRow),
     availability: availabilityFromRows(availRes.data),
     swapRequests: (swapsRes.data || []).map(swapFromRow),
-    tasks: (tasksRes.data || []).map(taskFromRow),
+    tasks: (tasksRes.data || []).map(withAssigneesFromEmbed).map(taskFromRow),
     // שתי אלה מכוונות **לא** להיכלל ב-`firstError`. הן העשרה, לא ליבה:
     // בסיס נתונים שהמיגרציה טרם רצה עליו יחזיר שגיאה כאן, והאפליקציה
     // צריכה להמשיך לעבוד בלי תבניות — לא ליפול על מסך שגיאה.
@@ -473,9 +527,9 @@ export async function removeRoleCompatibility(id) {
 
 export async function createShifts(shifts, teamCode) {
   const { data, error } = await supabase
-    .from("gs_shifts")
-    .insert(shifts.map((s) => shiftToRow(s, teamCode)))
-    .select("*, gs_assignments(guard_id, source, score, reason)");
+    .from("gs_work_items")
+    .insert(shifts.map((s) => shiftRowToWorkItem(shiftToRow(s, teamCode))))
+    .select(SHIFT_SELECT);
   if (error) throw new Error(error.message);
   return (data || []).map(shiftFromRow);
 }
@@ -485,8 +539,8 @@ export async function updateShift(shiftId, patch, teamCode) {
   delete row.id;
   delete row.team_code;
   const { data, error } = await supabase
-    .from("gs_shifts").update(row).eq("id", shiftId)
-    .select("*, gs_assignments(guard_id, source, score, reason)").maybeSingle();
+    .from("gs_work_items").update(shiftRowToWorkItem(row)).eq("id", shiftId).eq("kind", "shift")
+    .select(SHIFT_SELECT).maybeSingle();
   if (error) throw new Error(error.message);
   // `data` הוא null גם על "הצלחה" ש-RLS סינן אותה עד כדי אפס שורות — לא רק
   // כשהמשמרת נמחקה. בלי הבדיקה הזאת השורה נשארת בדיוק כמו שהייתה, אבל
@@ -501,7 +555,8 @@ export async function deleteShift(shiftId) {
   // .select() + בדיקת שורה חוזרת — אותה מוסכמה כמו updateShift ממש למעלה.
   // בלי זה מחיקה ש-RLS חוסמת נראית כמו הצלחה: המשמרת נעלמת מהמסך ברגע
   // האופטימי, וחוזרת ברענון הבא בלי שום הסבר.
-  const { data, error } = await supabase.from("gs_shifts").delete().eq("id", shiftId).select("id");
+  const { data, error } = await supabase
+    .from("gs_work_items").delete().eq("id", shiftId).eq("kind", "shift").select("id");
   if (error) throw new Error(error.message);
   if (!data?.length) {
     throw new Error("אין לך הרשאה למחוק את המשמרת הזו — התחבר מחדש ונסה שוב");
@@ -516,7 +571,8 @@ export async function deleteShift(shiftId) {
  */
 export async function deleteShifts(shiftIds) {
   if (!shiftIds.length) return;
-  const { data, error } = await supabase.from("gs_shifts").delete().in("id", shiftIds).select("id");
+  const { data, error } = await supabase
+    .from("gs_work_items").delete().in("id", shiftIds).eq("kind", "shift").select("id");
   if (error) throw new Error(error.message);
   if (!data?.length) {
     throw new Error("אין לך הרשאה למחוק את המשמרות האלה — התחבר מחדש ונסה שוב");
@@ -529,9 +585,10 @@ export async function setPublished(shiftIds, published) {
   // בדיוק המקום שבו "success" שקרי הכי יקר: המנהל רואה "פורסם" ומאמין
   // שהצוות רואה את הסידור, כשבפועל אף שורה לא השתנתה.
   const { data, error } = await supabase
-    .from("gs_shifts")
+    .from("gs_work_items")
     .update({ published })
     .in("id", shiftIds)
+    .eq("kind", "shift")
     .select("id");
   if (error) throw new Error(error.message);
   if (!data?.length) {
@@ -545,9 +602,12 @@ export async function assignGuard({ shiftId, guardId, source = "manual", score =
   // .select() + בדיקת שורה חוזרת — בלעדיה שיבוץ ש-RLS חוסם נראה כמו הצלחה:
   // השומר מופיע במשבצת ברגע האופטימי, ונעלם ברענון הבא בלי שום הסבר.
   const { data, error } = await supabase
-    .from("gs_assignments")
-    .upsert({ shift_id: shiftId, guard_id: guardId, source, score, reason }, { onConflict: "shift_id,guard_id" })
-    .select("shift_id");
+    .from("gs_work_item_assignments")
+    .upsert(
+      { work_item_id: shiftId, guard_id: guardId, source, score, reason },
+      { onConflict: "work_item_id,guard_id" }
+    )
+    .select("work_item_id");
   if (error) throw new Error(error.message);
   if (!data?.length) {
     throw new Error("אין לך הרשאה לשבץ את השומר הזה — התחבר מחדש ונסה שוב");
@@ -556,7 +616,7 @@ export async function assignGuard({ shiftId, guardId, source = "manual", score =
 
 export async function unassignGuard({ shiftId, guardId }) {
   const { data, error } = await supabase
-    .from("gs_assignments").delete().match({ shift_id: shiftId, guard_id: guardId }).select("shift_id");
+    .from("gs_work_item_assignments").delete().match({ work_item_id: shiftId, guard_id: guardId }).select("work_item_id");
   if (error) throw new Error(error.message);
   if (!data?.length) {
     throw new Error("אין לך הרשאה להסיר את השיבוץ הזה — התחבר מחדש ונסה שוב");
@@ -570,13 +630,13 @@ export async function applyPlan({ shiftIds, assignments }) {
     // עדיין שיבוץ "auto" קודם לשבוע הזה), לא כשל — לא כמו שאר הפונקציות
     // בקובץ הזה, שכל אחת מהן פועלת על שורה ספציפית שהקורא כבר יודע שקיימת.
     const { error } = await supabase
-      .from("gs_assignments").delete().in("shift_id", shiftIds).eq("source", "auto");
+      .from("gs_work_item_assignments").delete().in("work_item_id", shiftIds).eq("source", "auto");
     if (error) throw new Error(error.message);
   }
   const rows = assignments
     .filter((a) => !a.locked)
     .map((a) => ({
-      shift_id: a.shiftId,
+      work_item_id: a.shiftId,
       guard_id: a.guardId,
       source: "auto",
       score: a.score,
@@ -586,7 +646,7 @@ export async function applyPlan({ shiftIds, assignments }) {
   // כאן כן: rows לא ריק (נבדק למעלה), אז אפס שורות חוזרות הוא תמיד כשל —
   // לא מקרה לגיטימי כמו המחיקה שמעל.
   const { data, error } = await supabase
-    .from("gs_assignments").upsert(rows, { onConflict: "shift_id,guard_id" }).select("shift_id");
+    .from("gs_work_item_assignments").upsert(rows, { onConflict: "work_item_id,guard_id" }).select("work_item_id");
   if (error) throw new Error(error.message);
   if (!data?.length) {
     throw new Error("אין לך הרשאה לשמור את השיבוץ החדש — התחבר מחדש ונסה שוב");
@@ -595,7 +655,7 @@ export async function applyPlan({ shiftIds, assignments }) {
 
 export async function clearAssignments(shiftIds) {
   if (!shiftIds.length) return;
-  const { error } = await supabase.from("gs_assignments").delete().in("shift_id", shiftIds);
+  const { error } = await supabase.from("gs_work_item_assignments").delete().in("work_item_id", shiftIds);
   if (error) throw new Error(error.message);
 }
 
@@ -840,13 +900,20 @@ const asTaskError = (error) => {
 };
 
 export async function createTask(task, teamCode) {
+  const { itemRow, assignees } = taskRowToWorkItem(taskColumns(task));
   const { data, error } = await supabase
-    .from("gs_tasks")
-    .insert({ team_code: teamCode, ...taskColumns(task) })
-    .select()
+    .from("gs_work_items")
+    .insert({ team_code: teamCode, kind: "task", status: "pending", ...itemRow })
+    .select(TASK_SELECT)
     .single();
   if (error) throw asTaskError(error);
-  return taskFromRow(data);
+  if (assignees.length) {
+    const { error: aErr } = await supabase
+      .from("gs_work_item_assignments")
+      .insert(assignees.map((guard_id) => ({ work_item_id: data.id, guard_id, source: "manual" })));
+    if (aErr) throw asTaskError(aErr);
+  }
+  return taskFromRow({ ...data, assignees });
 }
 
 /**
@@ -858,32 +925,52 @@ export async function createTask(task, teamCode) {
  */
 export async function createTasks(tasks, teamCode) {
   if (!tasks.length) return [];
+  const split = tasks.map((t) => taskRowToWorkItem(taskColumns(t)));
   const { data, error } = await supabase
-    .from("gs_tasks")
-    .insert(tasks.map((t) => ({ team_code: teamCode, ...taskColumns(t) })))
-    .select();
+    .from("gs_work_items")
+    .insert(split.map(({ itemRow }) => ({ team_code: teamCode, kind: "task", status: "pending", ...itemRow })))
+    .select(TASK_SELECT);
   if (error) throw asTaskError(error);
-  return (data || []).map(taskFromRow);
+  const assignRows = (data || []).flatMap((row, i) =>
+    split[i].assignees.map((guard_id) => ({ work_item_id: row.id, guard_id, source: "manual" }))
+  );
+  if (assignRows.length) {
+    const { error: aErr } = await supabase.from("gs_work_item_assignments").insert(assignRows);
+    if (aErr) throw asTaskError(aErr);
+  }
+  return (data || []).map((row, i) => taskFromRow({ ...row, assignees: split[i].assignees }));
 }
 
 export async function updateTask(id, patch) {
   // עדכון סטטוס הוא הנתיב החם (סימון וי) ונוגע רק בעמודה אחת; עריכה
-  // מלאה כותבת את כל השדות.
-  const row = patch.full ? taskColumns(patch) : {};
-  if (patch.status) row.status = patch.status;
-  if (!patch.full && patch.title) row.title = patch.title;
+  // מלאה כותבת את כל השדות (כולל רשימת המשויכים, בטבלת הצירוף למטה).
+  const { itemRow, assignees } = patch.full ? taskRowToWorkItem(taskColumns(patch)) : { itemRow: {}, assignees: null };
+  if (patch.status) itemRow.status = patch.status;
+  if (!patch.full && patch.title) itemRow.title = patch.title;
   // קריאה חוזרת ולא עדכון עיוור: כש-RLS מסננת את כל השורות, Supabase מחזירה
   // error: null ומערך ריק — כלומר "הצלחה" שלא כתבה כלום. בלי הבדיקה הזאת
   // מנהל ששינה שעות משימה היה רואה אותן נעלמות ברענון הבא בלי שום הסבר.
-  const { data, error } = await supabase.from("gs_tasks").update(row).eq("id", id).select();
+  const { data, error } = await supabase.from("gs_work_items").update(itemRow).eq("id", id).eq("kind", "task").select("id");
   if (error) throw asTaskError(error);
   if (!data?.length) {
     throw new Error("העדכון לא נשמר — כנראה שאין לך הרשאה לשנות משימה זו");
   }
+  // עריכה מלאה בלבד מחליפה את המשויכים: עדכון-סטטוס (patch.full === false)
+  // לא נוגע בשיבוצים בכלל, כמו שהעמודה assignees לא הייתה חלק מ-row למעלה.
+  if (patch.full) {
+    const { error: delErr } = await supabase.from("gs_work_item_assignments").delete().eq("work_item_id", id);
+    if (delErr) throw asTaskError(delErr);
+    if (assignees.length) {
+      const { error: insErr } = await supabase
+        .from("gs_work_item_assignments")
+        .insert(assignees.map((guard_id) => ({ work_item_id: id, guard_id, source: "manual" })));
+      if (insErr) throw asTaskError(insErr);
+    }
+  }
 }
 
 export async function deleteTask(id) {
-  const { data, error } = await supabase.from("gs_tasks").delete().eq("id", id).select("id");
+  const { data, error } = await supabase.from("gs_work_items").delete().eq("id", id).eq("kind", "task").select("id");
   if (error) throw new Error(error.message);
   if (!data?.length) {
     throw new Error("אין לך הרשאה למחוק את המשימה הזו — התחבר מחדש ונסה שוב");
@@ -936,12 +1023,12 @@ export async function deletePosition(id) {
 export async function materializeTemplateShifts(rows, teamCode) {
   if (!rows.length) return [];
   const { data, error } = await supabase
-    .from("gs_shifts")
+    .from("gs_work_items")
     .upsert(
-      rows.map((r) => shiftToRow(r, teamCode)),
-      { onConflict: "position_id,date", ignoreDuplicates: true }
+      rows.map((r) => shiftRowToWorkItem(shiftToRow(r, teamCode))),
+      { onConflict: "position_id,start_date", ignoreDuplicates: true }
     )
-    .select("*, gs_assignments(guard_id, source, score, reason)");
+    .select(SHIFT_SELECT);
   if (error) throw new Error(error.message);
   return (data || []).map(shiftFromRow);
 }

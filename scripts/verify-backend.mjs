@@ -56,12 +56,16 @@ const iso = (n) => {
   d.setDate(d.getDate() + n);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
+// gs_shifts/gs_tasks/gs_assignments are stage-0 leftovers now — the app
+// (and this check) talks to gs_work_items (kind='shift'|'task') +
+// gs_work_item_assignments instead. date/label become start_date+due_date/
+// title; this is exactly what api.js's shiftRowToWorkItem does.
 const shiftRows = [
-  { team_code: CODE, date: iso(1), label: "משמרת יום",  start_time: "07:00", end_time: "19:00", type: "morning", color: "#3B82F6" },
-  { team_code: CODE, date: iso(1), label: "משמרת לילה", start_time: "19:00", end_time: "07:00", type: "night",   color: "#6366F1" },
-  { team_code: CODE, date: iso(2), label: "משמרת יום",  start_time: "07:00", end_time: "19:00", type: "morning", color: "#3B82F6" },
+  { team_code: CODE, kind: "shift", start_date: iso(1), due_date: iso(1), title: "משמרת יום",  start_time: "07:00", end_time: "19:00", type: "morning", color: "#3B82F6" },
+  { team_code: CODE, kind: "shift", start_date: iso(1), due_date: iso(1), title: "משמרת לילה", start_time: "19:00", end_time: "07:00", type: "night",   color: "#6366F1" },
+  { team_code: CODE, kind: "shift", start_date: iso(2), due_date: iso(2), title: "משמרת יום",  start_time: "07:00", end_time: "19:00", type: "morning", color: "#3B82F6" },
 ];
-const { data: shifts, error: shiftErr } = await sup.from("gs_shifts").insert(shiftRows).select();
+const { data: shifts, error: shiftErr } = await sup.from("gs_work_items").insert(shiftRows).select();
 check("supervisor can insert shifts", !shiftErr && shifts?.length === 3, shiftErr?.message);
 
 // ---------- 3. guards join anonymously ----------
@@ -92,7 +96,7 @@ check("unknown team code rejected", Boolean(badErr) && /TEAM_NOT_FOUND/.test(bad
 
 // ---------- 4. RLS visibility ----------
 console.log("\n=== row-level security ===");
-const { data: guardShifts } = await guardA.from("gs_shifts").select("*");
+const { data: guardShifts } = await guardA.from("gs_work_items").select("*").eq("kind", "shift");
 check("guard sees their team's shifts", guardShifts?.length === 3, `saw ${guardShifts?.length}`);
 
 const { data: guardProfiles } = await guardA.from("gs_profiles").select("*");
@@ -101,16 +105,16 @@ check("guard sees teammates", guardProfiles?.length === 3, `saw ${guardProfiles?
 // an outsider must see nothing
 const outsider = fresh();
 await outsider.auth.signInAnonymously();
-const { data: outsiderShifts } = await outsider.from("gs_shifts").select("*");
+const { data: outsiderShifts } = await outsider.from("gs_work_items").select("*").eq("kind", "shift");
 check("outsider sees no shifts", (outsiderShifts?.length || 0) === 0, `saw ${outsiderShifts?.length}`);
 
 // guards must not be able to create or publish shifts
-const { error: guardWriteErr } = await guardA.from("gs_shifts").insert({
-  team_code: CODE, date: iso(3), label: "פיראטית", start_time: "07:00", end_time: "19:00",
+const { error: guardWriteErr } = await guardA.from("gs_work_items").insert({
+  team_code: CODE, kind: "shift", start_date: iso(3), due_date: iso(3), title: "פיראטית", start_time: "07:00", end_time: "19:00",
 });
 check("guard cannot create shifts", Boolean(guardWriteErr), "insert unexpectedly allowed");
 
-const { data: pubData } = await guardA.from("gs_shifts")
+const { data: pubData } = await guardA.from("gs_work_items")
   .update({ published: true }).eq("id", shifts[0].id).select();
 check("guard cannot publish shifts", (pubData?.length || 0) === 0);
 
@@ -136,18 +140,18 @@ check("comments arrive intact", supAvail?.some((a) => a.comment === "מילוא�
 
 // ---------- 6. assignments + publishing ----------
 console.log("\n=== assignment and publishing ===");
-const { error: assignErr } = await sup.from("gs_assignments").insert({
-  shift_id: shifts[0].id, guard_id: profA.profile_id, source: "auto", score: 87.5,
+const { error: assignErr } = await sup.from("gs_work_item_assignments").insert({
+  work_item_id: shifts[0].id, guard_id: profA.profile_id, source: "auto", score: 87.5,
   reason: "סימן זמין · עומס נמוך",
 });
 check("supervisor assigns a guard", !assignErr, assignErr?.message);
 
-await sup.from("gs_shifts").update({ published: true }).eq("id", shifts[0].id);
+await sup.from("gs_work_items").update({ published: true }).eq("id", shifts[0].id);
 
-const { data: seen } = await guardA.from("gs_shifts")
-  .select("*, gs_assignments(guard_id, reason, score)").eq("published", true);
-check("guard sees the published shift with its assignment", seen?.[0]?.gs_assignments?.length === 1);
-check("assignment reasoning is readable by the guard", seen?.[0]?.gs_assignments?.[0]?.reason?.length > 0);
+const { data: seen } = await guardA.from("gs_work_items")
+  .select("*, gs_work_item_assignments(guard_id, reason, score)").eq("kind", "shift").eq("published", true);
+check("guard sees the published shift with its assignment", seen?.[0]?.gs_work_item_assignments?.length === 1);
+check("assignment reasoning is readable by the guard", seen?.[0]?.gs_work_item_assignments?.[0]?.reason?.length > 0);
 
 // ---------- 7. supervisor signs back in from a 'new device' ----------
 console.log("\n=== supervisor logs in from another device ===");
@@ -158,7 +162,7 @@ const { data: reAuth, error: reErr } = await device2.auth.signInWithPassword({
 check("password sign-in works", !reErr && Boolean(reAuth?.session), reErr?.message);
 const { data: myTeam } = await device2.rpc("gs_my_team");
 check("same team code on the new device", myTeam === CODE, `got ${myTeam}`);
-const { data: d2shifts } = await device2.from("gs_shifts").select("*");
+const { data: d2shifts } = await device2.from("gs_work_items").select("*").eq("kind", "shift");
 check("shifts are there on the new device", d2shifts?.length === 3, `saw ${d2shifts?.length}`);
 
 // ---------- 8. returning guard keeps their identity ----------
@@ -278,35 +282,35 @@ check("guard can read their own team's position", guardPosRead?.length === 1,
 // idempotency at the DB layer: the unique index on (position_id, date)
 // is the safety net behind materializeTemplateShifts()'s upsert (POS-04).
 const dupDate = iso(1);
-const { data: firstRow, error: firstErr } = await sup.from("gs_shifts").insert({
-  team_code: CODE, date: dupDate, label: "עמדת קבלה", start_time: "08:00", end_time: "16:00",
+const { data: firstRow, error: firstErr } = await sup.from("gs_work_items").insert({
+  team_code: CODE, kind: "shift", start_date: dupDate, due_date: dupDate, title: "עמדת קבלה", start_time: "08:00", end_time: "16:00",
   type: "custom", position_id: position?.id,
 }).select();
 check("first position-tagged shift for (position_id, date) is created",
   !firstErr && firstRow?.length === 1, firstErr?.message);
 
-const { error: plainDupErr } = await sup.from("gs_shifts").insert({
-  team_code: CODE, date: dupDate, label: "עמדת קבלה כפולה", start_time: "08:00", end_time: "16:00",
+const { error: plainDupErr } = await sup.from("gs_work_items").insert({
+  team_code: CODE, kind: "shift", start_date: dupDate, due_date: dupDate, title: "עמדת קבלה כפולה", start_time: "08:00", end_time: "16:00",
   type: "custom", position_id: position?.id,
 });
 check("a second plain insert for the same (position_id, date) is rejected by the unique index",
   Boolean(plainDupErr), "duplicate insert unexpectedly allowed");
 
-const { data: dupUpsert, error: dupUpsertErr } = await sup.from("gs_shifts").upsert({
-  team_code: CODE, date: dupDate, label: "עמדת קבלה כפולה", start_time: "08:00", end_time: "16:00",
+const { data: dupUpsert, error: dupUpsertErr } = await sup.from("gs_work_items").upsert({
+  team_code: CODE, kind: "shift", start_date: dupDate, due_date: dupDate, title: "עמדת קבלה כפולה", start_time: "08:00", end_time: "16:00",
   type: "custom", position_id: position?.id,
-}, { onConflict: "position_id,date", ignoreDuplicates: true }).select();
+}, { onConflict: "position_id,start_date", ignoreDuplicates: true }).select();
 check("with ignoreDuplicates:true the same conflict is a silent no-op (empty array, no error)",
   !dupUpsertErr && (dupUpsert?.length || 0) === 0, dupUpsertErr?.message || `returned ${dupUpsert?.length}`);
 
-const { data: positionShifts } = await sup.from("gs_shifts")
-  .select("id").eq("position_id", position?.id).eq("date", dupDate);
+const { data: positionShifts } = await sup.from("gs_work_items")
+  .select("id").eq("position_id", position?.id).eq("start_date", dupDate);
 check("exactly one shift row exists for this (position_id, date) after both duplicate attempts",
   positionShifts?.length === 1, `found ${positionShifts?.length}`);
 
 // ---------- cleanup ----------
 await sup.from("gs_teams").delete().eq("code", CODE);
-const { data: leftovers } = await sup.from("gs_shifts").select("id");
+const { data: leftovers } = await sup.from("gs_work_items").select("id");
 check("cascade delete cleans the team up", (leftovers?.length || 0) === 0);
 
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);

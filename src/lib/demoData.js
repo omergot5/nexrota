@@ -10,7 +10,7 @@
 import { supabase } from "./supabaseClient.js";
 import { SHIFT_TONES } from "../design/shiftPalette.js";
 import { weekByOffset } from "./dates.js";
-import { shiftFromRow } from "./api.js";
+import { shiftFromRow, shiftRowToWorkItem, SHIFT_SELECT } from "./api.js";
 
 // 7, לא 16: השבוע בונה 14 תקן (2 משמרות/יום × 7 ימים), אז 7 שומרים הוא
 // המספר שבו כל אחד/ת בהגדרה עושה/ה בדיוק שתי משמרות בשבוע רגיל — קנה
@@ -96,10 +96,11 @@ export async function seedDemoTeam({ teamCode, existingGuards = [], existingShif
       .eq("role", "guard")
       .order("created_at"),
     supabase
-      .from("gs_shifts")
-      .select("*, gs_assignments(guard_id, source, score, reason)")
+      .from("gs_work_items")
+      .select(SHIFT_SELECT)
       .eq("team_code", teamCode)
-      .in("date", dates),
+      .eq("kind", "shift")
+      .in("start_date", dates),
   ]);
   if (rosterRes.error) throw new Error(`קריאת הצוות נכשלה: ${rosterRes.error.message}`);
   if (weekRes.error) throw new Error(`קריאת השבוע נכשלה: ${weekRes.error.message}`);
@@ -153,8 +154,8 @@ export async function seedDemoTeam({ teamCode, existingGuards = [], existingShif
   let shiftRows = [];
   if (shiftPayload.length) {
     const { data, error } = await supabase
-      .from("gs_shifts").insert(shiftPayload)
-      .select("*, gs_assignments(guard_id, source, score, reason)");
+      .from("gs_work_items").insert(shiftPayload.map(shiftRowToWorkItem))
+      .select(SHIFT_SELECT);
     if (error) throw new Error(`יצירת משמרות הדגמה נכשלה: ${error.message}`);
     shiftRows = data || [];
   }
