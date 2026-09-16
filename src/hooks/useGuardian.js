@@ -482,13 +482,14 @@ export function useGuardian() {
 
   const actions = useMemo(
     () => ({
-      seedDemo: () =>
+      seedDemo: (guardCount = 7) =>
         run(async () => {
           const { team, guards, shifts } = dataRef.current;
           const res = await seedDemoTeam({
             teamCode: team?.code,
             existingGuards: guards,
             existingShifts: shifts,
+            guardCount,
           });
           await refresh();
           return res;

@@ -12,12 +12,12 @@ import { SHIFT_TONES } from "../design/shiftPalette.js";
 import { weekByOffset } from "./dates.js";
 import { shiftFromRow, shiftRowToWorkItem, SHIFT_SELECT } from "./api.js";
 
-// 7, לא 16: השבוע בונה 14 תקן (2 משמרות/יום × 7 ימים), אז 7 שומרים הוא
-// המספר שבו כל אחד/ת בהגדרה עושה/ה בדיוק שתי משמרות בשבוע רגיל — קנה
-// מידה שממחיש חלוקה-לא-1:1 (יותר תקנים מאנשים) בלי לרוקן את הדוגמה
-// לשישה אנשים ובלי לנפח אותה עד ש-16 מתוכם צריכים לשבת בחוץ כל שבוע.
-// כל שבעת השומרים שומרים על הדפוס הידני המקורי (PATTERN למטה) —
-// עדיין בלי Math.random בשום מקום.
+// 7 הראשונים שומרים על הדפוס הידני המקורי (PATTERN למטה) — קנה מידה
+// שממחיש חלוקה-לא-1:1 (יותר תקנים מאנשים) בלי לרוקן את הדוגמה לשישה
+// אנשים. מעבר לשבעה, שם הצוות (פלוגה/מחלקה אמיתית) גדול הרבה יותר
+// (15-25 איש) — אז המאגר הורחב ל-20 כדי ש-`guardCount` יוכל לבקש
+// גם 14/15/20 בלי לייצר שמות גנריים ("שומר 8"). מ-8 ומעלה אין PATTERN
+// ידני — `fallbackStatus` (למטה) כבר מכסה אותם דטרמיניסטית.
 const DEMO_GUARDS = [
   { name: "גיא לוי", phone: "050-1234567" },
   { name: "מיכל כהן", phone: "052-2345678" },
@@ -26,6 +26,19 @@ const DEMO_GUARDS = [
   { name: "דן מזרחי", phone: "050-5678901" },
   { name: "נועה ברק", phone: "053-6789012" },
   { name: "יובל אברהם", phone: "052-1112222" },
+  { name: "עידן פרץ", phone: "054-1113333" },
+  { name: "שירה גולן", phone: "050-1114444" },
+  { name: "אורי חדד", phone: "052-1115555" },
+  { name: "טל אביטן", phone: "053-1116666" },
+  { name: "מאיה סבג", phone: "058-1117777" },
+  { name: "רועי בן-דוד", phone: "050-1118888" },
+  { name: "ליאור כספי", phone: "054-1119999" },
+  { name: "הדר וקנין", phone: "052-2223333" },
+  { name: "עומר טל", phone: "053-2224444" },
+  { name: "יעל מלכה", phone: "058-2225555" },
+  { name: "נתן אוחיון", phone: "050-2226666" },
+  { name: "אלה ביטון", phone: "054-2227777" },
+  { name: "אסף רז", phone: "052-2228888" },
 ];
 
 const DAY = { label: "משמרת יום", startTime: "07:00", endTime: "19:00", type: "morning", color: SHIFT_TONES.morning };
@@ -74,8 +87,9 @@ function fallbackStatus(gi, di, kind) {
  * Seeds guards + next week's shifts + availability for a team.
  * Safe to re-run: it only adds what is missing.
  */
-export async function seedDemoTeam({ teamCode, existingGuards = [], existingShifts = [] }) {
+export async function seedDemoTeam({ teamCode, existingGuards = [], existingShifts = [], guardCount = 7 }) {
   const dates = weekByOffset(1);
+  const pool = DEMO_GUARDS.slice(0, Math.min(Math.max(guardCount, 1), DEMO_GUARDS.length));
 
   // מה שכבר יושב בצוות נקרא **מכאן**, ולא רק ממה שהקורא מסר.
   //
@@ -113,7 +127,7 @@ export async function seedDemoTeam({ teamCode, existingGuards = [], existingShif
 
   // ---- guards ----
   const have = new Set(knownGuards.map((g) => g.name.trim()));
-  const toAdd = DEMO_GUARDS.filter((g) => !have.has(g.name));
+  const toAdd = pool.filter((g) => !have.has(g.name));
   let guardRows = [];
   if (toAdd.length) {
     const { data, error } = await supabase

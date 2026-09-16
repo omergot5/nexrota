@@ -13,7 +13,7 @@
 // ============================================================
 
 import { useEffect, useMemo, useState } from "react";
-import { Btn, Card, IconBtn, Input, PageHeader, Select } from "../ui.jsx";
+import { Alert, Btn, Card, IconBtn, Input, PageHeader, Segmented, Select } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import { DAYS_HE_SHORT, fromISODate, rangeLabelHe } from "../../lib/dates.js";
 import { foldersFor } from "../../lib/categories.js";
@@ -63,7 +63,73 @@ const emptyDraft = (seed) => ({
   endTime: seed?.endTime || "16:00",
   requiredGuards: 1,
   active: true,
+  divisionHours: 0, // 0 = 24/7 רציף בלי חלוקה; אחרת שעות למשמרת בחלוקת ה-24/7
 });
+
+// שעות שמתחלקות ב-24 בלי שארית — חלוקה שלא מסתיימת "באמצע" היממה.
+const DIVISION_OPTIONS = [0, 4, 6, 8, 12];
+
+/**
+ * מייצר משמרות-תבנית שמחלקות 24 שעות לבלוקים שווים, מ-00:00. הבלוק
+ * האחרון מסתיים ב-"00:00" בדיוק כמו "משמרת לילה" הקיימת (19:00→07:00) —
+ * endTime שקטן/שווה ל-startTime כבר מפורש בכל האפליקציה כחוצה חצות,
+ * אין צורך בטיפול מיוחד.
+ */
+function buildDivisionRows(title, hours) {
+  const count = Math.round(24 / hours);
+  const pad = (n) => String(n).padStart(2, "0");
+  const fmt = (m) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
+  return Array.from({ length: count }, (_, i) => ({
+    title: count > 1 ? `${title} – משמרת ${i + 1}` : title,
+    startTime: fmt(i * hours * 60),
+    endTime: fmt((i + 1) * hours * 60),
+  }));
+}
+
+const MIN_PER_DAY = 24 * 60;
+const toMinutes = (hhmm) => {
+  const [h, m] = String(hhmm || "00:00").split(":").map(Number);
+  return h * 60 + (m || 0);
+};
+
+/** מרווחי הפעילות (בדקות, על פני שני שבועות רצופים כדי לתפוס חצייה של שבת→ראשון) של עמדת-תבנית. */
+function intervalsFor(pos) {
+  if (pos.shape !== "template" || !pos.startTime || !pos.endTime || !pos.weekdays?.length) return [];
+  const start = toMinutes(pos.startTime);
+  const end = toMinutes(pos.endTime);
+  const crosses = end <= start;
+  const out = [];
+  for (const d of pos.weekdays) {
+    for (const wk of [0, 1]) {
+      const dayOffset = (d + wk * 7) * MIN_PER_DAY;
+      out.push({ start: dayOffset + start, end: crosses ? dayOffset + MIN_PER_DAY + end : dayOffset + end });
+    }
+  }
+  return out;
+}
+
+/**
+ * הפער הקטן ביותר (שעות) בין שתי עמדות-תבנית, מתעלם מזוגות חופפים —
+ * חפיפה היא "חסימה" (כבר מוסברת בבאנר "הכול חוסם הכול"), לא שאלת מנוחה —
+ * ומזוגות **נוגעים בדיוק** (gap === 0, למשל סיור שמסתיים ב-18:00 וכוננות
+ * שמתחילה בדיוק ב-18:00): אותה חריגה בדיוק שקיימת ב-autoAssign.js
+ * (`touching`) — מסירה אחת ומכניסה אחת מיד אחריה היא חפיפה בפועל של
+ * תורן יוצא/נכנס, לא הפרת מנוחה. בלי החריגה הזו כל שרשרת משמרות רצופה
+ * (הדפוס הנפוץ ביותר) הייתה מסומנת כשגויה.
+ * מחזיר null אם אין שום זוג ימים סמוכים להשוות.
+ */
+function smallestRestGapBetween(a, b) {
+  const A = intervalsFor(a);
+  const B = intervalsFor(b);
+  let gap = Infinity;
+  for (const ia of A) {
+    for (const ib of B) {
+      if (ib.start > ia.end) gap = Math.min(gap, ib.start - ia.end);
+      else if (ia.start > ib.end) gap = Math.min(gap, ia.start - ib.end);
+    }
+  }
+  return gap === Infinity ? null : gap / 60;
+}
 
 const draftFromPosition = (p) => ({
   id: p.id,
@@ -75,10 +141,11 @@ const draftFromPosition = (p) => ({
   endTime: p.endTime || "16:00",
   requiredGuards: p.requiredGuards || 1,
   active: p.active !== false,
+  divisionHours: 0,
 });
 
 export default function RosterWizard({
-  positions = [], guards = [], weekDates = [], actions, busy, embedded = false,
+  positions = [], guards = [], weekDates = [], actions, busy, embedded = false, team,
 }) {
   const categories = foldersFor("army").map((f) => f.name);
 
@@ -132,8 +199,52 @@ export default function RosterWizard({
 
   const invalid = !form?.title?.trim() || !form?.category;
 
+  // מנוחה בין המשימה שבעריכה לשאר המשימות השמורות — מחושב כאן, בזמן
+  // בניית השבוע, ולא רק מאוחר יותר בשיבוץ החכם (D-06). משווה רק בין
+  // דפוסי-זמן של עמדות-תבנית: עמדת weekly היא רצף בלי גבולות, ואין לה
+  // "פער" להשוות אליו.
+  const restWarning = useMemo(() => {
+    if (!form || form.shape !== "template" || !form.startTime || !form.endTime || !form.weekdays?.length) return null;
+    if (!team?.restHours) return null;
+    const candidate = { shape: "template", startTime: form.startTime, endTime: form.endTime, weekdays: form.weekdays };
+    let worst = null;
+    for (const it of items) {
+      if (!it.position || it.key === resolvedActiveKey || it.position.shape !== "template") continue;
+      const gap = smallestRestGapBetween(candidate, it.position);
+      if (gap != null && gap < team.restHours && (!worst || gap < worst.gap)) {
+        worst = { title: it.position.title, gap };
+      }
+    }
+    return worst;
+  }, [form, items, resolvedActiveKey, team]);
+
+  // חלוקה זמינה רק ביצירה חדשה: עמדת weekly קיימת היא כבר רשומה בודדת
+  // ב-gs_positions, ולא ניתן להפוך אותה בדיעבד למספר עמדות-תבנית בלי
+  // למחוק/ליצור מחדש — פשוט יותר להסתיר את האופציה מאשר לשקר שהיא עובדת.
+  const dividing = form?.shape === "weekly" && !form.id && form.divisionHours > 0;
+
   const save = async () => {
     if (invalid) return;
+
+    if (dividing) {
+      const rows = buildDivisionRows(form.title.trim(), form.divisionHours);
+      for (const row of rows) {
+        await actions.addPosition({
+          title: row.title,
+          category: form.category,
+          shape: "template",
+          weekdays: [0, 1, 2, 3, 4, 5, 6],
+          startTime: row.startTime,
+          endTime: row.endTime,
+          requiredGuards: Math.max(1, Number(form.requiredGuards) || 1),
+          active: true,
+        });
+      }
+      if (form.seedId) setDraftSeeds((d) => d.filter((s) => s.id !== form.seedId));
+      await actions.ensurePositionsForWeek(weekDates[0]);
+      return;
+    }
+
     const cleanWeekdays = (form.weekdays || []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
     const payload = {
       title: form.title.trim(),
@@ -353,6 +464,34 @@ export default function RosterWizard({
               </span>
             </label>
 
+            {form.shape === "weekly" && !form.id && (
+              <div className="space-y-2 p-2.5 rounded-xl bg-surface-sunken ring-1 ring-inset ring-hairline">
+                <p className="text-[12px] font-bold text-muted">לכמה שעות לחלק כל שמירה?</p>
+                <Segmented
+                  value={form.divisionHours}
+                  onChange={(v) => setForm((f) => ({ ...f, divisionHours: v }))}
+                  options={DIVISION_OPTIONS.map((h) => ({
+                    value: h,
+                    label: h === 0 ? "רציף" : `${h} שעות`,
+                  }))}
+                />
+                <p className="text-[11px] text-faint">
+                  {form.divisionHours === 0
+                    ? "משמרת אחת רציפה לכל השבוע, בלי חלוקה לתורנים."
+                    : `${Math.round(24 / form.divisionHours)} משמרות ביום, ${form.divisionHours} שעות כל אחת — מ-00:00, כל ימות השבוע.`}
+                </p>
+                {dividing && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {buildDivisionRows(form.title.trim() || "משימה", form.divisionHours).map((r) => (
+                      <span key={r.title} className="text-[10.5px] font-bold bg-accent/15 text-accent px-2 py-1 rounded-lg" data-numeric>
+                        {r.startTime}–{r.endTime}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {form.shape === "template" && (
               <>
                 <div className="flex gap-1.5 flex-wrap">
@@ -377,6 +516,13 @@ export default function RosterWizard({
                   <Input type="time" value={form.startTime || ""} onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))} />
                   <Input type="time" value={form.endTime || ""} onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))} />
                 </div>
+                {form.startTime && form.endTime && form.weekdays.length > 0 && team?.restHours && (
+                  <Alert tone={restWarning ? "warn" : "accent"}>
+                    {restWarning
+                      ? `רק כ-${Math.round(restWarning.gap * 10) / 10} שעות מנוחה מול "${restWarning.title}" (נדרשות ${team.restHours}) — מי שישובץ לשתיהן ברצף יפר את כלל המנוחה.`
+                      : `מרווח המנוחה מול שאר המשימות השמורות תקין (${team.restHours}+ שעות).`}
+                  </Alert>
+                )}
               </>
             )}
 

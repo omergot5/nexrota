@@ -38,6 +38,21 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* "18:00–06:00" is two LTR number runs joined by a dash inside RTL text.
+   * The bidi algorithm is free to reorder the two runs as a whole, which
+   * silently swaps start/end on screen (מסתבר את המשמרת: לילה שנקרא כבוקר) —
+   * confirmed live, not theoretical: a shift card literally showed
+   * "00:00–16:00" for a 16:00→00:00 block. `shareImage.js` already forces
+   * LTR for the exact same string when drawing the shareable image
+   * (see its `drawLtr` helper/comment); every `[data-numeric]` span needs
+   * the same isolation, since that is the marker already used app-wide on
+   * every "start–end" range. `unicode-bidi: isolate` keeps the direction
+   * change from leaking into surrounding Hebrew text. */
+  [data-numeric] {
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+
   /* One focus ring for the whole app. Never removed — only restyled,
    * and only for pointer users who already have a hover affordance. */
   :focus-visible {

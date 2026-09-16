@@ -3,7 +3,7 @@ import { SHIFT_TONES } from "../../design/shiftPalette.js";
 import { AVAIL } from "../../design/availability.js";
 import { loadTable } from "../../lib/loadTable.js";
 import {
-  Alert, Avatar, Badge, Btn, Card, EmptyState, Field, guardColor, IconBtn, initials, Input, Meter,
+  Alert, Avatar, Badge, Btn, Card, categoryColor, EmptyState, Field, guardColor, IconBtn, initials, Input, Meter,
   Modal, PageHeader, readableInk, Segmented, Select, StatCard,
 } from "../ui.jsx";
 import { Dot, Icon } from "../icons.jsx";
@@ -59,6 +59,10 @@ const WEEK_PATTERNS = [
 export function SupDashboard({
   guards, shifts, swapRequests, tasks, team, weekDates = [], compatibility = [], onNavigate, onSeedDemo, busy, actions,
 }) {
+  // גודל צוות אמיתי בצבא הוא 15-25 איש, לא 7 — ברירת המחדל נשארת 7
+  // (הדוגמה המינימלית ההיסטורית), אבל מפקד שרוצה לבדוק עומס אמיתי
+  // (חפיפות, "הכול חוסם הכול", 24/7) צריך אפשרות לצוות גדול יותר.
+  const [demoCount, setDemoCount] = useState(7);
   const today = todayISO();
   const todayShifts = shifts.filter((s) => s.date === today);
   const pendingSwaps = swapRequests.filter((r) => r.status === "pending").length;
@@ -204,9 +208,16 @@ export function SupDashboard({
                 {doneCount} מתוך {steps.length} הושלמו
               </p>
             </div>
-            <Btn variant="outline" size="sm" icon="sparkles" onClick={onSeedDemo} loading={busy}>
-              מלא לי נתוני הדגמה
-            </Btn>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Segmented
+                value={demoCount}
+                onChange={setDemoCount}
+                options={[7, 14, 15, 20].map((n) => ({ value: n, label: String(n) }))}
+              />
+              <Btn variant="outline" size="sm" icon="sparkles" onClick={() => onSeedDemo(demoCount)} loading={busy}>
+                מלא לי נתוני הדגמה
+              </Btn>
+            </div>
           </div>
           <Meter value={doneCount} max={steps.length} height={8} label="התקדמות ההקמה" />
           <ol className="mt-4 space-y-2">
@@ -1405,6 +1416,10 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                   {dayShifts.map((s) => {
                     const ink = readableInk(s.color);
+                    // צבע רקע הכרטיס (s.color) מקודד שעת יום; השבב כאן מקודד
+                    // זהות קטגוריה/עמדה — שני ערוצי מידע נפרדים כדי שאפשר יהיה
+                    // להבדיל "מה" (השבב) מ"מתי" (הרקע) במבט אחד.
+                    const catColor = categoryColor(s.category || s.label);
                     return (
                       <div
                         key={s.id}
@@ -1412,7 +1427,10 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
                         style={{ background: s.color, color: ink }}
                       >
                         <div className="flex justify-between items-start mb-2 gap-2">
-                          <span className="font-bold text-sm bg-black/15 px-2 py-0.5 rounded-lg">
+                          <span
+                            className="font-bold text-sm px-2 py-0.5 rounded-lg"
+                            style={{ backgroundColor: catColor, color: readableInk(catColor) }}
+                          >
                             {s.label}
                           </span>
                           <span className="text-[11px] opacity-90" data-numeric>
@@ -1515,7 +1533,8 @@ export function SwapMgmt({ guards, shifts, availability = {}, swapRequests, acti
                     </div>
                     {s && (
                       <p className="text-xs text-muted mt-1">
-                        {formatDateHe(s.date)} · {s.label} {s.startTime}–{s.endTime}
+                        {formatDateHe(s.date)} · {s.label}{" "}
+                        <span data-numeric>{s.startTime}–{s.endTime}</span>
                       </p>
                     )}
                     {r.message && (
@@ -1779,7 +1798,7 @@ function TaskRow({ task, busy, actions, guards, onEdit }) {
             {eligible && (
               <span className="flex items-center gap-1">
                 <Icon name="clock" size={11} />
-                {task.startTime}–{task.endTime}
+                <span data-numeric>{task.startTime}–{task.endTime}</span>
               </span>
             )}
           </span>
@@ -2513,6 +2532,7 @@ export function TeamView({
   const [copied, setCopied] = useState(null); // 'code' | 'message' | null
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [demoCount, setDemoCount] = useState(7);
 
   // ---- עורך כשירות (QUAL-01, QUAL-02, D-03, D-04) ----
   // אותה טקסונומיה בדיוק שטופס המשמרת וטופס המשימה קוראים ממנה (D-01),
@@ -2700,9 +2720,16 @@ export function TeamView({
             {t("noun.memberPlural")} ({guards.length})
           </h2>
           {guards.length === 0 && onSeedDemo && (
-            <Btn variant="outline" size="sm" icon="sparkles" onClick={onSeedDemo} loading={busy}>
-              מלא נתוני הדגמה
-            </Btn>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Segmented
+                value={demoCount}
+                onChange={setDemoCount}
+                options={[7, 14, 15, 20].map((n) => ({ value: n, label: String(n) }))}
+              />
+              <Btn variant="outline" size="sm" icon="sparkles" onClick={() => onSeedDemo(demoCount)} loading={busy}>
+                מלא נתוני הדגמה
+              </Btn>
+            </div>
           )}
         </div>
         {guards.length === 0 ? (

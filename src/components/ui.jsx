@@ -38,6 +38,31 @@ export const guardColor = (id) => {
   return GUARD_COLORS[Math.abs(hash) % GUARD_COLORS.length];
 };
 
+/* ------------------------------------------------------------------ *
+ * Per-category / per-position identity colour
+ * ------------------------------------------------------------------ */
+
+/**
+ * צבע המשמרת עצמה (shiftTone) מקודד שעת יום — בוקר/ערב/לילה — ולכן
+ * "סיור" בבוקר ו"עמדת שמירה 1" בבוקר יוצאים באותו גוון בדיוק. זה נכון
+ * לקריאת יום-מול-לילה, אבל לא עונה על "מי עושה מה": כשמפרסמים סד"כ עם
+ * כמה קטגוריות באותו יום, אין שום דרך להבדיל ביניהן במבט חטוף. הפונקציה
+ * הזו נותנת לכל קטגוריה/עמדה צבע יציב משלה — משפחת גוון נפרדת מ-
+ * guardColor כדי ששני סוגי השבבים (מי / מה) לא יתערבבו למבט.
+ */
+const CATEGORY_COLORS = [
+  "#C97A3D", "#3E8FA8", "#8E5FA0", "#5E9E5A", "#B0555F",
+  "#7A8E3E", "#4F6FA8", "#A87A4F", "#5F9E8E", "#9E5F8E",
+];
+
+/** Stable colour per category/position name, distinct from guardColor's palette. */
+export const categoryColor = (key) => {
+  const s = String(key || "");
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) hash = s.charCodeAt(i) + ((hash << 5) - hash);
+  return CATEGORY_COLORS[Math.abs(hash) % CATEGORY_COLORS.length];
+};
+
 // WCAG relative luminance. Picking the ink by measurement rather than by
 // eye is what guarantees every chip clears 4.5:1 — including the ones a
 // future palette edit adds.

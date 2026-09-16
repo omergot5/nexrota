@@ -173,7 +173,8 @@ function WhyModal({ entry, guard, shift, onClose }) {
         <div className="min-w-0 flex-1">
           <p className="font-bold text-content">{guard?.name}</p>
           <p className="text-xs text-muted">
-            {shift?.label} · {formatDateHe(shift?.date)} · {shift?.startTime}–{shift?.endTime}
+            {shift?.label} · {formatDateHe(shift?.date)} ·{" "}
+            <span data-numeric>{shift?.startTime}–{shift?.endTime}</span>
           </p>
         </div>
         <div className="text-left">

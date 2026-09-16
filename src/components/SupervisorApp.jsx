@@ -172,8 +172,8 @@ export default function SupervisorApp({ state }) {
     }
   };
 
-  const startDemo = async () => {
-    await actions.seedDemo();
+  const startDemo = async (guardCount = 7) => {
+    await actions.seedDemo(guardCount);
     setWeekOffset(1);
     go("smart");
   };

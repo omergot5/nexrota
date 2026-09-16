@@ -30,6 +30,47 @@ const C = {
 
 const F = (size, weight = 400) => `${weight} ${size}px Rubik, Arial, sans-serif`;
 
+// אותם שני פלטות זהות בדיוק ל-ui.jsx (guardColor/categoryColor) — משוכפלות
+// ולא מיובאות, כי קנבס הוא אחד משלושת המקומות (עם ה-DB ו-Recharts) ש-
+// shiftPalette.js כבר מתעד ש-`rgb(var(--x))` לא מגיע אליהם. בלי הזיהוי
+// הכפול הזה (מי בצבע-שומר, מה בצבע-קטגוריה) התמונה המשותפת בוואטסאפ
+// חוזרת להיות "הכל אותו צבע" — בדיוק התלונה שהובילה לשינוי.
+const GUARD_COLORS = [
+  "#4C9585", "#3E7C9B", "#7A6FA8", "#A85F7A", "#B0763C",
+  "#5E8C5A", "#9A6250", "#4F7FA8", "#8A6B9E", "#2F7A6B",
+];
+const CATEGORY_COLORS = [
+  "#C97A3D", "#3E8FA8", "#8E5FA0", "#5E9E5A", "#B0555F",
+  "#7A8E3E", "#4F6FA8", "#A87A4F", "#5F9E8E", "#9E5F8E",
+];
+const hashColor = (key, palette) => {
+  const s = String(key || "");
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) hash = s.charCodeAt(i) + ((hash << 5) - hash);
+  return palette[Math.abs(hash) % palette.length];
+};
+const guardColor = (id) => hashColor(id, GUARD_COLORS);
+const categoryColor = (key) => hashColor(key, CATEGORY_COLORS);
+
+const toLinear = (c) => {
+  const v = c / 255;
+  return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+};
+const luminance = (hex) => {
+  const n = parseInt(hex.slice(1), 16);
+  return (
+    0.2126 * toLinear((n >> 16) & 255) +
+    0.7152 * toLinear((n >> 8) & 255) +
+    0.0722 * toLinear(n & 255)
+  );
+};
+const INK_DARK = "#1C3B37";
+const ratio = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+const readableInk = (hex) => {
+  const l = luminance(hex);
+  return ratio(l, 1) >= ratio(l, luminance(INK_DARK)) ? "#FFFFFF" : INK_DARK;
+};
+
 /**
  * מצייר קטע בכיוון שמאל־לימין בתוך ציור ימין־לשמאל.
  *
@@ -46,21 +87,29 @@ function drawLtr(ctx, text, x, y) {
   ctx.direction = "rtl";
 }
 
-/** שובר טקסט לשורות ברוחב נתון. מחזיר מערך שורות, לפחות אחת. */
-function wrap(ctx, text, maxWidth) {
-  const words = String(text).split(/\s+/).filter(Boolean);
-  if (!words.length) return [""];
+/**
+ * שובר רשימת שמות לשורות של "שבבים" (כמו בכרטיסי האפליקציה), בלי לחצות
+ * רוחב נתון. כל שם נשאר יחידה שלמה עם הצבע שלו, ולא מוזג לטקסט אחד — כדי
+ * שאפשר יהיה לזהות "מי" מהצבע לבד, גם בלי לקרוא את השם.
+ */
+function wrapPills(ctx, entries, maxWidth, padX = 14, gap = 8) {
+  if (!entries.length) return [];
+  const withWidth = entries.map((e) => ({ ...e, w: ctx.measureText(e.name).width + padX * 2 }));
   const lines = [];
-  let line = words[0];
-  for (const word of words.slice(1)) {
-    const next = `${line} ${word}`;
-    if (ctx.measureText(next).width <= maxWidth) line = next;
-    else {
+  let line = [];
+  let lineWidth = 0;
+  for (const e of withWidth) {
+    const add = line.length ? e.w + gap : e.w;
+    if (line.length && lineWidth + add > maxWidth) {
       lines.push(line);
-      line = word;
+      line = [e];
+      lineWidth = e.w;
+    } else {
+      line.push(e);
+      lineWidth += add;
     }
   }
-  lines.push(line);
+  if (line.length) lines.push(line);
   return lines;
 }
 
@@ -86,12 +135,11 @@ function layout(ctx, dates, shifts, nameOf) {
       .filter((s) => s.date === date)
       .sort((a, b) => a.startTime.localeCompare(b.startTime))
       .map((s) => {
-        const names = (s.assignedGuards || []).map(nameOf);
-        ctx.font = F(26);
-        const lines = names.length
-          ? wrap(ctx, names.join(" · "), W - PAD * 2 - 300)
-          : ["— לא מאויש —"];
-        return { shift: s, lines, height: Math.max(84, 46 + lines.length * 34) };
+        const entries = (s.assignedGuards || []).map((id) => ({ id, name: nameOf(id) }));
+        ctx.font = F(22, 700);
+        const pillLines = wrapPills(ctx, entries, W - PAD * 2 - 300);
+        const rows = Math.max(1, pillLines.length);
+        return { shift: s, pillLines, height: Math.max(84, 46 + rows * 44) };
       });
     const height = 54 + (rows.length ? rows.reduce((a, r) => a + r.height, 0) : 70);
     days.push({ date, rows, y, height });
@@ -158,24 +206,60 @@ export function renderWeekCanvas({ dates, shifts, guards, teamName }) {
       ctx.lineTo(W - PAD - 24, ry);
       ctx.stroke();
 
-      // פס הצבע של המשמרת — אותו צבע שמופיע באפליקציה, כדי שמי שמכיר את
-      // המסך יזהה את התמונה מיד.
+      // פס הצבע — צבע הקטגוריה/העמדה (לא שעת היום), כדי ש"מה" יהיה נבדל
+      // במבט אחד בדיוק כמו באפליקציה עצמה (categoryColor, ui.jsx).
+      const catColor = categoryColor(row.shift.category || row.shift.label);
       roundRect(ctx, right - 24 - 6, ry + 18, 6, row.height - 36, 3);
-      ctx.fillStyle = row.shift.color || C.brand;
+      ctx.fillStyle = catColor;
       ctx.fill();
 
       ctx.fillStyle = C.ink;
       ctx.font = F(28, 700);
-      drawLtr(ctx, `${row.shift.startTime}–${row.shift.endTime}`, right - 44, ry + 46);
-      ctx.fillStyle = C.muted;
-      ctx.font = F(24, 500);
-      ctx.fillText(row.shift.label || "", right - 240, ry + 46);
+      const timeText = `${row.shift.startTime}–${row.shift.endTime}`;
+      drawLtr(ctx, timeText, right - 44, ry + 46);
+      const timeWidth = ctx.measureText(timeText).width;
 
-      ctx.fillStyle = row.lines[0].startsWith("—") ? C.faint : C.ink;
-      ctx.font = F(26);
-      row.lines.forEach((line, i) => {
-        ctx.fillText(line, right - 44, ry + 82 + i * 34);
-      });
+      // שם העמדה/הקטגוריה כשבב צבעוני — לא טקסט אפור שטוח כמו קודם —
+      // כדי שאותה עמדה תיראה אותו דבר תמיד, גם בין ימים שונים.
+      const labelText = row.shift.label || "";
+      if (labelText) {
+        ctx.font = F(22, 700);
+        const labelInk = readableInk(catColor);
+        const labelPadX = 14;
+        const labelW = ctx.measureText(labelText).width + labelPadX * 2;
+        const labelRight = right - 44 - timeWidth - 16;
+        roundRect(ctx, labelRight - labelW, ry + 26, labelW, 32, 16);
+        ctx.fillStyle = catColor;
+        ctx.fill();
+        ctx.fillStyle = labelInk;
+        ctx.textAlign = "center";
+        ctx.fillText(labelText, labelRight - labelW / 2, ry + 48);
+        ctx.textAlign = "right";
+      }
+
+      if (!row.pillLines.length) {
+        ctx.fillStyle = C.faint;
+        ctx.font = F(26);
+        ctx.fillText("— לא מאויש —", right - 44, ry + 82);
+      } else {
+        ctx.font = F(22, 700);
+        row.pillLines.forEach((line, li) => {
+          let x = right - 44;
+          const yy = ry + 70 + li * 44;
+          for (const pill of line) {
+            const pillColor = guardColor(pill.id);
+            const pillInk = readableInk(pillColor);
+            roundRect(ctx, x - pill.w, yy - 24, pill.w, 32, 16);
+            ctx.fillStyle = pillColor;
+            ctx.fill();
+            ctx.fillStyle = pillInk;
+            ctx.textAlign = "center";
+            ctx.fillText(pill.name, x - pill.w / 2, yy - 2);
+            ctx.textAlign = "right";
+            x -= pill.w + 8;
+          }
+        });
+      }
 
       ry += row.height;
     }

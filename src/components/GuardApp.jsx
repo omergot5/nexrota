@@ -671,7 +671,8 @@ function MySwaps({ user, team, guards, shifts, availability = {}, swapRequests, 
                       </p>
                       {s && (
                         <p className="text-xs text-muted mt-0.5">
-                          {formatDateHe(s.date)} · {s.label} {s.startTime}–{s.endTime}
+                          {formatDateHe(s.date)} · {s.label}{" "}
+                          <span data-numeric>{s.startTime}–{s.endTime}</span>
                         </p>
                       )}
                       {r.message && (
@@ -737,7 +738,8 @@ function MySwaps({ user, team, guards, shifts, availability = {}, swapRequests, 
                       <p className="font-semibold text-sm text-content">בקשה ל{nameOf(r.toGuard)}</p>
                       {s && (
                         <p className="text-xs text-muted mt-0.5">
-                          {formatDateHe(s.date)} · {s.label} {s.startTime}–{s.endTime}
+                          {formatDateHe(s.date)} · {s.label}{" "}
+                          <span data-numeric>{s.startTime}–{s.endTime}</span>
                         </p>
                       )}
                     </div>
