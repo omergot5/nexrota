@@ -22,6 +22,7 @@ import { PrimaryAction, Segmented } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import SmartAssign from "../SmartAssign.jsx";
 import UnifiedBoard from "./UnifiedBoard.jsx";
+import RosterWizard from "./RosterWizard.jsx";
 import { ShiftMgmt, AvailView, AssignView, ScheduleMgmt } from "./views.jsx";
 import { availStatus } from "../../lib/autoAssign.js";
 import { boardItemsForDates } from "../../lib/dates.js";
@@ -47,6 +48,7 @@ export const STEP_OF = {
 
 export default function WeekFlow({
   step, setStep, guards, shifts, availability, weekDates, actions, busy, onNavigate, tasks = [], team,
+  positions = [],
 }) {
   // ברירת המחדל היא השיבוץ האוטומטי. הידני יושב לצידו בתוך אותו שלב — הוא
   // תיקון של התוצאה, לא מסך מתחרה.
@@ -153,7 +155,15 @@ export default function WeekFlow({
       onMove={actions.moveAssignment}
       mode={team?.mode || "security"}
     />,
-    <ShiftMgmt key="shifts" {...common} />,
+    // צבא בלבד (Phase 6): האשף המונחה מחליף את בניית-השבוע הגנרית, בנוי מעל
+    // gs_positions — כל שאר התחומים (אבטחה/מסעדנות) ממשיכים לקבל את
+    // ShiftMgmt המקורי בלי שום שינוי, בדיוק כפי שנקבע ("אשף ההדגמה מתעסק
+    // כרגע אך ורק בצבא").
+    team?.mode === "army" ? (
+      <RosterWizard key="shifts" {...common} positions={positions} />
+    ) : (
+      <ShiftMgmt key="shifts" {...common} />
+    ),
     <AvailView key="avail" {...common} />,
     <div key="assign" className="space-y-5">
       <Segmented

@@ -178,7 +178,7 @@ export default function SupervisorApp({ state }) {
     go("smart");
   };
 
-  const common = { guards, shifts, availability, weekDates, actions, busy, onNavigate: go, tasks, team };
+  const common = { guards, shifts, availability, weekDates, actions, busy, onNavigate: go, tasks, team, positions };
 
   const views = {
     week: <WeekFlow {...common} step={weekStep} setStep={setWeekStep} />,
