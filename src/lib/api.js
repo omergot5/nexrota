@@ -1063,3 +1063,27 @@ export async function materializeTemplateShifts(rows, teamCode) {
   if (error) throw new Error(error.message);
   return (data || []).map(shiftFromRow);
 }
+
+/**
+ * המקבילה של materializeTemplateShifts עבור עמדות shape==="weekly" (24/7,
+ * Phase 04-03 שנסגר עכשיו): כותבת שורת gs_work_items יחידה מסוג "task" לכל
+ * עמדה, עם start_date=יום ראשון של השבוע — בדיוק אותו זוג עמודות
+ * (position_id, start_date) ששומר על האידמפוטנטיות ל-materializeTemplateShifts
+ * (0017_work_items.sql), כי גם כאן start_date משתנה כל שבוע ולכן ייחודי
+ * לצמד הזה בדיוק כמו אצל template. אין צורך במיגרציה/אינדקס נוסף.
+ */
+export async function materializeWeeklyPositionTasks(rows, teamCode) {
+  if (!rows.length) return [];
+  const split = rows.map((r) => taskRowToWorkItem(taskColumns(r)));
+  const { data, error } = await supabase
+    .from("gs_work_items")
+    .upsert(
+      split.map(({ itemRow }) => ({ team_code: teamCode, kind: "task", status: "pending", ...itemRow })),
+      { onConflict: "position_id,start_date", ignoreDuplicates: true }
+    )
+    .select(TASK_SELECT);
+  if (error) throw asTaskError(error);
+  // עמדה שבועית שזה עתה מומשה: אף אחד עדיין לא משויך אליה (assignees
+  // ריק) — בדיוק כמו plannedRowsForWeek מחזירה, ואין embed לקרוא כאן.
+  return (data || []).map((row) => taskFromRow({ ...row, assignees: [] }));
+}

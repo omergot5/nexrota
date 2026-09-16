@@ -860,21 +860,26 @@ export function useGuardian() {
         ),
 
       /**
-       * מממש שורות שבועיות חסרות לכל עמדת template פעילה (POS-01, POS-04).
-       * שער ה-DoS (T-04-05): אם אין חוסרים, חוזר מיד עם {created: 0} בלי שום
-       * כתיבה ובלי refresh() — כי המסך שקורא לזה יכול לקרוא בכל שינוי שבוע,
-       * ו-refresh() ללא תנאי מכאן היה לולאה. עמדות shape==="weekly" מדולגות
-       * במפורש כאן — הרוטציה השבועית היא 04-03.
+       * מממש שורות שבועיות חסרות לכל עמדה פעילה — גם template (לתוך gs_shifts)
+       * וגם weekly/24-7 (לתוך gs_tasks), POS-01/POS-04 ל-04-03. שני הסוגים
+       * חולקים את אותו שער DoS (T-04-05): אם אין חוסרים בכלל, חוזר מיד עם
+       * {created: 0} בלי שום כתיבה ובלי refresh() — כי המסך שקורא לזה יכול
+       * לקרוא בכל שינוי שבוע, ו-refresh() ללא תנאי מכאן היה לולאה.
        */
       ensurePositionsForWeek: (sundayISO) =>
         run(async () => {
-          const { positions, shifts, team } = dataRef.current;
-          const active = (positions || []).filter((p) => p.active && p.shape === "template");
-          const rows = active.flatMap((p) => missingRowsForWeek(p, sundayISO, shifts));
-          if (!rows.length) return { created: 0 };
-          await api.materializeTemplateShifts(rows, team?.code);
+          const { positions, shifts, tasks, team } = dataRef.current;
+          const activeTemplates = (positions || []).filter((p) => p.active && p.shape === "template");
+          const templateRows = activeTemplates.flatMap((p) => missingRowsForWeek(p, sundayISO, shifts));
+
+          const activeWeekly = (positions || []).filter((p) => p.active && p.shape === "weekly");
+          const weeklyRows = activeWeekly.flatMap((p) => missingRowsForWeek(p, sundayISO, tasks));
+
+          if (!templateRows.length && !weeklyRows.length) return { created: 0 };
+          if (templateRows.length) await api.materializeTemplateShifts(templateRows, team?.code);
+          if (weeklyRows.length) await api.materializeWeeklyPositionTasks(weeklyRows, team?.code);
           await refresh();
-          return { created: rows.length };
+          return { created: templateRows.length + weeklyRows.length };
         }),
     }),
     [run, optimistic, deferred, refresh]
