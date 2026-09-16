@@ -88,6 +88,25 @@ export function missingRowsForWeek(position, sundayISO, realized = []) {
 }
 
 /**
+ * מחלק 24 שעות לבלוקים שווים, מ-00:00 — הדרך שבה עמדת 24/7 הופכת
+ * למספר עמדות-תבנית (RosterWizard, demoData). הבלוק האחרון מסתיים
+ * ב-"00:00" בדיוק כמו "משמרת לילה" הקיימת (19:00→07:00): endTime
+ * שקטן/שווה ל-startTime כבר מפורש בכל האפליקציה כחוצה חצות, אין
+ * צורך בטיפול מיוחד. טהורה בכוונה (D-01 בראש הקובץ) כדי שגם
+ * RosterWizard (UI) וגם demoData (seed) יסכימו על אותה חלוקה בדיוק.
+ */
+export function buildDivisionRows(title, hours) {
+  const count = Math.round(24 / hours);
+  const pad = (n) => String(n).padStart(2, "0");
+  const fmt = (m) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
+  return Array.from({ length: count }, (_, i) => ({
+    title: count > 1 ? `${title} – משמרת ${i + 1}` : title,
+    startTime: fmt(i * hours * 60),
+    endTime: fmt((i + 1) * hours * 60),
+  }));
+}
+
+/**
  * מי כשיר לעמדה — גזירה טהורה מעל isQualified() הקיים (D-04, POS-02),
  * ללא שינוי בו וללא כתיבה חדשה: שיוך אדם לעמדה אינו כתיבה, הוא הימצאות
  * category העמדה ברשימת qualifiedCategories של האדם.

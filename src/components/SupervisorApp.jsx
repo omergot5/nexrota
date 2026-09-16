@@ -172,7 +172,7 @@ export default function SupervisorApp({ state }) {
     }
   };
 
-  const startDemo = async (guardCount = 7) => {
+  const startDemo = async (guardCount) => {
     await actions.seedDemo(guardCount);
     setWeekOffset(1);
     go("smart");

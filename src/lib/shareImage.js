@@ -51,6 +51,14 @@ const hashColor = (key, palette) => {
 };
 const guardColor = (id) => hashColor(id, GUARD_COLORS);
 const categoryColor = (key) => hashColor(key, CATEGORY_COLORS);
+// אותו positionColorKey בדיוק כמו ui.jsx: "עמדת שמירה 1" ו"עמדת שמירה 2"
+// חולקות category ("תורנות שמירה"), ולכן categoryColor(category) היה נותן
+// לשתיהן צבע זהה בתמונה המשותפת — בדיוק מה שקרה בלוח החי (נצפה, לא
+// תיאורטי). השם שלפני המקף הוא זהות העמדה, לא הקטגוריה הרחבה.
+const positionColorKey = (label, category) => {
+  const base = String(label || "").split(" – ")[0].trim();
+  return base || category || label;
+};
 
 const toLinear = (c) => {
   const v = c / 255;
@@ -208,7 +216,7 @@ export function renderWeekCanvas({ dates, shifts, guards, teamName }) {
 
       // פס הצבע — צבע הקטגוריה/העמדה (לא שעת היום), כדי ש"מה" יהיה נבדל
       // במבט אחד בדיוק כמו באפליקציה עצמה (categoryColor, ui.jsx).
-      const catColor = categoryColor(row.shift.category || row.shift.label);
+      const catColor = categoryColor(positionColorKey(row.shift.label, row.shift.category));
       roundRect(ctx, right - 24 - 6, ry + 18, 6, row.height - 36, 3);
       ctx.fillStyle = catColor;
       ctx.fill();

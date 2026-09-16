@@ -4,7 +4,7 @@ import { AVAIL } from "../../design/availability.js";
 import { loadTable } from "../../lib/loadTable.js";
 import {
   Alert, Avatar, Badge, Btn, Card, categoryColor, EmptyState, Field, guardColor, IconBtn, initials, Input, Meter,
-  Modal, PageHeader, readableInk, Segmented, Select, StatCard,
+  Modal, PageHeader, positionColorKey, readableInk, Segmented, Select, StatCard,
 } from "../ui.jsx";
 import { Dot, Icon } from "../icons.jsx";
 import {
@@ -59,10 +59,10 @@ const WEEK_PATTERNS = [
 export function SupDashboard({
   guards, shifts, swapRequests, tasks, team, weekDates = [], compatibility = [], onNavigate, onSeedDemo, busy, actions,
 }) {
-  // גודל צוות אמיתי בצבא הוא 15-25 איש, לא 7 — ברירת המחדל נשארת 7
-  // (הדוגמה המינימלית ההיסטורית), אבל מפקד שרוצה לבדוק עומס אמיתי
-  // (חפיפות, "הכול חוסם הכול", 24/7) צריך אפשרות לצוות גדול יותר.
-  const [demoCount, setDemoCount] = useState(7);
+  // גודל צוות אמיתי בצבא הוא 15-25 איש, לא 7 — 20 הוא ברירת המחדל כאן
+  // (לא 7) כדי שהדגמה ראשונה כבר תראה עומס אמיתי: חפיפות, "הכול חוסם
+  // הכול", וכיסוי 24/7 אמיתי. 7/14/15 עדיין זמינים למי שרוצה מדגם קטן.
+  const [demoCount, setDemoCount] = useState(20);
   const today = todayISO();
   const todayShifts = shifts.filter((s) => s.date === today);
   const pendingSwaps = swapRequests.filter((r) => r.status === "pending").length;
@@ -1419,7 +1419,7 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
                     // צבע רקע הכרטיס (s.color) מקודד שעת יום; השבב כאן מקודד
                     // זהות קטגוריה/עמדה — שני ערוצי מידע נפרדים כדי שאפשר יהיה
                     // להבדיל "מה" (השבב) מ"מתי" (הרקע) במבט אחד.
-                    const catColor = categoryColor(s.category || s.label);
+                    const catColor = categoryColor(positionColorKey(s.label, s.category));
                     return (
                       <div
                         key={s.id}
@@ -2532,7 +2532,7 @@ export function TeamView({
   const [copied, setCopied] = useState(null); // 'code' | 'message' | null
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [demoCount, setDemoCount] = useState(7);
+  const [demoCount, setDemoCount] = useState(20);
 
   // ---- עורך כשירות (QUAL-01, QUAL-02, D-03, D-04) ----
   // אותה טקסונומיה בדיוק שטופס המשמרת וטופס המשימה קוראים ממנה (D-01),

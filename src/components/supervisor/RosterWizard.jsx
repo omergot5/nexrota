@@ -17,7 +17,7 @@ import { Alert, Btn, Card, IconBtn, Input, PageHeader, Segmented, Select } from 
 import { Icon } from "../icons.jsx";
 import { DAYS_HE_SHORT, fromISODate, rangeLabelHe } from "../../lib/dates.js";
 import { foldersFor } from "../../lib/categories.js";
-import { expectedDatesForWeek } from "../../lib/positions.js";
+import { buildDivisionRows, expectedDatesForWeek } from "../../lib/positions.js";
 import { t } from "../../lib/terms.js";
 
 // ארבע נקודות פתיחה שכל מפקד צריך, בסדר שבו הן מוזכרות בבקשה המקורית —
@@ -68,23 +68,6 @@ const emptyDraft = (seed) => ({
 
 // שעות שמתחלקות ב-24 בלי שארית — חלוקה שלא מסתיימת "באמצע" היממה.
 const DIVISION_OPTIONS = [0, 4, 6, 8, 12];
-
-/**
- * מייצר משמרות-תבנית שמחלקות 24 שעות לבלוקים שווים, מ-00:00. הבלוק
- * האחרון מסתיים ב-"00:00" בדיוק כמו "משמרת לילה" הקיימת (19:00→07:00) —
- * endTime שקטן/שווה ל-startTime כבר מפורש בכל האפליקציה כחוצה חצות,
- * אין צורך בטיפול מיוחד.
- */
-function buildDivisionRows(title, hours) {
-  const count = Math.round(24 / hours);
-  const pad = (n) => String(n).padStart(2, "0");
-  const fmt = (m) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
-  return Array.from({ length: count }, (_, i) => ({
-    title: count > 1 ? `${title} – משמרת ${i + 1}` : title,
-    startTime: fmt(i * hours * 60),
-    endTime: fmt((i + 1) * hours * 60),
-  }));
-}
 
 const MIN_PER_DAY = 24 * 60;
 const toMinutes = (hhmm) => {

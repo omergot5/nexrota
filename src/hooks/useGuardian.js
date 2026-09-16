@@ -20,7 +20,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient.js";
 import * as api from "../lib/api.js";
-import { seedDemoTeam } from "../lib/demoData.js";
+import { seedDemoTeam, seedArmyRoster } from "../lib/demoData.js";
 import { setTermProfile } from "../lib/terms.js";
 // שכבת ה-state הראשונה שנוגעת במנוע (Phase 3, QUAL-04 מסלול 4): שיבוץ ידני
 // מבצע כתיבה ישירה, ולכן חייב לשאול את אותה שאלה שהמנוע שואל לפני שהוא
@@ -482,15 +482,27 @@ export function useGuardian() {
 
   const actions = useMemo(
     () => ({
-      seedDemo: (guardCount = 7) =>
+      // army מקבל מסלול הדגמה נפרד (seedArmyRoster): סד"כ מלא — חמש
+      // המשימות שהאשף עצמו בונה, כולל שתי עמדות 24/7 מחולקות — לא שתי
+      // משמרות גנריות ליום כמו כל תחום אחר. תחומים אחרים ממשיכים
+      // ב-seedDemoTeam בלי שום שינוי.
+      seedDemo: (guardCount) =>
         run(async () => {
-          const { team, guards, shifts } = dataRef.current;
-          const res = await seedDemoTeam({
-            teamCode: team?.code,
-            existingGuards: guards,
-            existingShifts: shifts,
-            guardCount,
-          });
+          const { team, guards, shifts, positions } = dataRef.current;
+          const res =
+            team?.mode === "army"
+              ? await seedArmyRoster({
+                  teamCode: team?.code,
+                  existingGuards: guards,
+                  existingPositions: positions,
+                  guardCount: guardCount ?? 20,
+                })
+              : await seedDemoTeam({
+                  teamCode: team?.code,
+                  existingGuards: guards,
+                  existingShifts: shifts,
+                  guardCount: guardCount ?? 7,
+                });
           await refresh();
           return res;
         }),

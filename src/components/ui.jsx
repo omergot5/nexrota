@@ -63,6 +63,21 @@ export const categoryColor = (key) => {
   return CATEGORY_COLORS[Math.abs(hash) % CATEGORY_COLORS.length];
 };
 
+/**
+ * המפתח שצריך להזין ל-categoryColor כדי לצבוע "לפי משימה", לא "לפי
+ * קטגוריה" — שני דברים שונים ברגע שעמדת 24/7 מתחלקת למשמרות (RosterWizard,
+ * "לכמה שעות לחלק כל שמירה?"): "עמדת שמירה 1" ו"עמדת שמירה 2" חולקות
+ * category זהה ("תורנות שמירה"), ולכן categoryColor(category) היה נותן
+ * להן בדיוק אותו צבע — נצפה חי בלוח המפורסם: כל שש המשמרות של שתי
+ * העמדות יצאו ב-rgb(176,85,95) אחד. השם עצמו ("עמדת שמירה 1 – משמרת 2")
+ * כולל כבר את זהות העמדה לפני המקף — זו היחידה שצריך לצבוע לפיה, אחידה
+ * על פני שלוש המשמרות של אותה עמדה ושונה מהעמדה השנייה.
+ */
+export const positionColorKey = (label, category) => {
+  const base = String(label || "").split(" – ")[0].trim();
+  return base || category || label;
+};
+
 // WCAG relative luminance. Picking the ink by measurement rather than by
 // eye is what guarantees every chip clears 4.5:1 — including the ones a
 // future palette edit adds.
