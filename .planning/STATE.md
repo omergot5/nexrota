@@ -1,18 +1,16 @@
 ---
 gsd_state_version: 1.0
-status: Awaiting next milestone
-stopped_at: Phase 05 complete — all phases complete
-last_updated: "2026-09-03T20:06:52.136Z"
-last_activity: 2026-09-03
-last_activity_desc: Milestone v1.1 completed and archived
-state_head: 9b3fdb318e3a0769ae47fdf0ee45c4014c62ff86
+milestone: v1.2
+milestone_name: גימור להשקה
+status: planning
+last_updated: "2026-09-17T07:35:10.313Z"
+last_activity: 2026-09-17
 progress:
-  total_phases: 5
-  completed_phases: 2
-  total_plans: 17
-  completed_plans: 17
-  percent: 40
-current_phase: 05
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -26,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-09-03)
 
 ## Current Position
 
-Phase: Milestone v1.1 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-09-03 — Milestone v1.1 completed and archived
+Status: Defining requirements
+Last activity: 2026-09-17 — Milestone v1.2 started
 
 ## Performance Metrics
 
