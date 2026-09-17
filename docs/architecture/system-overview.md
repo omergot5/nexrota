@@ -68,6 +68,6 @@ src/
 
 ## 🧩 דפוס תצוגה משותף — קטגוריה × יום (Phase 6)
 
-הדפוס "שורת עמדה/קטגוריה × עמודות יום, תא = רשימת פריטים ממוינת עם שעה ושמות" חי ב-`src/components/supervisor/ResourceGrid.jsx` **בלבד**, ונזון מהמנוע הטהור `src/lib/resourceView.js` (פיבוט shifts+tasks לפי קטגוריה/יום, בלי React ובלי fetch). שלושה מסכים צורכים אותו כרגע — "מבט משאבים" (`ResourceView.jsx`), פאנל התצוגה בשלב "בניית סד"כ" (`RosterWizard.jsx`, מצב army), ותצוגת השבוע ביומן (`CalendarView.jsx`). מספר הפריטים בכל תא נגזר מהנתונים בלי תקרה (RESVIEW-03).
+הדפוס "שורת עמדה/קטגוריה × עמודות יום, תא = רשימת פריטים ממוינת עם שעה ושמות" חי ב-`src/components/supervisor/ResourceGrid.jsx` **בלבד**. הרכיב עצמו לא תלוי ב-`src/lib/resourceView.js` (D-02) — כל קורא (`ResourceView.jsx`, `RosterWizard.jsx` במצב army, `CalendarView.jsx`) מריץ בעצמו את `buildResourceRows` (המנוע הטהור ב-`resourceView.js`, פיבוט shifts+tasks לפי קטגוריה/יום בלי React ובלי fetch) ומזין את `ResourceGrid` ב-rows מוכן. מספר הפריטים בכל תא נגזר מהנתונים בלי תקרה (RESVIEW-03).
 
 **מסך חדש שמציג את אותו נתון (עמדה/קטגוריה × יום) אמור לצרוך את `ResourceGrid` ולא לצייר טבלה משלו.** הצבעים בתא מגיעים מ-`categoryTone`/`TONE_CLASSES` (`src/design/categoryPalette.js`) — מנגנון נפרד ובמכוון מזה שנבנה ב-Phase 7 לתצוגת הפרסום והשיתוף; שני מנועי צבע נפרדים בכוונה, לא כפילות לאיחוד.
