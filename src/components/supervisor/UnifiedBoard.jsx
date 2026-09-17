@@ -168,7 +168,7 @@ function BoardCard({ item, guards, onMove, mode }) {
   // לה עוד ניצול; פריט timeless אין לו requiredGuards בכלל).
   const missing = timeless ? 0 : missingOfItem(item);
   // שלב 3 (מחזור האיחוד): צבע לפי קטגוריה ("מה"), לא לפי שעת-יום ("מתי") —
-  // אותו tone שCalendarView/WeekTimeGrid כבר משתמשים בו, כדי שמשמרות
+  // אותו tone שתצוגת השבוע ב-CalendarView.jsx כבר משתמשת בו, כדי שמשמרות
   // וגם משימות יופיעו באותו צבע בכל מסך שמציג אותן, לא רק בחלקם.
   const tone = categoryTone(item.category, mode);
   const [dragOver, setDragOver] = useState(false);

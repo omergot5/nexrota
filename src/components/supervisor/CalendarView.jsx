@@ -1,17 +1,14 @@
-import { lazy, Suspense, useMemo, useState, useSyncExternalStore } from "react";
-import { Badge, Btn, Card, EmptyState, IconBtn, PageHeader, Spinner, guardColor, readableInk } from "../ui.jsx";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import { Badge, Btn, Card, EmptyState, IconBtn, PageHeader, guardColor, readableInk } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import { subscribeTerms, t, termProfile } from "../../lib/terms.js";
 import { categoryTone, TONE_VARS } from "../../design/categoryPalette.js";
+import { buildResourceRows } from "../../lib/resourceView.js";
+import ResourceGrid from "./ResourceGrid.jsx";
 import {
   DAYS_HE, DAYS_HE_SHORT, addDays, boardItemsForDates, formatDateHe, fromISODate, monthGrid,
   monthLabelHe, rangeLabelHe, rangeTextHe, shiftHours, startOfWeek, toISODate, todayISO, weekFrom,
 } from "../../lib/dates.js";
-
-// react-big-calendar (~190KB gzip) עולה רק כשמישהו בפועל פותח תצוגת שבוע —
-// אותו עיקרון בדיוק כמו recharts ב-Analytics.jsx (SupervisorApp.jsx), לא
-// עומס על כל מי שנכנס ליומן בתצוגת חודש/יום ולעולם לא מגיע לשבוע.
-const WeekTimeGrid = lazy(() => import("./WeekTimeGrid.jsx"));
 
 // ============================================================
 // CALENDAR
@@ -19,6 +16,9 @@ const WeekTimeGrid = lazy(() => import("./WeekTimeGrid.jsx"));
 // One dataset, three zoom levels. A month to see the shape of the roster and
 // spot the empty days, a week to work in, a day to check who is actually on.
 // The mode never changes what the data means — only how far back you stand.
+// תצוגת השבוע היא מעתה אותו מבנה קטגוריה×יום שמסך המשאבים (ResourceView)
+// ומסך בניית השבוע (RosterWizard) כבר מציגים — רזולוציה שונה של אותו נתון,
+// לא שפה עיצובית שונה (06-03, RESVIEW-02).
 //
 // משימות עוברות דרך boardItemsForDates — אותו מיזוג יחיד שהלוח המאוחד
 // (UnifiedBoard) ומסך הדוחות כבר עוברים דרכו — כדי שמשימה לעולם לא תיעלם
@@ -81,6 +81,16 @@ export default function CalendarView({ shifts, tasks = [], guards, onNavigate })
     return map;
   }, [merged]);
 
+  // הפיבוט קטגוריה×יום של ResourceGrid — מחושב רק כשהתצוגה בפועל היא שבוע,
+  // כדי שפיבוט של רשת חודש בת 42 יום לא ירוץ לשווא. ה-hook עצמו נקרא בלי
+  // תנאי (חוק ה-hooks); רק הגוף מותנה. שים לב: `mode` כאן הוא רזולוציית
+  // התצוגה (month/week/day), ואילו תחום הפעילות שנכנס ל-buildResourceRows
+  // הוא `teamMode` — שני שמות שונים בכוונה כדי לא לבלבל בין השאלות.
+  const weekRows = useMemo(
+    () => (mode === "week" ? buildResourceRows({ shifts, tasks, weekDates: dates, mode: teamMode }) : []),
+    [mode, shifts, tasks, dates, teamMode]
+  );
+
   const step = (dir) => {
     if (mode === "month") {
       const d = new Date(cur.getFullYear(), cur.getMonth() + dir, 1);
@@ -132,7 +142,7 @@ export default function CalendarView({ shifts, tasks = [], guards, onNavigate })
         }
       />
 
-      <Card className="p-3 sm:p-4">
+      <Card className="p-3 sm:p-4 overflow-hidden">
         <div className="flex items-center justify-between gap-2 mb-4">
           {/* Chevrons point the way the calendar moves, which in RTL is the
               mirror of the LTR habit: "next" sits on the left. */}
@@ -165,16 +175,15 @@ export default function CalendarView({ shifts, tasks = [], guards, onNavigate })
           />
         )}
 
-        {mode === "week" && (
-          <Suspense
-            fallback={
-              <div className="flex items-center justify-center gap-2 text-muted py-20 text-sm">
-                <Spinner size={18} /> טוען יומן…
-              </div>
-            }
-          >
-            <WeekTimeGrid shifts={shifts} tasks={tasks} guards={guards} dates={dates} mode={teamMode} />
-          </Suspense>
+        {mode === "week" && weekRows.length > 0 && (
+          // -mx מנטרל את ה-padding הרגיל של ה-Card בצדדים כדי שהגלילה
+          // האופקית והעמודה הנעוצה של ResourceGrid יגיעו עד לקצה הכרטיס —
+          // בדיוק כמו ש-ResourceView עוטף אותו ב-Card שלה (p-0). מצב-ריק
+          // לא מטופל כאן במכוון: ה-EmptyState הקיים בתחתית הרכיב כבר מכסה
+          // weekRows.length === 0, ואין ליצור שני מצבים-ריקים מתחרים.
+          <div className="-mx-3 sm:-mx-4">
+            <ResourceGrid rows={weekRows} dates={dates} guards={guards} />
+          </div>
         )}
 
         {mode === "day" && (
@@ -275,12 +284,11 @@ function MonthGrid({ dates, month, byDate, today, onPick, teamMode }) {
   );
 }
 
-// WeekStrip (גרירת-שבב-שומר בין כרטיסי יום) הוסר לטובת WeekTimeGrid
-// (RBC-01): גרירת "מי משובץ איפה" מייצג אינטראקציה שספריית לוח-שנה
-// בסגנון Google Calendar לא בנויה בשבילה מלכתחילה (היא גוררת *אירועים*
-// בזמן, לא שבבי-אדם בין אירועים) — נסיון לכפות אותה על RBC מלמעלה היה
-// שביר. שיבוץ מחדש בגרירה עדיין קיים באפליקציה: UnifiedBoard.jsx, שלב
-// "אסדר בעצמי" בבניית השבוע — אותו DRAG_MIME בדיוק, רק לא כפול כאן.
+// WeekStrip (גרירת-שבב-שומר בין כרטיסי יום) הוסר בזמנו (RBC-01) לטובת
+// תצוגת-שבוע מבוססת ספריית-לוח-שנה חיצונית, שהוחלפה מאז ב-ResourceGrid
+// (06-03). שיבוץ מחדש בגרירה עדיין לא חי כאן: הוא קיים באפליקציה דרך
+// UnifiedBoard.jsx, שלב "אסדר בעצמי" בבניית השבוע — אותו DRAG_MIME בדיוק,
+// רק לא כפול כאן.
 
 function DayList({ date, items, guards, teamMode }) {
   if (!items.length) {
