@@ -354,6 +354,8 @@ export default function RosterWizard({
     ];
   }, [form, weekDates, resolvedActiveKey]);
 
+  const allRows = [...rows, ...pendingRows];
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -416,38 +418,21 @@ export default function RosterWizard({
         </span>
       </div>
 
+      {/* הפאנל מציג מעתה את פריטי העבודה בפועל של השבוע דרך הרכיב המשותף
+        * ResourceGrid — אותו מבנה בדיוק שמסך המשאבים והיומן מציגים (D-04) —
+        * והמשימה שבעריכה מופיעה בו כשורה מקווקוות עד שהיא נשמרת (pendingRows). */}
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr] items-start">
-        <Card className="p-4">
+        <Card className="p-4 overflow-hidden">
           <h3 className="text-[13px] font-extrabold text-content mb-3">ככה השבוע נראה עד עכשיו</h3>
-          <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-            {dayItems.map(({ date, active }) => (
-              <div key={date}>
-                <div className="text-center mb-2 pb-1.5 border-b-2 border-hairline">
-                  <p className="text-[10.5px] text-faint font-bold" data-numeric>
-                    {DAYS_HE_SHORT[fromISODate(date).getDay()] || ""}
-                  </p>
-                </div>
-                <div className="space-y-1 min-h-[70px]">
-                  {active.length === 0 && (
-                    <div className="rounded-lg border border-dashed border-hairline-strong h-8" />
-                  )}
-                  {active.map((a) => (
-                    <div
-                      key={a.key}
-                      className={`rounded-lg px-1.5 py-1 text-[9.5px] font-bold leading-tight truncate ${
-                        a.editing
-                          ? "border border-dashed border-brand/50 text-brand text-center"
-                          : "bg-accent/15 text-accent"
-                      }`}
-                      title={a.label}
-                    >
-                      {a.editing ? "בעריכה" : a.full247 ? `${a.label} · 24/7` : a.label}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+          {allRows.length === 0 ? (
+            <p className="text-[12px] text-faint leading-relaxed">
+              עוד לא הוגדרה אף משימה לשבוע הזה. הגדירו אחת בטופס שלצד — היא תופיע כאן מיד.
+            </p>
+          ) : (
+            <div className="-mx-4 -mb-4">
+              <ResourceGrid rows={allRows} dates={weekDates} guards={guards} />
+            </div>
+          )}
         </Card>
 
         {form && (
