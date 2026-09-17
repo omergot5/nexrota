@@ -17,9 +17,9 @@ import { addDays, boardItemsForDates, shiftInterval } from "./dates.js";
 import { folderIcon, foldersFor, UNFILED } from "./categories.js";
 
 /**
- * האם פריט timed חוצה חצות (למשל 23:00–07:00) — אותו חישוב בדיוק
- * ש-`calendarEvents.js` מפעיל כדי לפצל אירוע ל-RBC. כאן התוצאה לא
- * מפוצלת לשני אירועים אלא רק קובעת אם להוסיף עותק-המשך בעמודת היום שאחרי.
+ * האם פריט timed חוצה חצות (למשל 23:00–07:00) — אותו חישוב midnight-wrap
+ * שהמנוע (autoAssign.js/conflicts.js) נשען עליו בכל מקום אחר. כאן התוצאה
+ * לא מפוצלת לשני אירועים אלא רק קובעת אם להוסיף עותק-המשך בעמודת היום שאחרי.
  */
 function crossesMidnight(item) {
   if (!item.startTime) return false; // timeless — אין חצייה
@@ -60,8 +60,7 @@ export function buildResourceRows({ shifts = [], tasks = [], weekDates = [], mod
       const category = item.category || UNFILED;
       place(category, day.date, item);
       // משמרת חוצה-חצות (19:00–07:00) ממשיכה גם בעמודת היום שאחריה —
-      // אותה תפיסה ש-`calendarEvents.js` מיישם בפיצול ל-RBC, כדי
-      // שמבט-המשאבים לא "יבלע" את חצי המשמרת שאחרי חצות.
+      // בלי העותק-הזה מבט-המשאבים היה "בולע" את חצי המשמרת שאחרי חצות.
       if (crossesMidnight(item)) {
         const nextDate = addDays(day.date, 1);
         // startTime מוחלף ל-00:00: העותק הזה מייצג רק את חצי-שאחרי-חצות
