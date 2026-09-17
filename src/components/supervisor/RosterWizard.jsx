@@ -10,15 +10,21 @@
 // "הכול חוסם הכול" (D-01, כבר ממומש ב-conflicts.js/autoAssign.js): אין כאן
 // שום מטריצת יחסים בין קטגוריות להגדיר — זה בכוונה. הבאנר רק מסביר את מה
 // שכבר קורה.
+//
+// פאנל התצוגה (06-02) מצייר מעתה את אותו דפוס משותף שמסך המשאבים והיומן
+// מציגים (ResourceGrid, D-04), מתוך פריטי העבודה בפועל של השבוע
+// (buildResourceRows על shifts/tasks) — לא מתוך העמדות הצפויות כפי שהיה קודם.
 // ============================================================
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Alert, Btn, Card, IconBtn, Input, PageHeader, Segmented, Select } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import { DAYS_HE_SHORT, fromISODate, rangeLabelHe } from "../../lib/dates.js";
-import { foldersFor } from "../../lib/categories.js";
-import { buildDivisionRows, expectedDatesForWeek } from "../../lib/positions.js";
-import { t } from "../../lib/terms.js";
+import { folderIcon, foldersFor } from "../../lib/categories.js";
+import { buildDivisionRows } from "../../lib/positions.js";
+import { buildResourceRows } from "../../lib/resourceView.js";
+import { subscribeTerms, t, termProfile } from "../../lib/terms.js";
+import ResourceGrid from "./ResourceGrid.jsx";
 
 // ארבע נקודות פתיחה שכל מפקד צריך, בסדר שבו הן מוזכרות בבקשה המקורית —
 // לא רשימה סגורה: "הוסף משימה" מוסיף עוד, ו-x בכרטיס מוחק. אלה רק
@@ -129,8 +135,15 @@ const draftFromPosition = (p) => ({
 
 export default function RosterWizard({
   positions = [], guards = [], weekDates = [], actions, busy, embedded = false, team,
+  shifts = [], tasks = [],
 }) {
   const categories = foldersFor("army").map((f) => f.name);
+
+  // תחום הפעילות מוחל מ-subscribeTerms/termProfile (D-07) — לא ננעל
+  // למחרוזת "army" למרות שהאשף הזה מוצג רק במצב הזה: buildResourceRows
+  // (ולכן צביעת הקטגוריות ב-ResourceGrid) זקוק למקור אמת אחד, אותו אחד
+  // שמסך המשאבים והיומן קוראים ממנו.
+  const mode = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
 
   // רשימת הפריטים ברצועה: כל עמדה קיימת (פעילה) של הצוות, ואחריה כל זרע
   // שהשם שלו לא תפוס כבר על ידי עמדה קיימת — כדי שרענון הדף לא יחזיר
@@ -296,23 +309,52 @@ export default function RosterWizard({
     await actions.ensurePositionsForWeek(weekDates[0]);
   };
 
-  // תצוגת השבוע: לכל יום, אילו עמדות שמורות רצות בו (expectedDatesForWeek,
-  // פונקציה טהורה קיימת) — plus placeholder לפריט שבעריכה כרגע ולכל שאר
-  // הפריטים שעוד לא הוגדרו, כדי שהעמודה תמיד תשקף את 7 הימים גם לפני
-  // שהמנוע מימש שורות בפועל.
-  const sundayISO = weekDates[0];
-  const dayItems = weekDates.map((date) => {
-    const active = [];
-    for (const it of items) {
-      if (it.position) {
-        const dates = expectedDatesForWeek(it.position, sundayISO);
-        if (dates.includes(date)) active.push({ key: it.key, label: it.position.title, done: true, full247: it.position.shape === "weekly" });
-      } else if (it.key === resolvedActiveKey) {
-        active.push({ key: it.key, label: form?.title || it.seed.title, done: false, editing: true });
-      }
-    }
-    return { date, active };
-  });
+  // תצוגת השבוע: אותו מסלול נתונים בדיוק כמו "מבט משאבים" (D-02) —
+  // buildResourceRows מפַנה shifts/tasks בפועל לפי קטגוריה×יום. הבדל
+  // מכוון מהרצועה הישנה: זה מדווח מה *קיים* בשבוע, לא מה *אמור* לרוץ
+  // בו לפי העמדות השמורות (ר' J-2 באובייקטיב התוכנית).
+  const rows = useMemo(
+    () => buildResourceRows({ shifts, tasks, weekDates, mode }),
+    [shifts, tasks, weekDates, mode]
+  );
+
+  // שורת-רפאים לפריט שבעריכה: פריט שמור כבר מופיע ב-rows דרך פריטי
+  // העבודה שלו בפועל — אין צורך לשכפל אותו כאן. רק draft חדש/לא-שמור
+  // (form.id ריק) מקבל שורה נפרדת, כדי שהמשוב החי של האשף ("מה שאני
+  // מקליד עכשיו מופיע בגריד") ישרוד את החלפת רצועת-הימים הישנה.
+  const pendingRows = useMemo(() => {
+    if (!form || form.id) return [];
+    const activeDays =
+      form.shape === "template" ? new Set(form.weekdays || []) : new Set([0, 1, 2, 3, 4, 5, 6]);
+    const label = form.title?.trim() || "משימה חדשה";
+    return [
+      {
+        category: form.category || "משימה חדשה",
+        icon: folderIcon(form.category),
+        pending: true,
+        days: weekDates.map((date) => {
+          const weekday = fromISODate(date).getDay();
+          if (!activeDays.has(weekday)) return { date, items: [] };
+          return {
+            date,
+            items: [
+              {
+                // מזהה יציב שנגזר מ-resolvedActiveKey, לא מזמן-מערכת ולא
+                // מאינדקס — דטרמיניזם (עקרון ברזל 1) גם בשורת-רפאים.
+                id: `pending:${resolvedActiveKey}`,
+                pending: true,
+                label,
+                startTime: form.shape === "template" ? form.startTime || null : null,
+                endTime: form.shape === "template" ? form.endTime || null : null,
+              },
+            ],
+          };
+        }),
+      },
+    ];
+  }, [form, weekDates, resolvedActiveKey]);
+
+  const allRows = [...rows, ...pendingRows];
 
   return (
     <div className="space-y-5">
@@ -376,38 +418,21 @@ export default function RosterWizard({
         </span>
       </div>
 
+      {/* הפאנל מציג מעתה את פריטי העבודה בפועל של השבוע דרך הרכיב המשותף
+        * ResourceGrid — אותו מבנה בדיוק שמסך המשאבים והיומן מציגים (D-04) —
+        * והמשימה שבעריכה מופיעה בו כשורה מקווקוות עד שהיא נשמרת (pendingRows). */}
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr] items-start">
-        <Card className="p-4">
+        <Card className="p-4 overflow-hidden">
           <h3 className="text-[13px] font-extrabold text-content mb-3">ככה השבוע נראה עד עכשיו</h3>
-          <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-            {dayItems.map(({ date, active }) => (
-              <div key={date}>
-                <div className="text-center mb-2 pb-1.5 border-b-2 border-hairline">
-                  <p className="text-[10.5px] text-faint font-bold" data-numeric>
-                    {DAYS_HE_SHORT[fromISODate(date).getDay()] || ""}
-                  </p>
-                </div>
-                <div className="space-y-1 min-h-[70px]">
-                  {active.length === 0 && (
-                    <div className="rounded-lg border border-dashed border-hairline-strong h-8" />
-                  )}
-                  {active.map((a) => (
-                    <div
-                      key={a.key}
-                      className={`rounded-lg px-1.5 py-1 text-[9.5px] font-bold leading-tight truncate ${
-                        a.editing
-                          ? "border border-dashed border-brand/50 text-brand text-center"
-                          : "bg-accent/15 text-accent"
-                      }`}
-                      title={a.label}
-                    >
-                      {a.editing ? "בעריכה" : a.full247 ? `${a.label} · 24/7` : a.label}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+          {allRows.length === 0 ? (
+            <p className="text-[12px] text-faint leading-relaxed">
+              עוד לא הוגדרה אף משימה לשבוע הזה. הגדירו אחת בטופס שלצד — היא תופיע כאן מיד.
+            </p>
+          ) : (
+            <div className="-mx-4 -mb-4">
+              <ResourceGrid rows={allRows} dates={weekDates} guards={guards} />
+            </div>
+          )}
         </Card>
 
         {form && (
