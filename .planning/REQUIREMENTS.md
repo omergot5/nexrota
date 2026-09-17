@@ -77,22 +77,26 @@
 
 ## Traceability
 
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| RESVIEW-01..03 | Phase 6 | Pending |
-| COLOR-01..04 | Phase 7 | Pending |
-| WEEKBUILD-01..05 | Phase 8 | Pending |
-| REST-01..04 | Phase 9 | Pending |
-| MORE-01..03 | Phase 10 | Pending |
-| INLINE-01..04 | Phase 11 | Pending |
-| CONFIRM-01..06 | Phase 12 | Pending |
-| BUG-01..04 | Phase 13 | Pending |
+| Requirement | Count | Phase | Status |
+|-------------|-------|-------|--------|
+| RESVIEW-01..03 | 3 | Phase 6 — מבט משאבים כאב-טיפוס עיצובי | Pending |
+| COLOR-01..04 | 4 | Phase 7 — צבעים וסדר משמרות | Pending |
+| WEEKBUILD-01..05 | 5 | Phase 8 — בניית שבוע + תמונת מצב שבועית | Pending |
+| REST-01..04 | 4 | Phase 9 — זמן מנוחה + הדגמה מפורשת | Pending |
+| MORE-01..03 | 3 | Phase 10 — ביקורת תפריט "עוד" | Pending |
+| INLINE-01..04 | 4 | Phase 11 — עריכה אינטואיטיבית + ניקוי הדגמה | Pending |
+| CONFIRM-01..06 | 6 | Phase 12 — אישורי פעולות קריטיות | Pending |
+| BUG-01..04 | 4 | Phase 13 — באג ביטול הפצה | Pending |
 
 **Coverage:**
 - v1 requirements: 33 total
-- Mapped to phases: 33
+- Mapped to phases: 33 (3+4+5+4+3+4+6+4)
 - Unmapped: 0 ✓
+- ממופה ליותר מפאזה אחת: 0 ✓ — כל דרישה שייכת לפאזה אחת בדיוק
+
+**Roadmap:** `.planning/ROADMAP.md` — Phases 6-13, בסדר העבודה שהמפרט החיצוני קובע.
+סטטוס דרישה עובר ל-Complete באימות הפאזה (`/gsd-verify-work`), לא בכתיבת ה-roadmap.
 
 ---
 *Requirements defined: 2026-09-17*
-*Last updated: 2026-09-17 after milestone v1.2 kickoff*
+*Last updated: 2026-09-17 — roadmap created, 33/33 requirements mapped to Phases 6-13*

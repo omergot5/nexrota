@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: גימור להשקה
 status: planning
-last_updated: "2026-09-17T07:35:10.313Z"
+last_updated: "2026-09-17T00:00:00.000Z"
 last_activity: 2026-09-17
 progress:
-  total_phases: 0
+  total_phases: 8
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,23 +17,25 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-03)
+See: .planning/PROJECT.md (updated 2026-09-17)
 
 **Core value:** אדם שמקבל את האפליקציה לידיו מסיים סידור שבועי מלא בלי שאף אחד יסביר לו כלום — ומה שהמערכת אומרת לו על עצמה הוא נכון.
-**Current focus:** Planning next milestone — run `/gsd-new-milestone`
+**Current focus:** Phase 6 — מבט משאבים כאב-טיפוס עיצובי
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-09-17 — Milestone v1.2 started
+Phase: 6 of 13 (מבט משאבים כאב-טיפוס עיצובי) — first phase of milestone v1.2
+Plan: — (not yet planned)
+Status: Ready to plan
+Last activity: 2026-09-17 — Roadmap created for v1.2, Phases 6-13, 33/33 requirements mapped
+
+Progress: [░░░░░░░░░░] 0% (v1.2)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 7
+- Total plans completed: 7 (tracked)
 - Average duration: —
 - Total execution time: —
 
@@ -50,20 +52,14 @@ Last activity: 2026-09-17 — Milestone v1.2 started
 - Trend: —
 
 *Updated after each plan completion*
-**Per-Plan Metrics:**
-
-| Plan | Duration | Tasks | Files |
-|------|----------|-------|-------|
-| Phase 02 P01 | 30min | 3 tasks | 5 files |
-| Phase 03 P03 | ~6min | 3 tasks | 2 files |
-| Phase 03-eligibility-model P04 | 35min | 2 tasks | 2 files |
-| Phase 05 P05 | ~35min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
 ### Decisions
 
-Full decision log for v1.1 lives in PROJECT.md Key Decisions table and `.planning/milestones/v1.1-ROADMAP.md`. Cleared here at milestone close — see RETROSPECTIVE.md for the milestone's lessons.
+- [v1.2 roadmap]: סדר הפאזות 6→13 מוכתב ע"י המפרט החיצוני (`shift-app-spec-for-claude-code.md`) ולא נגזר מחדש. Phase 6 קובעת דפוס עיצוב ש-7 ו-8 מאמצות; Phase 11 מייצרת את הפעולות ההרסניות ש-12 מחברת לאישור.
+- [v1.2 roadmap]: 8 פאזות למרות `granularity: standard` (4-6) — איחוד היה שובר את ההתאמה 1:1 בין פאזה לנושא במפרט, ואת הנחיית ה-commit-per-topic שבו.
+- v1.1 decision log: PROJECT.md Key Decisions + `.planning/milestones/v1.1-ROADMAP.md`.
 
 ### Pending Todos
 
@@ -73,8 +69,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- אין test runner בפרויקט. כל בדיקה חדשה חייבת להיות סקריפט Node עצמאי שמדפיס `ok`/`FAIL` ומחזיר קוד יציאה, מחובר ל-`npm test`. (עקרון עומד, לא ספציפי ל-v1.1)
-- ⚠️ [v1.1] Phases 1-3's VERIFICATION.md files predate the current `status:` frontmatter contract — GSD tooling reports them "missing" on format alone; carried forward as a known override (see MILESTONES.md v1.1 entry). Consider backfilling frontmatter on those three files early in the next milestone so this stops requiring a manual override at every future gate.
+- **[v1.2 Phase 12] סתירה לעקרון ברזל קיים.** `CLAUDE.md` עקרון 3 קובע "ביטול במקום אישור — בלי `confirm()`"; בעל המוצר הפך זאת במפורש לפעולות הרסניות. Phase 12 חייבת להכריע אילו פעולות עוברות לאישור-מראש ואילו נשארות ב-`UndoBar`, ולעדכן את `CLAUDE.md` + `PROJECT.md` בהתאם.
+- **[v1.2 Phase 8] התנגשות שם קיימת.** `terms.js` כבר מגדיר `nav.board` במצב army כ"תמונת מצב שבועית" (מצביע על ה-UnifiedBoard מ-v1.1 Phase 5) — בדיוק השם שהמפרט מבקש למסך חדש. להכריע הרחבה מול מסך נפרד לפני התכנון.
+- **[v1.2 Phase 12→13] CONFIRM-04 מחברת פעולה שבורה.** "ביטול הפצה" עדיין באג בזמן Phase 12; Phase 13 חייבת לאמת מחדש דרך הדיאלוג, לא במעקף שלו.
+- אין test runner בפרויקט. כל בדיקה חדשה חייבת להיות סקריפט Node עצמאי שמדפיס `ok`/`FAIL` ומחזיר קוד יציאה, מחובר ל-`npm test`. רלוונטי ישירות ל-BUG-04.
+- ⚠️ [v1.1] Phases 1-3's VERIFICATION.md files predate the current `status:` frontmatter contract — GSD tooling reports them "missing" on format alone; carried forward as a known override (see MILESTONES.md v1.1 entry). Consider backfilling frontmatter early in this milestone.
 - ⚠️ [v1.1] Pre-existing NUL-byte separator in `conflicts.js`'s `pairKey` — acknowledged tech debt, no observed impact (see Deferred Items below).
 
 ### Quick Tasks Completed
@@ -82,7 +81,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260903-wx1 | Add a real center dividing line to the AuthPage split layout | 2026-09-03 | (pending) | [260903-wx1-add-a-real-center-dividing-line-to-the-a](./quick/260903-wx1-add-a-real-center-dividing-line-to-the-a/) |
-| 260904-bal | Fix balanceWorkload oscillation bug — a shift whose load equaled the guard-pair gap flip-flopped for all 40 balance passes with zero net effect; found by replaying the demo roster directly through `autoAssign`, not from a test failure. Also fixed the resulting misleading "16 · כולל 40 העברות" KPI copy (grammatically wrong at n=1, numerically nonsensical at n>16) | 2026-09-04 | (pending) | — (direct fix, no quick-task dir; see commit for detail) |
+| 260904-bal | Fix balanceWorkload oscillation bug + misleading "16 · כולל 40 העברות" KPI copy | 2026-09-04 | (pending) | — (direct fix, no quick-task dir; see commit for detail) |
 
 ## Deferred Items
 
@@ -94,10 +93,11 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-03T19:56:59.702Z
-Stopped at: Phase 05 complete, all 5 phases of the milestone finished — ready to run /gsd-complete-milestone
+Last session: 2026-09-17
+Stopped at: v1.2 roadmap written — Phases 6-13 defined, 33/33 requirements mapped, no orphans
 Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Plan the first phase with `/gsd-plan-phase 6`
+- Phase 6 carries a UI hint — consider `/gsd-ui-phase 6` first (it establishes the design pattern Phases 7 and 8 inherit)
