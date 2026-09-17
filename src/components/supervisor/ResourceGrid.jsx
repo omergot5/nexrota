@@ -61,8 +61,12 @@ export default function ResourceGrid({ rows = [], dates = [], guards = [], first
         <tbody>
           {rows.map((row) => {
             const tone = TONE_CLASSES[categoryTone(row.category, mode)];
+            // row.key (כשקיים) גובר על category: קורא עשוי להזין שתי שורות
+            // עם אותה תווית-קטגוריה בדיוק (למשל RosterWizard, ששורת-הרפאים
+            // שלו יכולה לחלוק קטגוריה עם שורה שכבר נשמרה) — מפתח לפי
+            // category בלבד היה יוצר התנגשות מפתחות ב-React בדיוק במקרה הזה.
             return (
-              <tr key={row.category} className="border-t border-hairline">
+              <tr key={row.key ?? row.category} className="border-t border-hairline">
                 <td className="sticky right-0 z-10 bg-surface px-3 py-2.5 align-top">
                   <div className="flex items-center gap-1.5 font-bold text-content text-xs">
                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${tone.dot}`} aria-hidden="true" />
@@ -136,12 +140,21 @@ export default function ResourceGrid({ rows = [], dates = [], guards = [], first
                             <div
                               key={item.id}
                               title={item.label}
-                              className={`rounded-lg border-r-[3px] px-1.5 py-1 ${tone.bg} ${tone.border}`}
+                              className={`rounded-lg border-r-[3px] px-1.5 py-1 ${tone.bg} ${tone.border} ${
+                                // פריט חוצה-חצות (continuesBefore, resourceView.js) מתחיל
+                                // ב-00:00 באופן מלאכותי — פינה עליונה מרובעת מסמנת "זה
+                                // ממשיך מאתמול", אותו סימון בדיוק שהיה ב-WeekTimeGrid
+                                // (עכשיו נמחק) דרך borderTopLeftRadius/borderTopRightRadius.
+                                item.continuesBefore ? "rounded-t-none" : ""
+                              }`}
                             >
                               {item.startTime ? (
                                 <div className="flex items-center justify-between gap-1">
                                   <span className="text-[10px] font-bold text-muted leading-tight" data-numeric>
-                                    {item.startTime}–{item.endTime}
+                                    {/* "⋯" במקום "00:00" בחצי-הממשיך: 00:00 היה נקרא כאילו
+                                      * המשמרת *מתחילה* בחצות, בעוד שהיא רק נמשכת מאתמול —
+                                      * אותה הבחנה בדיוק שהייתה ב-WeekTimeGrid (EventContent). */}
+                                    {item.continuesBefore ? "⋯" : item.startTime}–{item.endTime}
                                   </span>
                                   {shortageBadge}
                                 </div>

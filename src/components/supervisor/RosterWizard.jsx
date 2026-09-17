@@ -329,6 +329,12 @@ export default function RosterWizard({
     const label = form.title?.trim() || "משימה חדשה";
     return [
       {
+        // מפתח שורה נפרד מ-category (RESVIEW-CR-01): form.category יכול
+        // להיות זהה לקטגוריה של שורה קיימת ב-rows (למשל addBlank() תמיד
+        // מציע categories[0], וזו בדיוק הקטגוריה של "עמדת שמירה 1" ב-
+        // SEED_POSITIONS) — בלי key ייחודי, ResourceGrid היה מקבל שני
+        // <tr> עם אותו מפתח React ומחליף DOM/fiber ביניהם בכל הקלדה.
+        key: `pending:${resolvedActiveKey}`,
         category: form.category || "משימה חדשה",
         icon: folderIcon(form.category),
         pending: true,
