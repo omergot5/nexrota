@@ -58,10 +58,11 @@ export const TONE_CLASSES = {
 };
 
 /**
- * ערך צבע חי ל-style מוטבע (react-big-calendar כותב `backgroundColor`
- * ישירות על ה-DOM, לא דרך מחלקת Tailwind) — `rgb(var(--x))` ולא hex קבוע,
- * כדי שהאירוע יתחלף אוטומטית בין מצב בהיר/כהה יחד עם שאר הטוקנים, בלי
- * קוד נפרד לכל ערכת נושא.
+ * ערך צבע חי ל-style מוטבע: הנקודות ב-MonthGrid, רצועת-הצבע ב-DayList
+ * (שני הענפים ב-CalendarView.jsx) ו-UnifiedBoard כולם כותבים
+ * `style={{ background: ... }}` מוטבע ולא מחלקת Tailwind — `rgb(var(--x))`
+ * ולא hex קבוע, כדי שהצבע יתחלף אוטומטית בין מצב בהיר/כהה יחד עם שאר
+ * הטוקנים, בלי קוד נפרד לכל ערכת נושא.
  */
 export const TONE_VARS = {
   "cat-red": "rgb(var(--cat-red))",
