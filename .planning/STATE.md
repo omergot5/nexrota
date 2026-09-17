@@ -5,16 +5,16 @@ milestone_name: גימור להשקה
 current_phase: 06
 current_phase_name: מבט משאבים כאב-טיפוס עיצובי
 status: executing
-stopped_at: v1.2 roadmap written — Phases 6-13 defined, 33/33 requirements mapped, no orphans
-last_updated: "2026-09-17T08:33:21.740Z"
+stopped_at: Completed 06-01-PLAN.md — ResourceGrid extraction + RESVIEW-03
+last_updated: "2026-09-17T08:42:12.959Z"
 last_activity: 2026-09-17
-last_activity_desc: Phase 06 execution started
-state_head: 066b0d4bd20c759b653c256758f2b320bf8c9b13
+last_activity_desc: Phase 06 plan 1/4 complete — ResourceGrid extracted
+state_head: 48fe055de8b617a54ce5fe3f4e8587d8ec0e9cf7
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 4
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 
 ## Current Position
 
-Phase: 06 (מבט משאבים כאב-טיפוס עיצובי) — EXECUTING
-Plan: 1 of 4
+Phase: 06 of 13 (מבט משאבים כאב-טיפוס עיצובי) — EXECUTING
+Plan: 1 of 4 complete
 Status: Executing Phase 06
-Last activity: 2026-09-17 — Phase 06 execution started
+Last activity: 2026-09-17 — Plan 06-01 complete (ResourceGrid extracted)
 
 Progress: [░░░░░░░░░░] 0% (v1.2)
 
@@ -57,6 +57,11 @@ Progress: [░░░░░░░░░░] 0% (v1.2)
 - Trend: —
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 06 P01 | 15min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -65,6 +70,7 @@ Progress: [░░░░░░░░░░] 0% (v1.2)
 - [v1.2 roadmap]: סדר הפאזות 6→13 מוכתב ע"י המפרט החיצוני (`shift-app-spec-for-claude-code.md`) ולא נגזר מחדש. Phase 6 קובעת דפוס עיצוב ש-7 ו-8 מאמצות; Phase 11 מייצרת את הפעולות ההרסניות ש-12 מחברת לאישור.
 - [v1.2 roadmap]: 8 פאזות למרות `granularity: standard` (4-6) — איחוד היה שובר את ההתאמה 1:1 בין פאזה לנושא במפרט, ואת הנחיית ה-commit-per-topic שבו.
 - v1.1 decision log: PROJECT.md Key Decisions + `.planning/milestones/v1.1-ROADMAP.md`.
+- [Phase 6]: 06-01: ResourceGrid.jsx חולץ כרכיב תצוגה גנרי יחיד (D-04); mode נקרא בתוך הרכיב מ-subscribeTerms/termProfile, לא כפרופ (D-07); חוזה row.pending/item.pending קיים לפני 06-02
 
 ### Pending Todos
 
@@ -98,8 +104,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-17
-Stopped at: v1.2 roadmap written — Phases 6-13 defined, 33/33 requirements mapped, no orphans
+Last session: 2026-09-17T08:42:12.930Z
+Stopped at: Completed 06-01-PLAN.md — ResourceGrid extraction + RESVIEW-03
 Resume file: None
 
 ## Operator Next Steps

@@ -74,8 +74,9 @@ const emptyCell = generalRow.days.find((d) => d.date === "2026-09-08");
 check("תא בלי אף פריט הוא מערך ריק, לא undefined", Array.isArray(emptyCell.items) && emptyCell.items.length === 0);
 
 // s-guard-2 (19:00–07:00, יום ראשון) חוצה חצות — ההמשך שלו אמור לנחות גם
-// בתא שמירות/שני, כמו שכבר קורה ב-WeekTimeGrid (calendarEvents.js). בלי
-// זה מבט-המשאבים "בולע" את חצי המשמרת שאחרי חצות (הבאג שתוקן כאן).
+// בתא שמירות/שני, כמו שכבר קורה במיזוג האירועים של היומן (calendarEvents.js,
+// שמפצל אירוע חוצה-חצות לשני חצאים באותה שיטה). בלי זה מבט-המשאבים "בולע"
+// את חצי המשמרת שאחרי חצות (הבאג שתוקן כאן).
 const mondayGuardCell = guardRow.days.find((d) => d.date === "2026-09-07");
 check(
   "משמרת חוצה-חצות ממשיכה גם בתא שמירות/שני",
@@ -145,6 +146,98 @@ const edgeGuardRow = edgeRows.find((r) => r.category === "שמירות");
 check(
   "משמרת חוצה-חצות בקצה השבוע לא קורסת כשיום-ההמשך מחוץ ל-weekDates",
   edgeGuardRow.days.reduce((n, d) => n + d.items.length, 0) === 1
+);
+
+// ============================================================
+// RESVIEW-03 · מספר פריטים דינמי בתא (D-05)
+//
+// למה הקטע הזה קיים: המפרט המקורי תיאר במקום אחד "3 משמרות" ובמקום אחר
+// "4 עמודות-משמרת × 6 שעות", ושני התיאורים סתרו זה את זה. ההכרעה
+// (06-CONTEXT.md, D-05) היא "דינמי לפי מה שבפועל מתוכנן לעמדה באותו
+// יום — אין תקרה, אין מספר עמודות קבוע". הקטע הזה הוא מה שהופך את
+// ההכרעה הזו מהנחה למשהו שנבדק בפועל בכל הרצה של npm test: שאם מישהו
+// יחזיר בטעות תקרה (Math.min, slice(0,4) וכו') ל-ResourceGrid או
+// ל-buildResourceRows, הבדיקה תיפול באדום ולא תישאר תלויה בעין.
+// ============================================================
+console.log("\nRESVIEW-03 · buildResourceRows — מספר פריטים דינמי בתא, בלי תקרה\n");
+
+const dynSunday = "2026-09-06";
+const dynWeek = weekFrom(dynSunday);
+
+// ארבע קטגוריות נפרדות, אותו יום ראשון, מספר משמרות שונה בכל אחת —
+// שעות יום בלבד (לא חוצות חצות), כדי שספירת התא תהיה בדיוק מספר
+// המשמרות שהוזנו ולא תושפע מעותק-ההמשך (כבר מכוסה למעלה).
+const oneShift = [
+  { id: "d1-a", date: dynSunday, startTime: "08:00", endTime: "10:00", label: "יחיד", assignedGuards: [], category: "שמירות" },
+];
+const twoShifts = [
+  { id: "d2-a", date: dynSunday, startTime: "08:00", endTime: "10:00", label: "א", assignedGuards: [], category: "סיור" },
+  { id: "d2-b", date: dynSunday, startTime: "12:00", endTime: "14:00", label: "ב", assignedGuards: [], category: "סיור" },
+];
+const threeShifts = [
+  { id: "d3-a", date: dynSunday, startTime: "08:00", endTime: "10:00", label: "א", assignedGuards: [], category: "עמדה קבועה" },
+  { id: "d3-b", date: dynSunday, startTime: "10:00", endTime: "12:00", label: "ב", assignedGuards: [], category: "עמדה קבועה" },
+  { id: "d3-c", date: dynSunday, startTime: "12:00", endTime: "14:00", label: "ג", assignedGuards: [], category: "עמדה קבועה" },
+];
+// סדר-קלט לא-כרונולוגי בכוונה — הבדיקה #4 למטה מוודאת שהתא ממיין
+// מחדש לפי startTime ולא שומר על סדר ההזנה.
+const fiveShifts = [
+  { id: "d5-c", date: dynSunday, startTime: "15:00", endTime: "17:00", label: "ג", assignedGuards: [], category: "ציוד אבטחה" },
+  { id: "d5-a", date: dynSunday, startTime: "07:00", endTime: "09:00", label: "א", assignedGuards: [], category: "ציוד אבטחה" },
+  { id: "d5-e", date: dynSunday, startTime: "13:00", endTime: "15:00", label: "ה", assignedGuards: [], category: "ציוד אבטחה" },
+  { id: "d5-b", date: dynSunday, startTime: "09:00", endTime: "11:00", label: "ב", assignedGuards: [], category: "ציוד אבטחה" },
+  { id: "d5-d", date: dynSunday, startTime: "11:00", endTime: "13:00", label: "ד", assignedGuards: [], category: "ציוד אבטחה" },
+];
+
+const dynShifts = [...oneShift, ...twoShifts, ...threeShifts, ...fiveShifts];
+const dynRows = buildResourceRows({ shifts: dynShifts, tasks: [], weekDates: dynWeek, mode: "security" });
+
+const countOf = (category) => dynRows.find((r) => r.category === category)?.days.find((d) => d.date === dynSunday)?.items.length;
+
+const counts = {
+  "שמירות": countOf("שמירות"),
+  "סיור": countOf("סיור"),
+  "עמדה קבועה": countOf("עמדה קבועה"),
+  "ציוד אבטחה": countOf("ציוד אבטחה"),
+};
+
+// 1. כל קטגוריה מחזירה בדיוק את מספר הפריטים שהוזן לה.
+check("תא שמירות/ראשון מכיל 1 פריט", counts["שמירות"] === 1, `count=${counts["שמירות"]}`);
+check("תא סיור/ראשון מכיל 2 פריטים", counts["סיור"] === 2, `count=${counts["סיור"]}`);
+check("תא עמדה-קבועה/ראשון מכיל 3 פריטים", counts["עמדה קבועה"] === 3, `count=${counts["עמדה קבועה"]}`);
+check("תא ציוד-אבטחה/ראשון מכיל 5 פריטים", counts["ציוד אבטחה"] === 5, `count=${counts["ציוד אבטחה"]}`);
+
+// 2. הספירות שונות זו מזו באותה קריאה אחת — המנוע לא מיישר תאים למספר
+// אחיד (למשל תקרה סמויה של 3 הייתה הופכת את {1,2,3,5} ל-{1,2,3,3}).
+const countSet = new Set(Object.values(counts));
+check(
+  "קבוצת הספירות בארבע השורות היא בדיוק {1,2,3,5}",
+  countSet.size === 4 && [1, 2, 3, 5].every((n) => countSet.has(n)),
+  `counts=${JSON.stringify(counts)}`
+);
+
+// 3. אין תקרה נסתרת: אצווה של 12 משמרות באותה קטגוריה/יום מחזירה 12.
+const twelveShifts = Array.from({ length: 12 }, (_, i) => ({
+  id: `d12-${i}`,
+  date: dynSunday,
+  startTime: `${String(6 + i).padStart(2, "0")}:00`,
+  endTime: `${String(7 + i).padStart(2, "0")}:00`,
+  label: `משמרת ${i + 1}`,
+  assignedGuards: [],
+  category: "דוח משמרת",
+}));
+const twelveRows = buildResourceRows({ shifts: twelveShifts, tasks: [], weekDates: dynWeek, mode: "security" });
+const twelveCount = twelveRows.find((r) => r.category === "דוח משמרת")?.days.find((d) => d.date === dynSunday)?.items.length;
+check("תא עם 12 משמרות מחזיר 12 — לא 3, לא 4, לא 10", twelveCount === 12, `count=${twelveCount}`);
+
+// 4. הסדר בתוך התא של חמש המשמרות כרונולוגי עולה לפי startTime — נגזר
+// מהנתונים, לא מסדר ההזנה (שהוזן במכוון לא-מסודר למעלה).
+const fiveCell = dynRows.find((r) => r.category === "ציוד אבטחה")?.days.find((d) => d.date === dynSunday);
+const fiveOrder = (fiveCell?.items || []).map((it) => it.startTime);
+check(
+  "חמש המשמרות בתא ציוד-אבטחה ממוינות כרונולוגית עולה, לא לפי סדר ההזנה",
+  JSON.stringify(fiveOrder) === JSON.stringify(["07:00", "09:00", "11:00", "13:00", "15:00"]),
+  `order=${fiveOrder.join(",")}`
 );
 
 console.log(failures === 0 ? "\nPASS\n" : `\n${failures} FAILURE(S)\n`);
