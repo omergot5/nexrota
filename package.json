@@ -8,7 +8,7 @@
     "dev:auto": "vite",
     "build": "vite build",
     "preview": "vite preview --port 3000",
-    "test": "node scripts/verify-scheduler.mjs && node scripts/verify-planning.mjs && node scripts/verify-positions.mjs && node scripts/verify-board.mjs && node scripts/verify-board-signals.mjs && node scripts/verify-resource-view.mjs && node scripts/verify-categories.mjs && node scripts/verify-terms.mjs",
+    "test": "node scripts/verify-scheduler.mjs && node scripts/verify-planning.mjs && node scripts/verify-positions.mjs && node scripts/verify-board.mjs && node scripts/verify-board-signals.mjs && node scripts/verify-resource-view.mjs && node scripts/verify-categories.mjs && node scripts/verify-terms.mjs && node scripts/verify-share-image.mjs",
     "test:backend": "node scripts/verify-backend.mjs"
   },
   "dependencies": {

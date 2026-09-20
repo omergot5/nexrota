@@ -13,7 +13,7 @@
 //      לא בתוך האפליקציה, ומסך כהה על רקע וואטסאפ בהיר נראה כמו תקלה.
 // ============================================================
 
-import { DAYS_HE, fromISODate, rangeLabelHe } from "./dates.js";
+import { byStartTime, DAYS_HE, fromISODate, rangeLabelHe } from "./dates.js";
 
 const W = 1080;
 const PAD = 48;
@@ -28,20 +28,28 @@ const C = {
   brand: "#2563eb",
 };
 
+// זהות העמדה/המשימה מסומנת מעתה בתווית שחורה אחידה וקריאה, לא בגוון
+// שנגזר מהעמדה (Phase 7, COLOR-02, D-01) — קשת הגוונים הקודמת יצרה לוח
+// שנראה צבעוני ולא אמר דבר: מנהל עם כמה עמדות קיבל צבע אקראי-למראה לכל
+// אחת, בלי שהצבע קידד משהו שאפשר לפעול לפיו. הצבע נשמר לערוץ אחד בלבד —
+// מי מבצע (`guardColor`, D-02/COLOR-03) — ולא נוגע כאן.
+//
+// ליטרל שש-ספרות מכוון (D-03), לא token מ-`tokens.css`: הכוונה כאן היא
+// יציבות בין-ערכות-נושא, והקנבס בכלל לא מכיר משתני CSS. אותו ליטרל בדיוק
+// קיים גם ב-`views.jsx` (ScheduleMgmt) — הבדיקה (`verify-share-image.mjs`)
+// אוכפת ששני העותקים לא נסחפים זה מזה.
+const POSITION_LABEL_BG = "#0A0A0A";
+
 const F = (size, weight = 400) => `${weight} ${size}px Rubik, Arial, sans-serif`;
 
-// אותם שני פלטות זהות בדיוק ל-ui.jsx (guardColor/categoryColor) — משוכפלות
-// ולא מיובאות, כי קנבס הוא אחד משלושת המקומות (עם ה-DB ו-Recharts) ש-
+// פלטת עשרת צבעי הכפופים — זהה בדיוק ל-ui.jsx (guardColor) — משוכפלת
+// ולא מיובאת, כי קנבס הוא אחד משלושת המקומות (עם ה-DB ו-Recharts) ש-
 // shiftPalette.js כבר מתעד ש-`rgb(var(--x))` לא מגיע אליהם. בלי הזיהוי
-// הכפול הזה (מי בצבע-שומר, מה בצבע-קטגוריה) התמונה המשותפת בוואטסאפ
-// חוזרת להיות "הכל אותו צבע" — בדיוק התלונה שהובילה לשינוי.
+// הזה (מי בצבע-שומר) התמונה המשותפת בוואטסאפ חוזרת להיות "הכל אותו
+// צבע" — בדיוק התלונה שהובילה לשינוי.
 const GUARD_COLORS = [
   "#4C9585", "#3E7C9B", "#7A6FA8", "#A85F7A", "#B0763C",
   "#5E8C5A", "#9A6250", "#4F7FA8", "#8A6B9E", "#2F7A6B",
-];
-const CATEGORY_COLORS = [
-  "#C97A3D", "#3E8FA8", "#8E5FA0", "#5E9E5A", "#B0555F",
-  "#7A8E3E", "#4F6FA8", "#A87A4F", "#5F9E8E", "#9E5F8E",
 ];
 const hashColor = (key, palette) => {
   const s = String(key || "");
@@ -50,15 +58,6 @@ const hashColor = (key, palette) => {
   return palette[Math.abs(hash) % palette.length];
 };
 const guardColor = (id) => hashColor(id, GUARD_COLORS);
-const categoryColor = (key) => hashColor(key, CATEGORY_COLORS);
-// אותו positionColorKey בדיוק כמו ui.jsx: "עמדת שמירה 1" ו"עמדת שמירה 2"
-// חולקות category ("תורנות שמירה"), ולכן categoryColor(category) היה נותן
-// לשתיהן צבע זהה בתמונה המשותפת — בדיוק מה שקרה בלוח החי (נצפה, לא
-// תיאורטי). השם שלפני המקף הוא זהות העמדה, לא הקטגוריה הרחבה.
-const positionColorKey = (label, category) => {
-  const base = String(label || "").split(" – ")[0].trim();
-  return base || category || label;
-};
 
 const toLinear = (c) => {
   const v = c / 255;
@@ -141,7 +140,7 @@ function layout(ctx, dates, shifts, nameOf) {
   for (const date of dates) {
     const rows = shifts
       .filter((s) => s.date === date)
-      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+      .sort(byStartTime)
       .map((s) => {
         const entries = (s.assignedGuards || []).map((id) => ({ id, name: nameOf(id) }));
         ctx.font = F(22, 700);
@@ -214,11 +213,11 @@ export function renderWeekCanvas({ dates, shifts, guards, teamName }) {
       ctx.lineTo(W - PAD - 24, ry);
       ctx.stroke();
 
-      // פס הצבע — צבע הקטגוריה/העמדה (לא שעת היום), כדי ש"מה" יהיה נבדל
-      // במבט אחד בדיוק כמו באפליקציה עצמה (categoryColor, ui.jsx).
-      const catColor = categoryColor(positionColorKey(row.shift.label, row.shift.category));
+      // פס הצבע — שחור קבוע, לא עוד גוון-לפי-עמדה (J-1, COLOR-02): להשאיר
+      // אותו צבעוני היה משאיר בתמונה בדיוק את קידוד-הצבע-לפי-עמדה שהמסך
+      // כבר לא מציג, ואז המסך והתמונה חוזרים לומר שני דברים שונים.
       roundRect(ctx, right - 24 - 6, ry + 18, 6, row.height - 36, 3);
-      ctx.fillStyle = catColor;
+      ctx.fillStyle = POSITION_LABEL_BG;
       ctx.fill();
 
       ctx.fillStyle = C.ink;
@@ -227,17 +226,18 @@ export function renderWeekCanvas({ dates, shifts, guards, teamName }) {
       drawLtr(ctx, timeText, right - 44, ry + 46);
       const timeWidth = ctx.measureText(timeText).width;
 
-      // שם העמדה/הקטגוריה כשבב צבעוני — לא טקסט אפור שטוח כמו קודם —
-      // כדי שאותה עמדה תיראה אותו דבר תמיד, גם בין ימים שונים.
+      // שם העמדה/המשימה כשבב שחור אחיד (J-1, COLOR-02) — לא עוד גוון-לפי-
+      // עמדה כמו קודם, כדי שאותה עמדה תיראה אותו דבר תמיד, בכל יום ובכל
+      // שבוע. צבע הטקסט נגזר מ-readableInk על הרקע (D-04) ולא קשיח.
       const labelText = row.shift.label || "";
       if (labelText) {
         ctx.font = F(22, 700);
-        const labelInk = readableInk(catColor);
+        const labelInk = readableInk(POSITION_LABEL_BG);
         const labelPadX = 14;
         const labelW = ctx.measureText(labelText).width + labelPadX * 2;
         const labelRight = right - 44 - timeWidth - 16;
         roundRect(ctx, labelRight - labelW, ry + 26, labelW, 32, 16);
-        ctx.fillStyle = catColor;
+        ctx.fillStyle = POSITION_LABEL_BG;
         ctx.fill();
         ctx.fillStyle = labelInk;
         ctx.textAlign = "center";
