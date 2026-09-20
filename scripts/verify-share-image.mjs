@@ -277,13 +277,48 @@ check(
 );
 
 // קישור-מקור: הליטרל השחור קיים בפועל בקובץ הנבדק.
-const shareImageSrc = await (await import("node:fs/promises")).readFile(
-  new URL("../src/lib/shareImage.js", import.meta.url),
-  "utf8"
-);
+const { readFile } = await import("node:fs/promises");
+const shareImageSrc = await readFile(new URL("../src/lib/shareImage.js", import.meta.url), "utf8");
 check(
   "src/lib/shareImage.js מכיל השמה ל-POSITION_LABEL_BG בליטרל בן שש ספרות הקסה",
   /POSITION_LABEL_BG\s*=\s*"#[0-9A-Fa-f]{6}"/.test(shareImageSrc)
+);
+
+// ============================================================
+console.log("\nCOLOR-02/04 · views.jsx — ScheduleMgmt (השוואת מקור)\n");
+// ============================================================
+
+// קוראים כטקסט דרך new URL(..., import.meta.url) כדי שלא יהיה תלוי
+// בתיקיית העבודה שממנה מריצים את הסקריפט.
+const viewsSrc = await readFile(
+  new URL("../src/components/supervisor/views.jsx", import.meta.url),
+  "utf8"
+);
+
+const HEX6_LITERAL = /POSITION_LABEL_BG\s*=\s*"(#[0-9A-Fa-f]{6})"/;
+const viewsLiteralMatch = viewsSrc.match(HEX6_LITERAL);
+check(
+  "views.jsx מגדיר POSITION_LABEL_BG בליטרל בן שש ספרות הקסה",
+  Boolean(viewsLiteralMatch)
+);
+
+const shareImageLiteralMatch = shareImageSrc.match(HEX6_LITERAL);
+check(
+  "הליטרל השחור ב-views.jsx זהה תו-בתו לליטרל ב-shareImage.js (D-03 — שני העותקים לא נסחפים)",
+  Boolean(viewsLiteralMatch) &&
+    Boolean(shareImageLiteralMatch) &&
+    viewsLiteralMatch[1] === shareImageLiteralMatch[1],
+  `views=${viewsLiteralMatch?.[1]} shareImage=${shareImageLiteralMatch?.[1]}`
+);
+
+check(
+  "views.jsx מייבא byStartTime מ-../../lib/dates.js וקורא ל-.sort(byStartTime)",
+  /byStartTime/.test(viewsSrc) && /\.sort\(byStartTime\)/.test(viewsSrc)
+);
+
+check(
+  "views.jsx עדיין קורא ל-guardColor ול-readableInk (COLOR-03 ובחירת הדיו לא נעלמו)",
+  /guardColor/.test(viewsSrc) && /readableInk/.test(viewsSrc)
 );
 
 console.log(failures === 0 ? "\nPASS\n" : `\n${failures} FAILURE(S)\n`);
