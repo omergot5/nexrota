@@ -53,6 +53,57 @@ const WEEK_PATTERNS = [
 ];
 
 // ============================================================
+// SEED DEMO DIALOG (REST-03/REST-04, שותף לשני נקודות-הכניסה)
+// ============================================================
+// שני הכפתורים היחידים שממלאים נתוני הדגמה לתוך הצוות האמיתי (כרטיס
+// ההקמה ב-SupDashboard, וה-empty-state ב-TeamView) חולקים את אותה
+// קומפוננטת דיאלוג — כתיבה בפועל (onConfirm) קורית רק אחרי אישור מפורש
+// כאן, אף פעם לא בלחיצת הכפתור שפותח את הדיאלוג. startGuestDemo (מסלול
+// האורח האנונימי לפני התחברות, AuthPage.jsx) לא עובר דרך הרכיב הזה
+// בכלל — הוא מחוץ לסקופ במפורש, וממשיך להיות לחיצה-אחת-בלי-דיאלוג.
+function SeedDemoDialog({ open, onClose, onConfirm, busy }) {
+  // גודל צוות אמיתי בצבא הוא 15-25 איש, לא 7 — 20 הוא ברירת המחדל כאן
+  // (לא 7) כדי שהדגמה ראשונה כבר תראה עומס אמיתי: חפיפות, "הכול חוסם
+  // הכול", וכיסוי 24/7 אמיתי. 7/14/15 עדיין זמינים למי שרוצה מדגם קטן.
+  const [guardCount, setGuardCount] = useState(20);
+
+  const confirm = async () => {
+    await onConfirm(guardCount);
+    onClose();
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="יצירת נתוני הדגמה"
+      footer={
+        <>
+          <Btn onClick={confirm} loading={busy} className="flex-1">
+            צור נתוני הדגמה
+          </Btn>
+          <Btn variant="secondary" onClick={onClose}>
+            ביטול
+          </Btn>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <p className="text-xs text-muted">
+          הפעולה מוסיפה {t("noun.memberPlural")}, משמרות ושיבוצים לדוגמה לצוות הנוכחי — נתונים אמיתיים, לא תצוגה
+          זמנית. שום דבר לא נוצר עד לחיצה על "צור נתוני הדגמה".
+        </p>
+        <Segmented
+          value={guardCount}
+          onChange={setGuardCount}
+          options={[7, 14, 15, 20].map((n) => ({ value: n, label: String(n) }))}
+        />
+      </div>
+    </Modal>
+  );
+}
+
+// ============================================================
 // DASHBOARD
 // ============================================================
 
@@ -2551,7 +2602,7 @@ export function TeamView({
   const [copied, setCopied] = useState(null); // 'code' | 'message' | null
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [demoCount, setDemoCount] = useState(20);
+  const [demoDialogOpen, setDemoDialogOpen] = useState(false);
 
   // ---- עורך כשירות (QUAL-01, QUAL-02, D-03, D-04) ----
   // אותה טקסונומיה בדיוק שטופס המשמרת וטופס המשימה קוראים ממנה (D-01),
@@ -2742,12 +2793,7 @@ export function TeamView({
           </h2>
           {guards.length === 0 && onSeedDemo && (
             <div className="flex items-center gap-2 flex-shrink-0">
-              <Segmented
-                value={demoCount}
-                onChange={setDemoCount}
-                options={[7, 14, 15, 20].map((n) => ({ value: n, label: String(n) }))}
-              />
-              <Btn variant="outline" size="sm" icon="sparkles" onClick={() => onSeedDemo(demoCount)} loading={busy}>
+              <Btn variant="outline" size="sm" icon="sparkles" onClick={() => setDemoDialogOpen(true)} loading={busy}>
                 מלא נתוני הדגמה
               </Btn>
             </div>
@@ -2968,6 +3014,13 @@ export function TeamView({
           })}
         </div>
       </Modal>
+
+      <SeedDemoDialog
+        open={demoDialogOpen}
+        onClose={() => setDemoDialogOpen(false)}
+        onConfirm={onSeedDemo}
+        busy={busy}
+      />
     </div>
   );
 }
