@@ -5,16 +5,16 @@ milestone_name: גימור להשקה
 current_phase: 9
 current_phase_name: לוח זמן מנוחה + כפתור הדגמה מפורש
 status: planning
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-09-22T19:27:17.027Z"
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-09-22T19:36:22.542Z"
 last_activity: 2026-09-22
 last_activity_desc: Phase 8 verified passed (5/5 success criteria); code review fixes applied and live-verified; transitioned to Phase 9
-state_head: 71dde2805840764d9f2bf99f90f859cd15f3f195
+state_head: 0e8cbd8d03cdbd6c2b80345d513df1ef89ec7830
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
   percent: 38
 ---
 
@@ -68,6 +68,7 @@ Progress: [████░░░░░░] 38% (v1.2)
 | Phase 08 P02 | 55min | 2 tasks | 1 files |
 | Phase 08 P03 | unknown | 2 tasks | 2 files |
 | Phase 09 P01 | ~15min | 1 tasks | 1 files |
+| Phase 09 P02 | ~20min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,7 @@ Progress: [████░░░░░░] 38% (v1.2)
 - [Phase 8]: 08-02: הלוח (UnifiedBoard) יושב עכשיו בשלב 1 (מיד אחרי בניית שבוע), לא שלב 0 — הזזה שכללה גם רילוקציה של gate ה-hasShifts ושכתוב מצב-הריק של הלוח שכבר לא קורא בשם כפתור, ואומת חי בדפדפן ולא רק בקוד
 - [Phase 8]: 08-03: onRowClick אופציונלי נוסף ל-ResourceGrid.jsx (ResourceView.jsx/CalendarView.jsx נשארים ללא שינוי, לא מעבירים אותו); RosterWizard.jsx מוסיף תצוגה ממוקדת לעמדה בודדת + טוגל "מה שיש עד עכשיו" — שני הפיצ'רים לא נוגעים בשלב ה-board כלל
 - [Phase 9]: RestHoursSettings placed first among team-settings siblings (before FairnessWindowSettings) reflecting hard-constraint-before-soft-criteria priority, matching autoAssign.js
+- [Phase 9]: [Phase 9] 09-02: SeedDemoDialog shared once above SupDashboard, owns its own guardCount state; both real-team demo-fill buttons (SupDashboard onboarding card, TeamView empty-state) now open it instead of writing on click — startGuestDemo/AuthPage.jsx untouched
 
 ### Pending Todos
 
@@ -114,8 +116,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-22T19:27:15.767Z
-Stopped at: Completed 09-01-PLAN.md
+Last session: 2026-09-22T19:36:21.329Z
+Stopped at: Completed 09-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
