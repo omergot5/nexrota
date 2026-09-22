@@ -440,6 +440,11 @@ export function SupDashboard({
               ))}
             </div>
           )}
+          <div className="mt-4 flex justify-end">
+            <Btn variant="ghost" size="sm" icon="left" onClick={() => onNavigate("analytics")}>
+              לדוח המלא
+            </Btn>
+          </div>
         </Card>
       </div>
 
