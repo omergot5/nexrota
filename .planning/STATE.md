@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: גימור להשקה
-current_phase: 8
-current_phase_name: בניית שבוע (שינוי שם) + תמונת מצב שבועית
+current_phase: 9
+current_phase_name: לוח זמן מנוחה + כפתור הדגמה מפורש
 status: planning
-stopped_at: Completed 08-01, 08-02, 08-03 PLAN.md (all Wave 1 plans executed and merged; 08-03's browser human-check not performed, no browser tooling in that executor's environment)
-last_updated: "2026-09-22T12:38:27.207Z"
+stopped_at: Phase 8 complete — verified 5/5, transitioned to Phase 9
+last_updated: "2026-09-22T13:10:00.000Z"
 last_activity: 2026-09-22
-last_activity_desc: Phase 8 all three plans executed and merged; ready for code review
-state_head: b436d295099f217c84b7622309e2faa05eaff1e1
+last_activity_desc: Phase 8 verified passed (5/5 success criteria); code review fixes applied and live-verified; transitioned to Phase 9
+state_head: 4a390b679f1417293c249bf729ae116511bb1a80
 progress:
   total_phases: 8
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 9
   completed_plans: 9
-  percent: 25
+  percent: 38
 ---
 
 # Project State
@@ -29,12 +29,12 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 
 ## Current Position
 
-Phase: 8 — בניית שבוע (שינוי שם) + תמונת מצב שבועית
-Plan: 3/3 executed, code review pending
-Status: Executing
-Last activity: 2026-09-22 — Phase 8 all three Wave-1 plans executed and merged
+Phase: 9 — לוח זמן מנוחה + כפתור הדגמה מפורש
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-09-22 — Phase 8 verified passed (5/5), transitioned to Phase 9
 
-Progress: [███░░░░░░░] 25% (v1.2)
+Progress: [████░░░░░░] 38% (v1.2)
 
 ## Performance Metrics
 
@@ -89,7 +89,7 @@ None yet.
 ### Blockers/Concerns
 
 - **[v1.2 Phase 12] סתירה לעקרון ברזל קיים.** `CLAUDE.md` עקרון 3 קובע "ביטול במקום אישור — בלי `confirm()`"; בעל המוצר הפך זאת במפורש לפעולות הרסניות. Phase 12 חייבת להכריע אילו פעולות עוברות לאישור-מראש ואילו נשארות ב-`UndoBar`, ולעדכן את `CLAUDE.md` + `PROJECT.md` בהתאם.
-- **[v1.2 Phase 8] ✓ הוכרע מחדש (2026-09-22).** `UnifiedBoard.jsx` אינו מסך נפרד — הוא שלב 0 בתוך `WeekFlow.jsx` עצמה (`STEP_OF`: board→shifts→availability→assign→schedule). ההחלטה: להזיז את שלב `board` להיות **אחרי** `shifts`, לא לפניו — לא לבנות מסך/רכיב חדש ולא לשנות שם ל-UnifiedBoard. ר' ROADMAP.md Phase 8 לפירוט.
+- **[v1.2 Phase 8] ✓ הושלם ואומת (2026-09-22).** שלושת התוכניות מוזגו, code review עלה 3 אזהרות (WR-01/02/03) שתוקנו ואומתו לייב בדפדפן, ו-`gsd-verifier` אישר 5/5 קריטריוני הצלחה. `UnifiedBoard.jsx` נשאר באותו שם, רק זז לשלב אחרי `shifts`.
 - **[v1.2 Phase 12→13] CONFIRM-04 מחברת פעולה שבורה.** "ביטול הפצה" עדיין באג בזמן Phase 12; Phase 13 חייבת לאמת מחדש דרך הדיאלוג, לא במעקף שלו.
 - אין test runner בפרויקט. כל בדיקה חדשה חייבת להיות סקריפט Node עצמאי שמדפיס `ok`/`FAIL` ומחזיר קוד יציאה, מחובר ל-`npm test`. רלוונטי ישירות ל-BUG-04.
 - ⚠️ [v1.1] Phases 1-3's VERIFICATION.md files predate the current `status:` frontmatter contract — GSD tooling reports them "missing" on format alone; carried forward as a known override (see MILESTONES.md v1.1 entry). Consider backfilling frontmatter early in this milestone.
@@ -112,11 +112,12 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-22T12:38:27.207Z
-Stopped at: Completed 08-01, 08-02, 08-03 PLAN.md (all Wave 1 plans executed, ready for code review)
+Last session: 2026-09-22T13:10:00.000Z
+Stopped at: Phase 8 complete (verified 5/5); transitioned to Phase 9
 Resume file: None
 
 ## Operator Next Steps
 
-- Plan the first phase with `/gsd-plan-phase 6`
-- Phase 6 carries a UI hint — consider `/gsd-ui-phase 6` first (it establishes the design pattern Phases 7 and 8 inherit)
+- Plan Phase 9 with `/gsd-plan-phase 9`
+- Phase 9 carries a UI hint — consider `/gsd-ui-phase 9` first
+- Phase 9 removes the "זמן מנוחה" board from the main Dashboard and moves it into "הכפופים לי"/"הצוות שלי", and replaces silent demo-data seeding with an explicit "הדגמה" button + parameter dialog (REST-01..04)
