@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 7
+open_count: 5
 waived_count: 0
-fixed_count: 1
+fixed_count: 3
 total_count: 8
-last_updated: 2026-09-22T19:35:31.340Z
+last_updated: 2026-09-22T20:10:00.000Z
 ---
 
 # Broken Windows Ledger
@@ -21,8 +21,8 @@ last_updated: 2026-09-22T19:35:31.340Z
 | 4 | 05 | unrun-verify | src/components/GuardApp.jsx |  | Task 2 human-check not run in this worktree agent session (no browser): task-in-duty-list ordering, timed-only hero selection, no duplication, QUAL-08 lock parity guard-vs-supervisor, worded empty state | open |  | 2026-09-02T19:24:12.259Z |  |
 | 5 | 05 | unrun-verify | .planning/phases/05-unified-board/05-05-PLAN.md |  | Task 2 human-check items 1-6 (glyph legibility, blocked-label legibility, no-padlock-elsewhere, empty-state copy, no-legend D-14, יומן/participant parity) not verified in browser — isolated worktree, no browser access | open |  | 2026-09-03T12:04:32.800Z |  |
 | 6 | 07 | unrun-verify | scripts/verify-share-image.mjs |  | Task 1 human-check (7 live-browser points incl. downloaded PNG width, phone WhatsApp-preview legibility) not run by the executor: sandboxed worktree Bash tool blocks launching any browser automation binary (aside not installed; gstack $B blocked by worktree-isolation guard). Automated dimension/scale/logical-unit assertions in verify-share-image.mjs all pass; needs a human to run npm run dev and verify the 7 points in 07-02-PLAN.md Task 1. | fixed |  | 2026-09-22T08:56:58.546Z | 2026-09-22T09:20:04.961Z |
-| 7 | 09 | unrun-verify | src/components/supervisor/views.jsx |  | 09-02 Task 1 human-check not run (no browser tool available): TeamView empty-state SeedDemoDialog live-browser verification (5 points) outstanding | open |  | 2026-09-22T19:35:28.027Z |  |
-| 8 | 09 | unrun-verify | src/components/supervisor/views.jsx |  | 09-02 Task 2 human-check not run (no browser tool available): SupDashboard onboarding-card SeedDemoDialog live-browser verification (5 points) outstanding | open |  | 2026-09-22T19:35:31.340Z |  |
+| 7 | 09 | unrun-verify | src/components/supervisor/views.jsx |  | 09-02 Task 1 human-check not run (no browser tool available): TeamView empty-state SeedDemoDialog live-browser verification (5 points) outstanding | fixed |  | 2026-09-22T19:35:28.027Z | 2026-09-22T20:10:00.000Z |
+| 8 | 09 | unrun-verify | src/components/supervisor/views.jsx |  | 09-02 Task 2 human-check not run (no browser tool available): SupDashboard onboarding-card SeedDemoDialog live-browser verification (5 points) outstanding | fixed |  | 2026-09-22T19:35:31.340Z | 2026-09-22T20:10:00.000Z |
 
 ````json
 [
@@ -105,10 +105,10 @@ last_updated: 2026-09-22T19:35:31.340Z
     "file": "src/components/supervisor/views.jsx",
     "line": null,
     "description": "09-02 Task 1 human-check not run (no browser tool available): TeamView empty-state SeedDemoDialog live-browser verification (5 points) outstanding",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-09-22T19:35:28.027Z",
-    "resolved_at": null
+    "resolved_at": "2026-09-22T20:10:00.000Z"
   },
   {
     "id": 8,
@@ -117,10 +117,10 @@ last_updated: 2026-09-22T19:35:31.340Z
     "file": "src/components/supervisor/views.jsx",
     "line": null,
     "description": "09-02 Task 2 human-check not run (no browser tool available): SupDashboard onboarding-card SeedDemoDialog live-browser verification (5 points) outstanding",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-09-22T19:35:31.340Z",
-    "resolved_at": null
+    "resolved_at": "2026-09-22T20:10:00.000Z"
   }
 ]
 ````
