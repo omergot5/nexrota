@@ -5,7 +5,7 @@ milestone_name: גימור להשקה
 current_phase: 8
 current_phase_name: בניית שבוע (שינוי שם) + תמונת מצב שבועית
 status: planning
-stopped_at: Completed 08-01, 08-02, 08-03 PLAN.md (all Wave 1 plans executed)
+stopped_at: Completed 08-01, 08-02, 08-03 PLAN.md (all Wave 1 plans executed and merged; 08-03's browser human-check not performed, no browser tooling in that executor's environment)
 last_updated: "2026-09-22T12:38:27.207Z"
 last_activity: 2026-09-22
 last_activity_desc: Phase 8 all three plans executed and merged; ready for code review
@@ -66,7 +66,7 @@ Progress: [███░░░░░░░] 25% (v1.2)
 | Phase 06 P01 | 15min | 2 tasks | 3 files |
 | Phase 08 P01 | 15min | 1 tasks | 1 files |
 | Phase 08 P02 | 55min | 2 tasks | 1 files |
-| Phase 08 P03 | ~15min | 2 tasks | 2 files |
+| Phase 08 P03 | unknown | 2 tasks | 2 files |
 
 ## Accumulated Context
 

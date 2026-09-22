@@ -154,6 +154,8 @@ export default function RosterWizard({
   const [draftSeeds, setDraftSeeds] = useState([]); // זרעים/עמדות-חדשות שנוספו ידנית ב"הוסף משימה", עדיין לא נשמרו
   const [activeKey, setActiveKey] = useState(null);
   const [form, setForm] = useState(null); // draft נוכחי בעריכה
+  const [focusedKey, setFocusedKey] = useState(null); // מפתח השורה הממוקדת כרגע בפאנל התצוגה (WEEKBUILD-05), null = תצוגה כללית
+  const [hideDrafts, setHideDrafts] = useState(false); // WEEKBUILD-04: true = הצג רק rows (ממומשות), הסתר pendingRows (טיוטה בעריכה)
 
   // מפתח כל פריט נגזר מזהות יציבה — לעולם לא מהאינדקס שלו במערך: זרעי
   // SEED_POSITIONS מזוהים לפי השם הקבוע שלהם (לא משתנה בין רינדורים), וזרעים
@@ -362,6 +364,15 @@ export default function RosterWizard({
 
   const allRows = [...rows, ...pendingRows];
 
+  // focusedRow נגזר מ-allRows בכל רינדור מחדש — לא snapshot קפוא שנשמר
+  // ב-state בזמן הלחיצה — כדי שהתצוגה הממוקדת תישאר עדכנית אם השיבוץ
+  // משתנה תוך כדי שהיא פתוחה (WEEKBUILD-05).
+  const focusedRow = focusedKey ? allRows.find((row) => (row.key ?? row.category) === focusedKey) || null : null;
+
+  // visibleRows משפיע רק על התצוגה הכללית (הלא-ממוקדת) — הענף הממוקד
+  // (focusedRow) לא לחיץ דרך שורת-רפאים מלכתחילה (WEEKBUILD-04/05).
+  const visibleRows = hideDrafts ? rows : allRows;
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -429,14 +440,41 @@ export default function RosterWizard({
         * והמשימה שבעריכה מופיעה בו כשורה מקווקוות עד שהיא נשמרת (pendingRows). */}
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr] items-start">
         <Card className="p-4 overflow-hidden">
-          <h3 className="text-[13px] font-extrabold text-content mb-3">ככה השבוע נראה עד עכשיו</h3>
-          {allRows.length === 0 ? (
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h3 className="text-[13px] font-extrabold text-content">
+              {focusedRow ? `${focusedRow.category} · תצוגה ממוקדת` : "ככה השבוע נראה עד עכשיו"}
+            </h3>
+            {focusedRow ? (
+              <Btn variant="ghost" size="sm" icon="x" onClick={() => setFocusedKey(null)}>
+                חזרה לכל העמדות
+              </Btn>
+            ) : (
+              <Btn
+                variant="ghost"
+                size="sm"
+                aria-pressed={hideDrafts}
+                onClick={() => setHideDrafts((v) => !v)}
+              >
+                {hideDrafts ? "הצג גם טיוטה" : "מה שיש עד עכשיו"}
+              </Btn>
+            )}
+          </div>
+          {focusedRow ? (
+            <div className="-mx-4 -mb-4">
+              <ResourceGrid rows={[focusedRow]} dates={weekDates} guards={guards} />
+            </div>
+          ) : visibleRows.length === 0 ? (
             <p className="text-[12px] text-faint leading-relaxed">
               עוד לא הוגדרה אף משימה לשבוע הזה. הגדירו אחת בטופס שלצד — היא תופיע כאן מיד.
             </p>
           ) : (
             <div className="-mx-4 -mb-4">
-              <ResourceGrid rows={allRows} dates={weekDates} guards={guards} />
+              <ResourceGrid
+                rows={visibleRows}
+                dates={weekDates}
+                guards={guards}
+                onRowClick={(row) => setFocusedKey(row.key ?? row.category)}
+              />
             </div>
           )}
         </Card>
