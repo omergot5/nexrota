@@ -424,5 +424,61 @@ check(
   /guardColor/.test(viewsSrc) && /readableInk/.test(viewsSrc)
 );
 
+// ============================================================
+console.log("\nD-07 · ביקורת צרכנים קבועה — categoryColor/positionColorKey (Task 2, 07-02)\n");
+// ============================================================
+
+// סריקה רקורסיבית של src/ ו-scripts/ (.js/.jsx/.mjs), הערות מוסרות לפני
+// הבדיקה (הערת נימוק שמזכירה את השם אינה צריכה להיחשב כצריכה). מסלולי
+// הקבצים נבנים ביחס למיקום הסקריפט (new URL), לא לתיקיית העבודה.
+const { readdir } = await import("node:fs/promises");
+const { fileURLToPath } = await import("node:url");
+const path = await import("node:path");
+
+const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+const CODE_EXTS = [".js", ".jsx", ".mjs"];
+
+async function collectCodeFiles(dir) {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await collectCodeFiles(full)));
+    } else if (CODE_EXTS.includes(path.extname(entry.name))) {
+      files.push(full);
+    }
+  }
+  return files;
+}
+
+const stripCommentsForAudit = (src) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+const consumerPattern = /\bcategoryColor\b|\bpositionColorKey\b/;
+const scanRoots = [path.join(repoRoot, "src"), path.join(repoRoot, "scripts")];
+const selfPath = fileURLToPath(import.meta.url);
+const scannedFiles = (await Promise.all(scanRoots.map(collectCodeFiles)))
+  .flat()
+  // הסקריפט הזה עצמו מזכיר את שני השמות בטענה שבודקת אותם — זו הביקורת
+  // עצמה מדברת עליהן, לא צריכה שמפעילה אותן, ולכן אינו נספר כצרכן.
+  .filter((file) => file !== selfPath);
+
+const consumerFiles = [];
+for (const file of scannedFiles) {
+  const src = await readFile(file, "utf8");
+  if (consumerPattern.test(stripCommentsForAudit(src))) {
+    consumerFiles.push(path.relative(repoRoot, file).split(path.sep).join("/"));
+  }
+}
+consumerFiles.sort();
+
+console.log(`  קבצים שמכילים categoryColor/positionColorKey מחוץ להערות: ${JSON.stringify(consumerFiles)}`);
+check(
+  "אין צרכן של categoryColor/positionColorKey מחוץ ל-src/components/ui.jsx (D-07)",
+  JSON.stringify(consumerFiles) === JSON.stringify(["src/components/ui.jsx"]),
+  `consumers=${consumerFiles.join(",")}`
+);
+
 console.log(failures === 0 ? "\nPASS\n" : `\n${failures} FAILURE(S)\n`);
 process.exit(failures === 0 ? 0 : 1);
