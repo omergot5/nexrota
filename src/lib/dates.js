@@ -157,9 +157,12 @@ export const shiftHours = (shift) => {
 
 /**
  * המקור היחיד ל"כרונולוגי" בכל מקום שמציג משמרות בסדר (Phase 7,
- * COLOR-04) — המסך (`ScheduleMgmt`) והתמונה המשותפת (`shareImage.js`)
- * שניהם ממיינים דרך הפונקציה הזו, כדי שלא יתפצלו לשתי הגדרות עצמאיות
- * ש"כרונולוגי" יכול לסטות ביניהן בלי שאף אחד ישים לב.
+ * COLOR-04) — המסך (`ScheduleMgmt`), התמונה המשותפת (`shareImage.js`)
+ * והלוח המאוחד (`boardItemsForDates`, למטה באותו קובץ) כולם ממיינים דרך
+ * הפונקציה הזו, כדי שלא יתפצלו לשתי הגדרות עצמאיות ש"כרונולוגי" יכול
+ * לסטות ביניהן בלי שאף אחד ישים לב (עד WR-01 בביקורת של שלב 07, מיון
+ * המיזוג של הלוח היה עותק-הדבק נפרד עם דחיפת ריק-startTime הפוכה — קיים
+ * כאן, לא שם, בדיוק כדי שזה לא יקרה שוב).
  *
  * `api.js` (`hhmm`) מנרמל כל `start_time` ל-"HH:MM" מרופד באפסים לפני
  * שהוא מגיע לכאן, ולכן `localeCompare` על המחרוזת הוא השוואה כרונולוגית
@@ -401,13 +404,7 @@ export function boardItemsForDates(shifts = [], tasks = [], dates = []) {
   for (const item of timelessPool) if (!dateSet.has(item.date)) outside++;
 
   const days = safeDates.map((date) => {
-    const timed = timedPool
-      .filter((item) => item.date === date)
-      .sort(
-        (a, b) =>
-          String(a.startTime || "").localeCompare(String(b.startTime || "")) ||
-          String(a.id).localeCompare(String(b.id))
-      );
+    const timed = timedPool.filter((item) => item.date === date).sort(byStartTime);
     const timeless = timelessPool
       .filter((item) => item.date === date)
       .sort((a, b) => String(a.id).localeCompare(String(b.id)));
