@@ -84,7 +84,7 @@ export default function ResourceGrid({
                       type="button"
                       onClick={() => onRowClick(row)}
                       aria-label={`פתח תצוגה ממוקדת לעמדה ${row.category}`}
-                      className="flex items-center gap-1.5 font-bold text-content text-xs text-right w-full cursor-pointer hover:text-brand focus:outline-none focus:ring-2 focus:ring-brand/30 rounded transition-colors"
+                      className="flex items-center gap-1.5 font-bold text-content text-xs w-full cursor-pointer hover:text-brand focus:outline-none focus:ring-2 focus:ring-brand/30 rounded transition-colors"
                     >
                       <span className={`w-2 h-2 rounded-full flex-shrink-0 ${tone.dot}`} aria-hidden="true" />
                       <Icon name={row.icon} size={14} className="text-muted flex-shrink-0" />

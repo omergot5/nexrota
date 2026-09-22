@@ -369,6 +369,14 @@ export default function RosterWizard({
   // משתנה תוך כדי שהיא פתוחה (WEEKBUILD-05).
   const focusedRow = focusedKey ? allRows.find((row) => (row.key ?? row.category) === focusedKey) || null : null;
 
+  // אם focusedKey מצביע לשורה שכבר לא קיימת (נמחקה), מנקים אותו — אחרת
+  // הוא נשאר תקוע, וברגע ששורה אחרת לא-קשורה תקבל אותו key (למשל עמדה
+  // חדשה באותה קטגוריה) התצוגה הממוקדת "תיפתח" מעצמה בלי לחיצה (WR-02,
+  // code review Phase 8).
+  useEffect(() => {
+    if (focusedKey && !focusedRow) setFocusedKey(null);
+  }, [focusedKey, focusedRow]);
+
   // visibleRows משפיע רק על התצוגה הכללית (הלא-ממוקדת) — הענף הממוקד
   // (focusedRow) לא לחיץ דרך שורת-רפאים מלכתחילה (WEEKBUILD-04/05).
   const visibleRows = hideDrafts ? rows : allRows;
