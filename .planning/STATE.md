@@ -4,17 +4,17 @@ milestone: v1.2
 milestone_name: גימור להשקה
 current_phase: 10
 current_phase_name: "ביקורת תפריט \"עוד\" מול לוח הבקרה"
-status: planning
-stopped_at: "Completed 10-02-PLAN.md — resources removed from \"עוד\" menu (MORE-03); browser human-check pending (no browser access this session)"
-last_updated: "2026-09-22T20:34:30.267Z"
+status: executing
+stopped_at: "Completed 10-01-PLAN.md and 10-02-PLAN.md (both Wave 1, live-verified); ready for 10-03 (Wave 2)"
+last_updated: "2026-09-22T20:50:00.000Z"
 last_activity: 2026-09-22
-last_activity_desc: Phase 9 verified passed (5/5 success criteria); code review fixes applied and live-verified (incl. army-mode vocabulary bug); transitioned to Phase 10
-state_head: b81a374485a3b3513cf126834d60d73de8e4ef24
+last_activity_desc: Phase 9 verified passed (5/5 success criteria); code review fixes applied and live-verified (incl. army-mode vocabulary bug); transitioned to Phase 10; 10-01/10-02 both executed and live-verified
+state_head: 53969d15a2b9404d5649d50265dde3d96c173489
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 14
-  completed_plans: 12
+  completed_plans: 13
   percent: 50
 ---
 
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 
 ## Current Position
 
-Phase: 10 — ביקורת תפריט "עוד" מול לוח הבקרה
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-09-22 — Phase 9 verified passed (5/5), transitioned to Phase 10
+Phase: 10 (ביקורת תפריט "עוד" מול לוח הבקרה)
+Plan: 2 of 3 executed (Wave 1 complete, live-verified), Wave 2 (10-03) next
+Status: Executing
+Last activity: 2026-09-22 — 10-01/10-02 both executed, merged, and live-verified
 
 Progress: [█████░░░░░] 50% (v1.2)
 
@@ -69,6 +69,7 @@ Progress: [█████░░░░░] 50% (v1.2)
 | Phase 08 P03 | unknown | 2 tasks | 2 files |
 | Phase 09 P01 | ~15min | 1 tasks | 1 files |
 | Phase 09 P02 | ~20min | 2 tasks | 1 files |
+| Phase 10 P01 | ~15min | 1 tasks | 1 files |
 | Phase 10 P02 | ~15min | 1 tasks | 6 files |
 
 ## Accumulated Context
@@ -84,7 +85,8 @@ Progress: [█████░░░░░] 50% (v1.2)
 - [Phase 8]: 08-03: onRowClick אופציונלי נוסף ל-ResourceGrid.jsx (ResourceView.jsx/CalendarView.jsx נשארים ללא שינוי, לא מעבירים אותו); RosterWizard.jsx מוסיף תצוגה ממוקדת לעמדה בודדת + טוגל "מה שיש עד עכשיו" — שני הפיצ'רים לא נוגעים בשלב ה-board כלל
 - [Phase 9]: RestHoursSettings placed first among team-settings siblings (before FairnessWindowSettings) reflecting hard-constraint-before-soft-criteria priority, matching autoAssign.js
 - [Phase 9]: [Phase 9] 09-02: SeedDemoDialog shared once above SupDashboard, owns its own guardCount state; both real-team demo-fill buttons (SupDashboard onboarding card, TeamView empty-state) now open it instead of writing on click — startGuestDemo/AuthPage.jsx untouched
-- [Phase 10]: [Phase 10] 10-02: resources הוסר מ-moreItems()/views; ResourceView.jsx נמחק; 3 הערות היסטוריות (CalendarView.jsx, ResourceGrid.jsx, categories.js) נוסחו מחדש ללא המחרוזת המילולית ResourceView כדי לעמוד בשער האוטומטי של התוכנית עצמה
+- [Phase 10]: 10-01: קישור "לדוח המלא" בכרטיס עומס מוצג תמיד (לא תלוי ב-loadRows.length) כי הדוח המלא קיים גם כשאין עדיין נתוני עומס; אין קיצור ל-positions כמוכרע ב-10-CONTEXT.md MORE-02
+- [Phase 10]: 10-02: resources הוסר מ-moreItems()/views; ResourceView.jsx נמחק; 3 הערות היסטוריות (CalendarView.jsx, ResourceGrid.jsx, categories.js) נוסחו מחדש ללא המחרוזת המילולית ResourceView כדי לעמוד בשער האוטומטי של התוכנית עצמה
 
 ### Pending Todos
 
@@ -119,8 +121,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-22T20:34:24.996Z
-Stopped at: Completed 10-02-PLAN.md — resources removed from "עוד" menu (MORE-03); browser human-check pending (no browser access this session)
+Last session: 2026-09-22T20:50:00.000Z
+Stopped at: Completed 10-01-PLAN.md and 10-02-PLAN.md (both Wave 1, live-verified); ready for 10-03 (Wave 2)
 Resume file: None
 
 ## Operator Next Steps
