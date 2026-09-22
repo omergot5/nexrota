@@ -102,7 +102,7 @@ export const PROFILE_TERMS = {
   army: {
     "noun.member":       "כפוף",
     "noun.memberPlural": "כפופים",
-    "nav.shifts":       "בניית סד\"כ",
+    "nav.shifts":       "בניית שבוע",
     "nav.availability": "מי דיווח",
     "nav.smart":        "בנה לי סד\"כ",
     "nav.assignment":   "לשבץ בעצמי",
