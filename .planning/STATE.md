@@ -5,16 +5,16 @@ milestone_name: גימור להשקה
 current_phase: 8
 current_phase_name: בניית שבוע (שינוי שם) + תמונת מצב שבועית
 status: planning
-stopped_at: Completed 08-01-PLAN.md
+stopped_at: Completed 08-01, 08-02, 08-03 PLAN.md (all Wave 1 plans executed)
 last_updated: "2026-09-22T12:38:27.207Z"
 last_activity: 2026-09-22
-last_activity_desc: Phase 07 complete, transitioned to Phase 8
-state_head: d877ae82a472af870cf7a4b2e9788c0150e66af8
+last_activity_desc: Phase 8 all three plans executed and merged; ready for code review
+state_head: b436d295099f217c84b7622309e2faa05eaff1e1
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 9
   percent: 25
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 ## Current Position
 
 Phase: 8 — בניית שבוע (שינוי שם) + תמונת מצב שבועית
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-09-22 — Phase 07 complete, transitioned to Phase 8
+Plan: 3/3 executed, code review pending
+Status: Executing
+Last activity: 2026-09-22 — Phase 8 all three Wave-1 plans executed and merged
 
 Progress: [███░░░░░░░] 25% (v1.2)
 
@@ -65,6 +65,8 @@ Progress: [███░░░░░░░] 25% (v1.2)
 |------|----------|-------|-------|
 | Phase 06 P01 | 15min | 2 tasks | 3 files |
 | Phase 08 P01 | 15min | 1 tasks | 1 files |
+| Phase 08 P02 | 55min | 2 tasks | 1 files |
+| Phase 08 P03 | ~15min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -75,6 +77,8 @@ Progress: [███░░░░░░░] 25% (v1.2)
 - v1.1 decision log: PROJECT.md Key Decisions + `.planning/milestones/v1.1-ROADMAP.md`.
 - [Phase 6]: 06-01: ResourceGrid.jsx חולץ כרכיב תצוגה גנרי יחיד (D-04); mode נקרא בתוך הרכיב מ-subscribeTerms/termProfile, לא כפרופ (D-07); חוזה row.pending/item.pending קיים לפני 06-02
 - [Phase 8]: 08-01: רק PROFILE_TERMS.army["nav.shifts"] שונה ל-"בניית שבוע"; BASE["nav.shifts"] (עם ה' הידיעה) נשאר ללא שינוי כפי שנעול ב-08-CONTEXT.md.
+- [Phase 8]: 08-02: הלוח (UnifiedBoard) יושב עכשיו בשלב 1 (מיד אחרי בניית שבוע), לא שלב 0 — הזזה שכללה גם רילוקציה של gate ה-hasShifts ושכתוב מצב-הריק של הלוח שכבר לא קורא בשם כפתור, ואומת חי בדפדפן ולא רק בקוד
+- [Phase 8]: 08-03: onRowClick אופציונלי נוסף ל-ResourceGrid.jsx (ResourceView.jsx/CalendarView.jsx נשארים ללא שינוי, לא מעבירים אותו); RosterWizard.jsx מוסיף תצוגה ממוקדת לעמדה בודדת + טוגל "מה שיש עד עכשיו" — שני הפיצ'רים לא נוגעים בשלב ה-board כלל
 
 ### Pending Todos
 
@@ -108,8 +112,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-22T12:38:25.997Z
-Stopped at: Completed 08-01-PLAN.md
+Last session: 2026-09-22T12:38:27.207Z
+Stopped at: Completed 08-01, 08-02, 08-03 PLAN.md (all Wave 1 plans executed, ready for code review)
 Resume file: None
 
 ## Operator Next Steps
