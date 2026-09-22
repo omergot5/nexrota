@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 6
+open_count: 5
 waived_count: 0
-fixed_count: 0
+fixed_count: 1
 total_count: 6
-last_updated: 2026-09-22T08:56:58.546Z
+last_updated: 2026-09-22T09:20:04.961Z
 ---
 
 # Broken Windows Ledger
@@ -20,7 +20,7 @@ last_updated: 2026-09-22T08:56:58.546Z
 | 3 | 05 | unrun-verify | src/components/supervisor/UnifiedBoard.jsx |  | Task 2 human-check (6 items) not run in a live browser — no browser tool available to this parallel worktree agent; data-level coverage passes via verify-board.mjs, but visual/click confirmation is outstanding (see 05-01-SUMMARY.md) | open |  | 2026-09-02T13:02:04.780Z |  |
 | 4 | 05 | unrun-verify | src/components/GuardApp.jsx |  | Task 2 human-check not run in this worktree agent session (no browser): task-in-duty-list ordering, timed-only hero selection, no duplication, QUAL-08 lock parity guard-vs-supervisor, worded empty state | open |  | 2026-09-02T19:24:12.259Z |  |
 | 5 | 05 | unrun-verify | .planning/phases/05-unified-board/05-05-PLAN.md |  | Task 2 human-check items 1-6 (glyph legibility, blocked-label legibility, no-padlock-elsewhere, empty-state copy, no-legend D-14, יומן/participant parity) not verified in browser — isolated worktree, no browser access | open |  | 2026-09-03T12:04:32.800Z |  |
-| 6 | 07 | unrun-verify | scripts/verify-share-image.mjs |  | Task 1 human-check (7 live-browser points incl. downloaded PNG width, phone WhatsApp-preview legibility) not run by the executor: sandboxed worktree Bash tool blocks launching any browser automation binary (aside not installed; gstack $B blocked by worktree-isolation guard). Automated dimension/scale/logical-unit assertions in verify-share-image.mjs all pass; needs a human to run npm run dev and verify the 7 points in 07-02-PLAN.md Task 1. | open |  | 2026-09-22T08:56:58.546Z |  |
+| 6 | 07 | unrun-verify | scripts/verify-share-image.mjs |  | Task 1 human-check (7 live-browser points incl. downloaded PNG width, phone WhatsApp-preview legibility) not run by the executor: sandboxed worktree Bash tool blocks launching any browser automation binary (aside not installed; gstack $B blocked by worktree-isolation guard). Automated dimension/scale/logical-unit assertions in verify-share-image.mjs all pass; needs a human to run npm run dev and verify the 7 points in 07-02-PLAN.md Task 1. | fixed |  | 2026-09-22T08:56:58.546Z | 2026-09-22T09:20:04.961Z |
 
 ````json
 [
@@ -91,10 +91,10 @@ last_updated: 2026-09-22T08:56:58.546Z
     "file": "scripts/verify-share-image.mjs",
     "line": null,
     "description": "Task 1 human-check (7 live-browser points incl. downloaded PNG width, phone WhatsApp-preview legibility) not run by the executor: sandboxed worktree Bash tool blocks launching any browser automation binary (aside not installed; gstack $B blocked by worktree-isolation guard). Automated dimension/scale/logical-unit assertions in verify-share-image.mjs all pass; needs a human to run npm run dev and verify the 7 points in 07-02-PLAN.md Task 1.",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-09-22T08:56:58.546Z",
-    "resolved_at": null
+    "resolved_at": "2026-09-22T09:20:04.961Z"
   }
 ]
 ````
