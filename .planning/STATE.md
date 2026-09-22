@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: גימור להשקה
-current_phase: 9
-current_phase_name: לוח זמן מנוחה + כפתור הדגמה מפורש
+current_phase: 10
+current_phase_name: ביקורת תפריט "עוד" מול לוח הבקרה
 status: planning
-stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-09-22T19:36:22.542Z"
+stopped_at: Phase 9 complete — verified 5/5, transitioned to Phase 10
+last_updated: "2026-09-22T21:00:00.000Z"
 last_activity: 2026-09-22
-last_activity_desc: Phase 8 verified passed (5/5 success criteria); code review fixes applied and live-verified; transitioned to Phase 9
-state_head: 0e8cbd8d03cdbd6c2b80345d513df1ef89ec7830
+last_activity_desc: Phase 9 verified passed (5/5 success criteria); code review fixes applied and live-verified (incl. army-mode vocabulary bug); transitioned to Phase 10
+state_head: 14228185624f0575143b1142dcd3efc05b042fa4
 progress:
   total_phases: 8
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 11
   completed_plans: 11
-  percent: 38
+  percent: 50
 ---
 
 # Project State
@@ -29,12 +29,12 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 
 ## Current Position
 
-Phase: 9 — לוח זמן מנוחה + כפתור הדגמה מפורש
+Phase: 10 — ביקורת תפריט "עוד" מול לוח הבקרה
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-09-22 — Phase 8 verified passed (5/5), transitioned to Phase 9
+Last activity: 2026-09-22 — Phase 9 verified passed (5/5), transitioned to Phase 10
 
-Progress: [████░░░░░░] 38% (v1.2)
+Progress: [█████░░░░░] 50% (v1.2)
 
 ## Performance Metrics
 
@@ -94,6 +94,7 @@ None yet.
 
 - **[v1.2 Phase 12] סתירה לעקרון ברזל קיים.** `CLAUDE.md` עקרון 3 קובע "ביטול במקום אישור — בלי `confirm()`"; בעל המוצר הפך זאת במפורש לפעולות הרסניות. Phase 12 חייבת להכריע אילו פעולות עוברות לאישור-מראש ואילו נשארות ב-`UndoBar`, ולעדכן את `CLAUDE.md` + `PROJECT.md` בהתאם.
 - **[v1.2 Phase 8] ✓ הושלם ואומת (2026-09-22).** שלושת התוכניות מוזגו, code review עלה 3 אזהרות (WR-01/02/03) שתוקנו ואומתו לייב בדפדפן, ו-`gsd-verifier` אישר 5/5 קריטריוני הצלחה. `UnifiedBoard.jsx` נשאר באותו שם, רק זז לשלב אחרי `shifts`.
+- **[v1.2 Phase 9] ✓ הושלם ואומת (2026-09-22).** שתי התוכניות מוזגו, code review עלה 1 Critical (מחרוזת "משמרות" קשיחה בדיאלוג ההדגמה שבירה את אוצר המילים במצב army) + 2 Warnings + 1 Info — כולם תוקנו ואומתו לייב בדפדפן (כולל רישום צוות-בדיקה נקי במצב army במיוחד כדי לתפוס את הבאג), ו-`gsd-verifier` אישר 5/5 קריטריוני הצלחה.
 - **[v1.2 Phase 12→13] CONFIRM-04 מחברת פעולה שבורה.** "ביטול הפצה" עדיין באג בזמן Phase 12; Phase 13 חייבת לאמת מחדש דרך הדיאלוג, לא במעקף שלו.
 - אין test runner בפרויקט. כל בדיקה חדשה חייבת להיות סקריפט Node עצמאי שמדפיס `ok`/`FAIL` ומחזיר קוד יציאה, מחובר ל-`npm test`. רלוונטי ישירות ל-BUG-04.
 - ⚠️ [v1.1] Phases 1-3's VERIFICATION.md files predate the current `status:` frontmatter contract — GSD tooling reports them "missing" on format alone; carried forward as a known override (see MILESTONES.md v1.1 entry). Consider backfilling frontmatter early in this milestone.
@@ -116,12 +117,12 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-22T19:36:21.329Z
-Stopped at: Completed 09-02-PLAN.md
+Last session: 2026-09-22T21:00:00.000Z
+Stopped at: Phase 9 complete (verified 5/5); transitioned to Phase 10
 Resume file: None
 
 ## Operator Next Steps
 
-- Plan Phase 9 with `/gsd-plan-phase 9`
-- Phase 9 carries a UI hint — consider `/gsd-ui-phase 9` first
-- Phase 9 removes the "זמן מנוחה" board from the main Dashboard and moves it into "הכפופים לי"/"הצוות שלי", and replaces silent demo-data seeding with an explicit "הדגמה" button + parameter dialog (REST-01..04)
+- Plan Phase 10 with `/gsd-plan-phase 10`
+- Phase 10 carries a UI hint — consider `/gsd-ui-phase 10` first
+- Phase 10 audits the "עוד" menu (currently exactly 5 items: swaps, tasks, positions, resources, analytics) against the Dashboard, adds relevant shortcuts, and removes redundancies without breaking any existing feature (MORE-01..03)

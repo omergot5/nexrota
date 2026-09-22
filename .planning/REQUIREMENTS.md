@@ -82,7 +82,7 @@
 | RESVIEW-01..03 | 3 | Phase 6 — מבט משאבים כאב-טיפוס עיצובי | Pending |
 | COLOR-01..04 | 4 | Phase 7 — צבעים וסדר משמרות | Pending |
 | WEEKBUILD-01..05 | 5 | Phase 8 — בניית שבוע + תמונת מצב שבועית | Complete |
-| REST-01..04 | 4 | Phase 9 — זמן מנוחה + הדגמה מפורשת | Pending |
+| REST-01..04 | 4 | Phase 9 — זמן מנוחה + הדגמה מפורשת | Complete |
 | MORE-01..03 | 3 | Phase 10 — ביקורת תפריט "עוד" | Pending |
 | INLINE-01..04 | 4 | Phase 11 — עריכה אינטואיטיבית + ניקוי הדגמה | Pending |
 | CONFIRM-01..06 | 6 | Phase 12 — אישורי פעולות קריטיות | Pending |
