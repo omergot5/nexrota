@@ -170,13 +170,16 @@ function buildFixture() {
 // סטטי היה רץ ראשון ומייבא מודול שרואה document לא-מוגדר.
 const { renderWeekCanvas } = await import("../src/lib/shareImage.js");
 
-drawLog.length = 0;
-renderWeekCanvas(buildFixture());
-const log1 = JSON.parse(JSON.stringify(drawLog));
+// מוציא את הרצת-הרינדור-והלכידה לפונקציה אחת שמקבלת פיקסצ'ר, כדי שאפשר
+// להריץ אותה גם על הפיקסצ'ר העמוס (J-4) בלי לשכפל את קוד יומן הפעולות.
+function renderAndCapture(fixture) {
+  drawLog.length = 0;
+  const canvas = renderWeekCanvas(fixture);
+  return { canvas, log: JSON.parse(JSON.stringify(drawLog)) };
+}
 
-drawLog.length = 0;
-renderWeekCanvas(buildFixture());
-const log2 = JSON.parse(JSON.stringify(drawLog));
+const { canvas: canvas1, log: log1 } = renderAndCapture(buildFixture());
+const { log: log2 } = renderAndCapture(buildFixture());
 
 check(
   "שני רינדורים רצופים של אותו קלט מייצרים יומן פעולות זהה בתו (דטרמיניזם, עקרון ברזל 1)",
@@ -276,6 +279,106 @@ check(
   new Set(guardPillFills.map((e) => e.fillStyle)).size >= 2
 );
 
+// ============================================================
+console.log("\nCOLOR-01 · shareImage.js — קנבס בפי-שניים עם גבול בטיחות (J-4/J-5)\n");
+// ============================================================
+
+// פיקסצ'ר רגיל (log1/canvas1 שכבר נלכדו למעלה): מידות הקנבס, סדר ה-scale,
+// ורקע/חתימה ביחידות לוגיות.
+const logicalHeight1 = canvas1.height / 2;
+
+check(
+  `canvas.width שווה בדיוק לרוחב הלוגי (1080) כפול פקטור ההגדלה (2) — ${canvas1.width}`,
+  canvas1.width === 1080 * 2,
+  `got=${canvas1.width}`
+);
+check(
+  "canvas.height מתחלק ב-2 ללא שארית, והגובה הלוגי שמתקבל גדול מאפס",
+  canvas1.height % 2 === 0 && logicalHeight1 > 0,
+  `height=${canvas1.height} logical=${logicalHeight1}`
+);
+
+const scaleCalls1 = log1.filter((e) => e.action === "scale");
+check(
+  "הפעולה הראשונה ביומן היא scale, ושני הארגומנטים שלה שווים ל-2 (ההקשר הוגדל לפני הציור הראשון)",
+  log1[0]?.action === "scale" && log1[0]?.args?.[0] === 2 && log1[0]?.args?.[1] === 2,
+  `first=${JSON.stringify(log1[0])}`
+);
+check(
+  "scale נקראת פעם אחת בדיוק בכל רינדור",
+  scaleCalls1.length === 1,
+  `count=${scaleCalls1.length}`
+);
+
+const bgFillRect1 = log1.find((e) => e.action === "fillRect");
+check(
+  "fillRect של רקע התמונה מצויר ברוחב 1080 ובגובה הלוגי — לא במידות המכשיר (J-5)",
+  Boolean(bgFillRect1) && bgFillRect1.args[2] === 1080 && bgFillRect1.args[3] === logicalHeight1,
+  `args=${JSON.stringify(bgFillRect1?.args)} expectedHeight=${logicalHeight1}`
+);
+
+const signature1 = log1.find((e) => e.action === "fillText" && e.args[0] === "NexRota");
+const signatureY1 = signature1?.args[2];
+check(
+  "ה-fillText של שורת החתימה מצויר בקואורדינטת y שנמצאת בתוך הגובה הלוגי, במרחק של פחות מ-60 יחידות מתחתיתו (J-5)",
+  Boolean(signature1) && signatureY1 > 0 && signatureY1 <= logicalHeight1 && logicalHeight1 - signatureY1 < 60,
+  `y=${signatureY1} logicalHeight=${logicalHeight1}`
+);
+
+// פיקסצ'ר עמוס: שבעה תאריכים, ארבע-עשרה משמרות ליום, שעה נגזרת מהאינדקס
+// (דטרמיניסטי, לא Math.random — עקרון ברזל 1), משובץ אחד לכל משמרת כדי
+// שגובה השורה יהיה מלא. נבנה כך שהגובה הלוגי חוצה את מחצית גבול הצלע —
+// הכפלתו בפקטור המבוקש (2) חוצה את MAX_CANVAS_PX.
+function buildBusyFixture() {
+  const guards = [
+    { id: "g1", name: "דנה" },
+    { id: "g2", name: "רון" },
+    { id: "g3", name: "מאיה" },
+  ];
+  const dates = Array.from({ length: 7 }, (_, d) => `2025-02-${String(d + 1).padStart(2, "0")}`);
+  const shifts = [];
+  dates.forEach((date, d) => {
+    for (let i = 0; i < 14; i++) {
+      const startHour = i % 24;
+      const endHour = (startHour + 1) % 24;
+      shifts.push({
+        id: `busy-${d}-${i}`,
+        date,
+        label: `עמדה ${i + 1}`,
+        category: "תורנות שמירה",
+        startTime: `${String(startHour).padStart(2, "0")}:00`,
+        endTime: `${String(endHour).padStart(2, "0")}:00`,
+        requiredGuards: 1,
+        assignedGuards: [guards[i % guards.length].id],
+        color: "#fca5a5",
+      });
+    }
+  });
+  return { dates, shifts, guards, teamName: "שבוע עמוס" };
+}
+
+const { canvas: canvasBusy, log: logBusy } = renderAndCapture(buildBusyFixture());
+const busyFactor = canvasBusy.width / 1080;
+
+check(
+  "הפקטור בפועל (canvas.width / 1080) יוצא 1, לא 2, על פיקסצ'ר עמוס שחוצה את מחצית גבול הצלע (J-4)",
+  busyFactor === 1,
+  `factor=${busyFactor} width=${canvasBusy.width} height=${canvasBusy.height}`
+);
+check(
+  "שתי צלעות הקנבס העמוס קטנות או שוות לגבול 16384 (J-4)",
+  canvasBusy.width <= 16384 && canvasBusy.height <= 16384,
+  `width=${canvasBusy.width} height=${canvasBusy.height}`
+);
+
+const busyLogicalHeight = canvasBusy.height / busyFactor;
+const signatureBusy = logBusy.find((e) => e.action === "fillText" && e.args[0] === "NexRota");
+check(
+  "שורת החתימה עדיין בתוך הגובה הלוגי בפיקסצ'ר העמוס — הנפילה לפקטור 1 אינה שוברת את הפריסה (J-4/J-5)",
+  Boolean(signatureBusy) && signatureBusy.args[2] > 0 && signatureBusy.args[2] <= busyLogicalHeight,
+  `y=${signatureBusy?.args[2]} logicalHeight=${busyLogicalHeight}`
+);
+
 // קישור-מקור: הליטרל השחור קיים בפועל בקובץ הנבדק.
 const { readFile } = await import("node:fs/promises");
 const shareImageSrc = await readFile(new URL("../src/lib/shareImage.js", import.meta.url), "utf8");
@@ -319,6 +422,62 @@ check(
 check(
   "views.jsx עדיין קורא ל-guardColor ול-readableInk (COLOR-03 ובחירת הדיו לא נעלמו)",
   /guardColor/.test(viewsSrc) && /readableInk/.test(viewsSrc)
+);
+
+// ============================================================
+console.log("\nD-07 · ביקורת צרכנים קבועה — categoryColor/positionColorKey (Task 2, 07-02)\n");
+// ============================================================
+
+// סריקה רקורסיבית של src/ ו-scripts/ (.js/.jsx/.mjs), הערות מוסרות לפני
+// הבדיקה (הערת נימוק שמזכירה את השם אינה צריכה להיחשב כצריכה). מסלולי
+// הקבצים נבנים ביחס למיקום הסקריפט (new URL), לא לתיקיית העבודה.
+const { readdir } = await import("node:fs/promises");
+const { fileURLToPath } = await import("node:url");
+const path = await import("node:path");
+
+const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+const CODE_EXTS = [".js", ".jsx", ".mjs"];
+
+async function collectCodeFiles(dir) {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await collectCodeFiles(full)));
+    } else if (CODE_EXTS.includes(path.extname(entry.name))) {
+      files.push(full);
+    }
+  }
+  return files;
+}
+
+const stripCommentsForAudit = (src) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+const consumerPattern = /\bcategoryColor\b|\bpositionColorKey\b/;
+const scanRoots = [path.join(repoRoot, "src"), path.join(repoRoot, "scripts")];
+const selfPath = fileURLToPath(import.meta.url);
+const scannedFiles = (await Promise.all(scanRoots.map(collectCodeFiles)))
+  .flat()
+  // הסקריפט הזה עצמו מזכיר את שני השמות בטענה שבודקת אותם — זו הביקורת
+  // עצמה מדברת עליהן, לא צריכה שמפעילה אותן, ולכן אינו נספר כצרכן.
+  .filter((file) => file !== selfPath);
+
+const consumerFiles = [];
+for (const file of scannedFiles) {
+  const src = await readFile(file, "utf8");
+  if (consumerPattern.test(stripCommentsForAudit(src))) {
+    consumerFiles.push(path.relative(repoRoot, file).split(path.sep).join("/"));
+  }
+}
+consumerFiles.sort();
+
+console.log(`  קבצים שמכילים categoryColor/positionColorKey מחוץ להערות: ${JSON.stringify(consumerFiles)}`);
+check(
+  "אין צרכן של categoryColor/positionColorKey מחוץ ל-src/components/ui.jsx (D-07)",
+  JSON.stringify(consumerFiles) === JSON.stringify(["src/components/ui.jsx"]),
+  `consumers=${consumerFiles.join(",")}`
 );
 
 console.log(failures === 0 ? "\nPASS\n" : `\n${failures} FAILURE(S)\n`);
