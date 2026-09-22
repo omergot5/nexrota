@@ -163,39 +163,6 @@ export function SupDashboard({
         subtitle={isNew ? "בוא נסיים את ההקמה — 4 צעדים קצרים" : "סיכום מצב הצוות"}
       />
 
-      {/* שלב 4 (מחזור האיחוד, החלטה 4): מנוחה מינימלית היא הגדרת-צוות
-        * קבועה — 10 או 12 שעות בלבד, בלי שדה חופשי — ולכן חיה כאן, בכרטיס
-        * קבוע בלוח הבקרה הראשי, ולא בתוך מודל "כללי השיבוץ" שנפתח רק
-        * ברגע ההרצה של מסך "שיבוץ חכם". נשמרת על gs_teams עצמו, לא ב-state
-        * או ב-localStorage, כדי שכל בדיקת אילוץ באפליקציה (לא רק המנוע
-        * האוטומטי) תסכים על אותו ערך. */}
-      <Card>
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="min-w-0">
-            <h2 className="font-bold text-content flex items-center gap-2">
-              <Icon name="bed" size={18} className="text-brand" />
-              מנוחה מינימלית בין {t("unit.shifts")}
-            </h2>
-            <p className="text-xs text-muted mt-0.5">
-              שיבוץ שמפר את המנוחה הזו פשוט לא ייווצר — בכל מסך באפליקציה
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {[10, 12].map((hours) => (
-              <Btn
-                key={hours}
-                size="sm"
-                variant={team?.restHours === hours ? "primary" : "outline"}
-                disabled={busy}
-                onClick={() => actions.updateTeamSettings({ restHours: hours })}
-              >
-                {hours} שעות
-              </Btn>
-            ))}
-          </div>
-        </div>
-      </Card>
-
       {isNew && (
         <Card>
           <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
@@ -2418,6 +2385,47 @@ function DeadlineSettings({ team, actions, busy }) {
 }
 
 /**
+ * מנוחה מינימלית בין המשמרות היא הגדרת-צוות קבועה — 10 או 12 שעות בלבד,
+ * בלי שדה חופשי — ונשמרת על gs_teams עצמו, לא ב-state או ב-localStorage,
+ * כדי שכל בדיקת אילוץ באפליקציה (לא רק המנוע האוטומטי) תסכים על אותו ערך.
+ * זהו אילוץ קשיח (שיבוץ שמפר אותו פשוט לא ייווצר), ולכן היא מוצגת ראשונה
+ * בין הגדרות-הצוות במסך הזה, לפני קריטריונים רכים כמו חלון ההוגנות — אותו
+ * סדר עדיפויות (קשיח לפני רך) שכבר קיים במנוע ב-autoAssign.js. חיה כאן,
+ * במסך הצוות, לצד שאר הגדרות-הצוות — ולא בלוח הבקרה הראשי, שמציג רק מה
+ * ששייך לו.
+ */
+function RestHoursSettings({ team, actions, busy }) {
+  return (
+    <Card>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <h2 className="font-bold text-content flex items-center gap-2">
+            <Icon name="bed" size={18} className="text-brand" />
+            מנוחה מינימלית בין {t("unit.shifts")}
+          </h2>
+          <p className="text-xs text-muted mt-0.5">
+            שיבוץ שמפר את המנוחה הזו פשוט לא ייווצר — בכל מסך באפליקציה
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {[10, 12].map((hours) => (
+            <Btn
+              key={hours}
+              size="sm"
+              variant={team?.restHours === hours ? "primary" : "outline"}
+              disabled={busy}
+              onClick={() => actions.updateTeamSettings({ restHours: hours })}
+            >
+              {hours} שעות
+            </Btn>
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/**
  * שלב 5 (מחזור האיחוד, החלטה 5): חלון ההוגנות שהמנוע (SmartAssign) ומסך
  * "אסדר בעצמי" (AssignView) מסתכלים אחורה כדי לחשב מי "חייב עוד" — הגדרת-
  * צוות אחת ב-gs_teams.fairness_window_days, לא 14 שרוף בקוד. חמש אפשרויות
@@ -2635,6 +2643,8 @@ export function TeamView({
       <ProfilePicker team={team} actions={actions} busy={busy} shifts={shifts} tasks={tasks} />
 
       <DeadlineSettings team={team} actions={actions} busy={busy} />
+
+      <RestHoursSettings team={team} actions={actions} busy={busy} />
 
       <FairnessWindowSettings team={team} actions={actions} busy={busy} />
 
