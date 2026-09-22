@@ -3,12 +3,12 @@ import { SHIFT_TONES } from "../../design/shiftPalette.js";
 import { AVAIL } from "../../design/availability.js";
 import { loadTable } from "../../lib/loadTable.js";
 import {
-  Alert, Avatar, Badge, Btn, Card, categoryColor, EmptyState, Field, guardColor, IconBtn, initials, Input, Meter,
-  Modal, PageHeader, positionColorKey, readableInk, Segmented, Select, StatCard,
+  Alert, Avatar, Badge, Btn, Card, EmptyState, Field, guardColor, IconBtn, initials, Input, Meter,
+  Modal, PageHeader, readableInk, Segmented, Select, StatCard,
 } from "../ui.jsx";
 import { Dot, Icon } from "../icons.jsx";
 import {
-  availabilityDeadline, dayName, DAYS_HE_SHORT, formatDateHe, fromISODate, isTaskEngineEligible,
+  availabilityDeadline, byStartTime, dayName, DAYS_HE_SHORT, formatDateHe, fromISODate, isTaskEngineEligible,
   rangeLabelHe, rangeTextHe, recentItems, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
 } from "../../lib/dates.js";
 import { loadWindowMode, RECENT_DAYS, setLoadWindowMode, subscribeLoadWindow } from "../../lib/loadWindow.js";
@@ -1349,6 +1349,14 @@ function ShareWeekBtn({ dates, shifts, guards }) {
   );
 }
 
+// זהות העמדה/המשימה בלוח המפורסם מסומנת בתווית שחורה אחידה, במכוון
+// משוכפלת בליטרל מ-`shareImage.js` ולא מיובאת ממנו ולהפך — זו המוסכמה
+// שנעולה ב-07-CONTEXT.md, כי הקנבס והמסך הם שני משטחי רינדור עצמאיים.
+// תמיד-שחור בכוונה: לא עוקב ערכת-נושא, ולכן אינו token מ-tokens.css
+// (Phase 7, COLOR-02, D-01/D-03). `verify-share-image.mjs` אוכף ששני
+// העותקים זהים תו-בתו.
+const POSITION_LABEL_BG = "#0A0A0A";
+
 export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedded = false }) {
   const weekShifts = shifts.filter((s) => weekDates.includes(s.date));
   const allIds = weekShifts.map((s) => s.id);
@@ -1390,7 +1398,9 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
             </Alert>
           )}
           {weekDates.map((date) => {
-            const dayShifts = weekShifts.filter((s) => s.date === date);
+            // כרונולוגי לפי שעת ההתחלה בפועל, לא סדר ההכנסה ל-DB — אותה
+            // byStartTime בדיוק שתמונת השיתוף ממיינת דרכה (COLOR-04, D-06).
+            const dayShifts = weekShifts.filter((s) => s.date === date).sort(byStartTime);
             if (!dayShifts.length) return null;
             const allPub = dayShifts.every((s) => s.published);
             return (
@@ -1417,9 +1427,10 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
                   {dayShifts.map((s) => {
                     const ink = readableInk(s.color);
                     // צבע רקע הכרטיס (s.color) מקודד שעת יום; השבב כאן מקודד
-                    // זהות קטגוריה/עמדה — שני ערוצי מידע נפרדים כדי שאפשר יהיה
-                    // להבדיל "מה" (השבב) מ"מתי" (הרקע) במבט אחד.
-                    const catColor = categoryColor(positionColorKey(s.label, s.category));
+                    // זהות עמדה/משימה בתווית שחורה אחידה — שני ערוצי מידע
+                    // נפרדים כדי שאפשר יהיה להבדיל "מה" (השבב) מ"מתי" (הרקע)
+                    // במבט אחד (D-08). לפני Phase 7 השבב היה בגוון-לפי-עמדה;
+                    // עכשיו הוא שחור קבוע, כי קשת הגוונים לא אמרה דבר.
                     return (
                       <div
                         key={s.id}
@@ -1429,7 +1440,7 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
                         <div className="flex justify-between items-start mb-2 gap-2">
                           <span
                             className="font-bold text-sm px-2 py-0.5 rounded-lg"
-                            style={{ backgroundColor: catColor, color: readableInk(catColor) }}
+                            style={{ backgroundColor: POSITION_LABEL_BG, color: readableInk(POSITION_LABEL_BG) }}
                           >
                             {s.label}
                           </span>
