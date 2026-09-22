@@ -11,12 +11,28 @@
 //      אותו שבוע מפיק אותה תמונה מטלפון וממחשב.
 //   2. פלטה קבועה ובהירה, גם כשהאפליקציה במצב כהה. התמונה נצפית בתוך שיחה,
 //      לא בתוך האפליקציה, ומסך כהה על רקע וואטסאפ בהיר נראה כמו תקלה.
+//   3. הקנבס נוצר בפי-שניים מהמידות הלוגיות, עם ctx.scale תואם מיד אחרי
+//      יצירת ההקשר — כל קוד הציור ממשיך לחיות ביחידות לוגיות ולא מרגיש את
+//      ההגדלה (Phase 7, COLOR-01). הפקטור קבוע ולא נגזר מ-devicePixelRatio
+//      של המכשיר המייצא: התמונה נוצרת אצל האחמ"ש ונצפית אצל כפוף, לרוב
+//      בטלפון אחר לגמרי, ולכן צפיפות הפיקסלים של המייצא אינה הנתון
+//      שקובע חדות אצל הצופה (D-05). יש גבול צלע שמעליו הפקטור נופל ל-1,
+//      כדי ששבוע עמוס לא יחזיר קנבס ריק (J-4).
 // ============================================================
 
 import { byStartTime, DAYS_HE, fromISODate, rangeLabelHe } from "./dates.js";
 
 const W = 1080;
 const PAD = 48;
+
+// גבול הצלע שמעליו דפדפנים מחזירים קנבס ריק (תמונה לבנה) במקום שגיאה —
+// ראה תנאי ה-scale ב-renderWeekCanvas (J-4).
+const MAX_CANVAS_PX = 16384;
+
+// פקטור הגדלה קבוע במכוון — לא devicePixelRatio (D-05). התמונה נוצרת
+// במכשיר אחד ונצפית במכשיר אחר, לרוב טלפון של כפוף, ולכן ה-DPR של המכשיר
+// שמייצא אינו הנתון הרלוונטי לחדות שהצופה יראה.
+const EXPORT_SCALE = 2;
 
 const C = {
   bg: "#f6f8fb",
@@ -163,16 +179,26 @@ export function renderWeekCanvas({ dates, shifts, guards, teamName }) {
 
   const HEAD = 150;
   const FOOT = 60;
+  // גובה לוגי — כל קוד הציור שמתחת ממשיך לעבוד ביחידות האלה, גם אחרי ההגדלה.
+  const H = HEAD + total + FOOT + PAD;
+  // הפקטור בפועל: EXPORT_SCALE כשהגובה הלוגי כפול בו נכנס בגבול הדפדפן,
+  // ואחרת נופל ל-1 (J-4). קנבס שחורג מ-MAX_CANVAS_PX חוזר ריק — תמונה
+  // לבנה במקום סידור — וזו תקלה חמורה יותר מהטשטוש שהשינוי הזה בא לתקן.
+  // הרוחב (1080×2=2160) תמיד בטוח ואינו חלק מהתנאי.
+  const scale = H * EXPORT_SCALE <= MAX_CANVAS_PX ? EXPORT_SCALE : 1;
   const canvas = document.createElement("canvas");
-  canvas.width = W;
-  canvas.height = HEAD + total + FOOT + PAD;
+  canvas.width = W * scale;
+  canvas.height = H * scale;
   const ctx = canvas.getContext("2d");
+  // מיד אחרי יצירת ההקשר, לפני כל הגדרה/ציור אחרים: הצבה ל-canvas.width
+  // מאפסת את מצב ההקשר, ולכן scale חייבת לבוא אחריה ולפני כל השאר.
+  ctx.scale(scale, scale);
   ctx.direction = "rtl";
   ctx.textAlign = "right";
   ctx.textBaseline = "alphabetic";
 
   ctx.fillStyle = C.bg;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, W, H);
 
   const right = W - PAD;
 
@@ -278,7 +304,7 @@ export function renderWeekCanvas({ dates, shifts, guards, teamName }) {
   ctx.fillStyle = C.faint;
   ctx.font = F(22, 500);
   ctx.textAlign = "center";
-  drawLtr(ctx, "NexRota", W / 2, canvas.height - 34);
+  drawLtr(ctx, "NexRota", W / 2, H - 34);
 
   return canvas;
 }
