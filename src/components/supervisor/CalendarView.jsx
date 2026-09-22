@@ -16,7 +16,7 @@ import {
 // One dataset, three zoom levels. A month to see the shape of the roster and
 // spot the empty days, a week to work in, a day to check who is actually on.
 // The mode never changes what the data means — only how far back you stand.
-// תצוגת השבוע היא מעתה אותו מבנה קטגוריה×יום שמסך המשאבים (ResourceView)
+// תצוגת השבוע היא מעתה אותו מבנה קטגוריה×יום שמסך "מבט משאבים" הישן (הוסר ב-Phase 10)
 // ומסך בניית השבוע (RosterWizard) כבר מציגים — רזולוציה שונה של אותו נתון,
 // לא שפה עיצובית שונה (06-03, RESVIEW-02).
 //
@@ -52,7 +52,7 @@ const coverageOf = (dayItems) => {
 
 export default function CalendarView({ shifts, tasks = [], guards, onNavigate }) {
   // תחום הפעילות מוחל מ-useGuardian (setTermProfile) ולא מפרופ — אותה
-  // קריאה בדיוק כמו ResourceView/PositionsScreen, כדי שהצבע-לפי-קטגוריה
+  // קריאה בדיוק כמו PositionsScreen (ומסך "מבט משאבים" הישן שהוסר), כדי שהצבע-לפי-קטגוריה
   // לא ייסחף משני מקורות אמת (היה הפער לפני התיקון: הרכיב הזה קיבל mode
   // כפרופ עם ברירת מחדל "security" קבועה, במקום לקרוא את מצב התחום החי).
   const teamMode = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
@@ -178,7 +178,7 @@ export default function CalendarView({ shifts, tasks = [], guards, onNavigate })
         {mode === "week" && weekRows.length > 0 && (
           // -mx מנטרל את ה-padding הרגיל של ה-Card בצדדים כדי שהגלילה
           // האופקית והעמודה הנעוצה של ResourceGrid יגיעו עד לקצה הכרטיס —
-          // בדיוק כמו ש-ResourceView עוטף אותו ב-Card שלה (p-0). מצב-ריק
+          // בדיוק כמו שמסך "מבט משאבים" הישן (הוסר) עטף אותו ב-Card שלו (p-0). מצב-ריק
           // לא מטופל כאן במכוון: ה-EmptyState הקיים בתחתית הרכיב כבר מכסה
           // weekRows.length === 0, ואין ליצור שני מצבים-ריקים מתחרים.
           <div className="-mx-3 sm:-mx-4">

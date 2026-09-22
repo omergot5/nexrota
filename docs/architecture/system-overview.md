@@ -22,7 +22,6 @@ src/
 │   │   ├── WeekFlow.jsx        # מסך "השבוע" — ארבעת השלבים, לב חוויית האחמ"ש
 │   │   ├── views.jsx           # מסכי הניהול (צוות, זמינות, החלפות, משימות)
 │   │   ├── CalendarView.jsx    # יומן חודש / שבוע / יום — תצוגת השבוע דרך ResourceGrid
-│   │   ├── ResourceView.jsx    # "מבט משאבים" — ניווט שבועי מעל ResourceGrid
 │   │   ├── RosterWizard.jsx    # "בניית סד"כ" (army) — פאנל התצוגה שלו מעל ResourceGrid
 │   │   ├── ResourceGrid.jsx    # רכיב התצוגה הגנרי היחיד לדפוס קטגוריה×יום — ר' §🧩 למטה
 │   │   └── Analytics.jsx       # דוחות (recharts, נטען lazy — חצי מה-bundle)
@@ -68,6 +67,6 @@ src/
 
 ## 🧩 דפוס תצוגה משותף — קטגוריה × יום (Phase 6)
 
-הדפוס "שורת עמדה/קטגוריה × עמודות יום, תא = רשימת פריטים ממוינת עם שעה ושמות" חי ב-`src/components/supervisor/ResourceGrid.jsx` **בלבד**. הרכיב עצמו לא תלוי ב-`src/lib/resourceView.js` (D-02) — כל קורא (`ResourceView.jsx`, `RosterWizard.jsx` במצב army, `CalendarView.jsx`) מריץ בעצמו את `buildResourceRows` (המנוע הטהור ב-`resourceView.js`, פיבוט shifts+tasks לפי קטגוריה/יום בלי React ובלי fetch) ומזין את `ResourceGrid` ב-rows מוכן. מספר הפריטים בכל תא נגזר מהנתונים בלי תקרה (RESVIEW-03).
+הדפוס "שורת עמדה/קטגוריה × עמודות יום, תא = רשימת פריטים ממוינת עם שעה ושמות" חי ב-`src/components/supervisor/ResourceGrid.jsx` **בלבד**. הרכיב עצמו לא תלוי ב-`src/lib/resourceView.js` (D-02) — כל קורא (`RosterWizard.jsx` במצב army, `CalendarView.jsx`) מריץ בעצמו את `buildResourceRows` (המנוע הטהור ב-`resourceView.js`, פיבוט shifts+tasks לפי קטגוריה/יום בלי React ובלי fetch) ומזין את `ResourceGrid` ב-rows מוכן. מספר הפריטים בכל תא נגזר מהנתונים בלי תקרה (RESVIEW-03).
 
 **מסך חדש שמציג את אותו נתון (עמדה/קטגוריה × יום) אמור לצרוך את `ResourceGrid` ולא לצייר טבלה משלו.** הצבעים בתא מגיעים מ-`categoryTone`/`TONE_CLASSES` (`src/design/categoryPalette.js`) — מנגנון נפרד ובמכוון מזה שנבנה ב-Phase 7 לתצוגת הפרסום והשיתוף; שני מנועי צבע נפרדים בכוונה, לא כפילות לאיחוד.
