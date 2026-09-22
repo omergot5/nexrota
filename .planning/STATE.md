@@ -5,16 +5,16 @@ milestone_name: גימור להשקה
 current_phase: 8
 current_phase_name: בניית שבוע (שינוי שם) + תמונת מצב שבועית
 status: planning
-stopped_at: Phase 07 complete, ready to plan Phase 8
-last_updated: "2026-09-22T09:20:28.849Z"
+stopped_at: Completed 08-03-PLAN.md (worktree branch worktree-agent-a36d2ba8b3bf77761; browser human-check not performed, no browser tooling in this environment)
+last_updated: "2026-09-22T12:30:34.934Z"
 last_activity: 2026-09-22
 last_activity_desc: Phase 07 complete, transitioned to Phase 8
-state_head: 633fa00bab648c435a33a6715ae541d392026e5c
+state_head: 19c898668101ababac31db783eacb949f0d49bd2
 progress:
   total_phases: 8
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 9
+  completed_plans: 7
   percent: 25
 ---
 
@@ -34,7 +34,7 @@ Plan: Not started
 Status: Ready to plan
 Last activity: 2026-09-22 — Phase 07 complete, transitioned to Phase 8
 
-Progress: [░░░░░░░░░░] 0% (v1.2)
+Progress: [███░░░░░░░] 25% (v1.2)
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Progress: [░░░░░░░░░░] 0% (v1.2)
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 06 P01 | 15min | 2 tasks | 3 files |
+| Phase 08 P03 | unknown | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,7 @@ Progress: [░░░░░░░░░░] 0% (v1.2)
 - [v1.2 roadmap]: 8 פאזות למרות `granularity: standard` (4-6) — איחוד היה שובר את ההתאמה 1:1 בין פאזה לנושא במפרט, ואת הנחיית ה-commit-per-topic שבו.
 - v1.1 decision log: PROJECT.md Key Decisions + `.planning/milestones/v1.1-ROADMAP.md`.
 - [Phase 6]: 06-01: ResourceGrid.jsx חולץ כרכיב תצוגה גנרי יחיד (D-04); mode נקרא בתוך הרכיב מ-subscribeTerms/termProfile, לא כפרופ (D-07); חוזה row.pending/item.pending קיים לפני 06-02
+- [Phase 8]: Phase 8 Plan 3: focused single-position view (onRowClick on ResourceGrid, WEEKBUILD-05) + draft-hiding toggle in RosterWizard display panel (WEEKBUILD-04); WeekFlow.jsx and board step untouched
 
 ### Pending Todos
 
@@ -106,8 +108,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-17T08:42:12.930Z
-Stopped at: Phase 07 complete, ready to plan Phase 8
+Last session: 2026-09-22T12:30:33.995Z
+Stopped at: Completed 08-03-PLAN.md (worktree branch worktree-agent-a36d2ba8b3bf77761; browser human-check not performed, no browser tooling in this environment)
 Resume file: None
 
 ## Operator Next Steps
