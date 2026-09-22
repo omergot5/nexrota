@@ -155,6 +155,7 @@ export default function RosterWizard({
   const [activeKey, setActiveKey] = useState(null);
   const [form, setForm] = useState(null); // draft נוכחי בעריכה
   const [focusedKey, setFocusedKey] = useState(null); // מפתח השורה הממוקדת כרגע בפאנל התצוגה (WEEKBUILD-05), null = תצוגה כללית
+  const [hideDrafts, setHideDrafts] = useState(false); // WEEKBUILD-04: true = הצג רק rows (ממומשות), הסתר pendingRows (טיוטה בעריכה)
 
   // מפתח כל פריט נגזר מזהות יציבה — לעולם לא מהאינדקס שלו במערך: זרעי
   // SEED_POSITIONS מזוהים לפי השם הקבוע שלהם (לא משתנה בין רינדורים), וזרעים
@@ -368,6 +369,10 @@ export default function RosterWizard({
   // משתנה תוך כדי שהיא פתוחה (WEEKBUILD-05).
   const focusedRow = focusedKey ? allRows.find((row) => (row.key ?? row.category) === focusedKey) || null : null;
 
+  // visibleRows משפיע רק על התצוגה הכללית (הלא-ממוקדת) — הענף הממוקד
+  // (focusedRow) לא לחיץ דרך שורת-רפאים מלכתחילה (WEEKBUILD-04/05).
+  const visibleRows = hideDrafts ? rows : allRows;
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -439,9 +444,18 @@ export default function RosterWizard({
             <h3 className="text-[13px] font-extrabold text-content">
               {focusedRow ? `${focusedRow.category} · תצוגה ממוקדת` : "ככה השבוע נראה עד עכשיו"}
             </h3>
-            {focusedRow && (
+            {focusedRow ? (
               <Btn variant="ghost" size="sm" icon="x" onClick={() => setFocusedKey(null)}>
                 חזרה לכל העמדות
+              </Btn>
+            ) : (
+              <Btn
+                variant="ghost"
+                size="sm"
+                aria-pressed={hideDrafts}
+                onClick={() => setHideDrafts((v) => !v)}
+              >
+                {hideDrafts ? "הצג גם טיוטה" : "מה שיש עד עכשיו"}
               </Btn>
             )}
           </div>
@@ -449,14 +463,14 @@ export default function RosterWizard({
             <div className="-mx-4 -mb-4">
               <ResourceGrid rows={[focusedRow]} dates={weekDates} guards={guards} />
             </div>
-          ) : allRows.length === 0 ? (
+          ) : visibleRows.length === 0 ? (
             <p className="text-[12px] text-faint leading-relaxed">
               עוד לא הוגדרה אף משימה לשבוע הזה. הגדירו אחת בטופס שלצד — היא תופיע כאן מיד.
             </p>
           ) : (
             <div className="-mx-4 -mb-4">
               <ResourceGrid
-                rows={allRows}
+                rows={visibleRows}
                 dates={weekDates}
                 guards={guards}
                 onRowClick={(row) => setFocusedKey(row.key ?? row.category)}
