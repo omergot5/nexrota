@@ -66,23 +66,41 @@ function SeedDemoDialog({ open, onClose, onConfirm, busy }) {
   // (לא 7) כדי שהדגמה ראשונה כבר תראה עומס אמיתי: חפיפות, "הכול חוסם
   // הכול", וכיסוי 24/7 אמיתי. 7/14/15 עדיין זמינים למי שרוצה מדגם קטן.
   const [guardCount, setGuardCount] = useState(20);
+  // מאפס לברירת המחדל (20) בכל פתיחה — אחרת בחירה קודמת שבוטלה "נדבקת"
+  // בשקט לפתיחה הבאה, בניגוד למה ש-09-CONTEXT.md מתעד כברירת המחדל.
+  useEffect(() => {
+    if (open) setGuardCount(20);
+  }, [open]);
+  // pending נשאר true רק בין לחיצה על "צור נתוני הדגמה" לסיום הכתיבה —
+  // בלעדיו, ביטול/Escape/קליק-רקע/X באמצע כתיבה בתהליך היו סוגרים את
+  // הדיאלוג ויזואלית בעוד ה-seed שכבר נשלח (ועימו הניווט ל"smart")
+  // ממשיך לרוץ ברקע, מה שנראה למשתמש כאילו "לא קרה כלום" (CR review 09).
+  const [pending, setPending] = useState(false);
 
   const confirm = async () => {
-    await onConfirm(guardCount);
+    setPending(true);
+    try {
+      await onConfirm(guardCount);
+    } finally {
+      setPending(false);
+    }
     onClose();
+  };
+  const closeUnlessPending = () => {
+    if (!pending) onClose();
   };
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={closeUnlessPending}
       title="יצירת נתוני הדגמה"
       footer={
         <>
-          <Btn onClick={confirm} loading={busy} className="flex-1">
+          <Btn onClick={confirm} loading={busy || pending} className="flex-1">
             צור נתוני הדגמה
           </Btn>
-          <Btn variant="secondary" onClick={onClose}>
+          <Btn variant="secondary" onClick={closeUnlessPending} disabled={pending}>
             ביטול
           </Btn>
         </>
@@ -90,8 +108,8 @@ function SeedDemoDialog({ open, onClose, onConfirm, busy }) {
     >
       <div className="space-y-3">
         <p className="text-xs text-muted">
-          הפעולה מוסיפה {t("noun.memberPlural")}, משמרות ושיבוצים לדוגמה לצוות הנוכחי — נתונים אמיתיים, לא תצוגה
-          זמנית. שום דבר לא נוצר עד לחיצה על "צור נתוני הדגמה".
+          הפעולה מוסיפה {t("noun.memberPlural")}, {t("unit.shifts")} ושיבוצים לדוגמה לצוות הנוכחי — נתונים אמיתיים,
+          לא תצוגה זמנית. שום דבר לא נוצר עד לחיצה על "צור נתוני הדגמה".
         </p>
         <Segmented
           value={guardCount}
@@ -224,7 +242,7 @@ export function SupDashboard({
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <Btn variant="outline" size="sm" icon="sparkles" onClick={() => setDemoDialogOpen(true)} loading={busy}>
+              <Btn variant="outline" size="sm" icon="sparkles" onClick={() => setDemoDialogOpen(true)}>
                 מלא לי נתוני הדגמה
               </Btn>
             </div>
@@ -2792,7 +2810,7 @@ export function TeamView({
           </h2>
           {guards.length === 0 && onSeedDemo && (
             <div className="flex items-center gap-2 flex-shrink-0">
-              <Btn variant="outline" size="sm" icon="sparkles" onClick={() => setDemoDialogOpen(true)} loading={busy}>
+              <Btn variant="outline" size="sm" icon="sparkles" onClick={() => setDemoDialogOpen(true)}>
                 מלא נתוני הדגמה
               </Btn>
             </div>
