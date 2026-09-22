@@ -5,16 +5,16 @@ milestone_name: גימור להשקה
 current_phase: 10
 current_phase_name: "ביקורת תפריט \"עוד\" מול לוח הבקרה"
 status: executing
-stopped_at: "Completed 10-01-PLAN.md and 10-02-PLAN.md (both Wave 1, live-verified); ready for 10-03 (Wave 2)"
-last_updated: "2026-09-22T20:50:00.000Z"
+stopped_at: Completed 10-03-PLAN.md
+last_updated: "2026-09-22T20:58:57.759Z"
 last_activity: 2026-09-22
 last_activity_desc: Phase 9 verified passed (5/5 success criteria); code review fixes applied and live-verified (incl. army-mode vocabulary bug); transitioned to Phase 10; 10-01/10-02 both executed and live-verified
-state_head: 53969d15a2b9404d5649d50265dde3d96c173489
+state_head: 870bf7f548d93429a2fadecdb446d3ec93959bbe
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 14
-  completed_plans: 13
+  completed_plans: 14
   percent: 50
 ---
 
@@ -30,8 +30,8 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 ## Current Position
 
 Phase: 10 (ביקורת תפריט "עוד" מול לוח הבקרה)
-Plan: 2 of 3 executed (Wave 1 complete, live-verified), Wave 2 (10-03) next
-Status: Executing
+Plan: 3 of 3 executed (Wave 1 complete, live-verified), Wave 2 (10-03) next
+Status: Ready to execute
 Last activity: 2026-09-22 — 10-01/10-02 both executed, merged, and live-verified
 
 Progress: [█████░░░░░] 50% (v1.2)
@@ -71,6 +71,7 @@ Progress: [█████░░░░░] 50% (v1.2)
 | Phase 09 P02 | ~20min | 2 tasks | 1 files |
 | Phase 10 P01 | ~15min | 1 tasks | 1 files |
 | Phase 10 P02 | ~15min | 1 tasks | 6 files |
+| Phase 10 P03 | 55min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,8 @@ Progress: [█████░░░░░] 50% (v1.2)
 - [Phase 9]: [Phase 9] 09-02: SeedDemoDialog shared once above SupDashboard, owns its own guardCount state; both real-team demo-fill buttons (SupDashboard onboarding card, TeamView empty-state) now open it instead of writing on click — startGuestDemo/AuthPage.jsx untouched
 - [Phase 10]: 10-01: קישור "לדוח המלא" בכרטיס עומס מוצג תמיד (לא תלוי ב-loadRows.length) כי הדוח המלא קיים גם כשאין עדיין נתוני עומס; אין קיצור ל-positions כמוכרע ב-10-CONTEXT.md MORE-02
 - [Phase 10]: 10-02: resources הוסר מ-moreItems()/views; ResourceView.jsx נמחק; 3 הערות היסטוריות (CalendarView.jsx, ResourceGrid.jsx, categories.js) נוסחו מחדש ללא המחרוזת המילולית ResourceView כדי לעמוד בשער האוטומטי של התוכנית עצמה
+- [Phase 10]: MORE-01 audit table anchored as a durable Hebrew comment above moreItems() in SupervisorApp.jsx, faithfully transferred from 10-CONTEXT.md, not re-derived.
+- [Phase 10]: All 5 original 'עוד' items + new analytics shortcut + 2 pre-existing dashboard shortcuts re-verified live in one integrated browser pass (gstack $B headless fallback), closing the gap left by 10-01/10-02 each verifying only their own slice.
 
 ### Pending Todos
 
@@ -121,8 +124,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-22T20:50:00.000Z
-Stopped at: Completed 10-01-PLAN.md and 10-02-PLAN.md (both Wave 1, live-verified); ready for 10-03 (Wave 2)
+Last session: 2026-09-22T20:58:55.576Z
+Stopped at: Completed 10-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
