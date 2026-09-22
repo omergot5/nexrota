@@ -110,10 +110,7 @@ function SeedDemoDialog({ open, onClose, onConfirm, busy }) {
 export function SupDashboard({
   guards, shifts, swapRequests, tasks, team, weekDates = [], compatibility = [], onNavigate, onSeedDemo, busy, actions,
 }) {
-  // גודל צוות אמיתי בצבא הוא 15-25 איש, לא 7 — 20 הוא ברירת המחדל כאן
-  // (לא 7) כדי שהדגמה ראשונה כבר תראה עומס אמיתי: חפיפות, "הכול חוסם
-  // הכול", וכיסוי 24/7 אמיתי. 7/14/15 עדיין זמינים למי שרוצה מדגם קטן.
-  const [demoCount, setDemoCount] = useState(20);
+  const [demoDialogOpen, setDemoDialogOpen] = useState(false);
   const today = todayISO();
   const todayShifts = shifts.filter((s) => s.date === today);
   const pendingSwaps = swapRequests.filter((r) => r.status === "pending").length;
@@ -227,12 +224,7 @@ export function SupDashboard({
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <Segmented
-                value={demoCount}
-                onChange={setDemoCount}
-                options={[7, 14, 15, 20].map((n) => ({ value: n, label: String(n) }))}
-              />
-              <Btn variant="outline" size="sm" icon="sparkles" onClick={() => onSeedDemo(demoCount)} loading={busy}>
+              <Btn variant="outline" size="sm" icon="sparkles" onClick={() => setDemoDialogOpen(true)} loading={busy}>
                 מלא לי נתוני הדגמה
               </Btn>
             </div>
@@ -432,6 +424,13 @@ export function SupDashboard({
           )}
         </Card>
       </div>
+
+      <SeedDemoDialog
+        open={demoDialogOpen}
+        onClose={() => setDemoDialogOpen(false)}
+        onConfirm={onSeedDemo}
+        busy={busy}
+      />
     </div>
   );
 }
