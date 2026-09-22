@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: גימור להשקה
 current_phase: 10
-current_phase_name: ביקורת תפריט "עוד" מול לוח הבקרה
+current_phase_name: "ביקורת תפריט \"עוד\" מול לוח הבקרה"
 status: planning
-stopped_at: Phase 9 complete — verified 5/5, transitioned to Phase 10
-last_updated: "2026-09-22T21:00:00.000Z"
+stopped_at: "Completed 10-02-PLAN.md — resources removed from \"עוד\" menu (MORE-03); browser human-check pending (no browser access this session)"
+last_updated: "2026-09-22T20:34:30.267Z"
 last_activity: 2026-09-22
 last_activity_desc: Phase 9 verified passed (5/5 success criteria); code review fixes applied and live-verified (incl. army-mode vocabulary bug); transitioned to Phase 10
-state_head: 14228185624f0575143b1142dcd3efc05b042fa4
+state_head: b81a374485a3b3513cf126834d60d73de8e4ef24
 progress:
   total_phases: 8
   completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 14
+  completed_plans: 12
   percent: 50
 ---
 
@@ -69,6 +69,7 @@ Progress: [█████░░░░░] 50% (v1.2)
 | Phase 08 P03 | unknown | 2 tasks | 2 files |
 | Phase 09 P01 | ~15min | 1 tasks | 1 files |
 | Phase 09 P02 | ~20min | 2 tasks | 1 files |
+| Phase 10 P02 | ~15min | 1 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,7 @@ Progress: [█████░░░░░] 50% (v1.2)
 - [Phase 8]: 08-03: onRowClick אופציונלי נוסף ל-ResourceGrid.jsx (ResourceView.jsx/CalendarView.jsx נשארים ללא שינוי, לא מעבירים אותו); RosterWizard.jsx מוסיף תצוגה ממוקדת לעמדה בודדת + טוגל "מה שיש עד עכשיו" — שני הפיצ'רים לא נוגעים בשלב ה-board כלל
 - [Phase 9]: RestHoursSettings placed first among team-settings siblings (before FairnessWindowSettings) reflecting hard-constraint-before-soft-criteria priority, matching autoAssign.js
 - [Phase 9]: [Phase 9] 09-02: SeedDemoDialog shared once above SupDashboard, owns its own guardCount state; both real-team demo-fill buttons (SupDashboard onboarding card, TeamView empty-state) now open it instead of writing on click — startGuestDemo/AuthPage.jsx untouched
+- [Phase 10]: [Phase 10] 10-02: resources הוסר מ-moreItems()/views; ResourceView.jsx נמחק; 3 הערות היסטוריות (CalendarView.jsx, ResourceGrid.jsx, categories.js) נוסחו מחדש ללא המחרוזת המילולית ResourceView כדי לעמוד בשער האוטומטי של התוכנית עצמה
 
 ### Pending Todos
 
@@ -117,8 +119,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-22T21:00:00.000Z
-Stopped at: Phase 9 complete (verified 5/5); transitioned to Phase 10
+Last session: 2026-09-22T20:34:24.996Z
+Stopped at: Completed 10-02-PLAN.md — resources removed from "עוד" menu (MORE-03); browser human-check pending (no browser access this session)
 Resume file: None
 
 ## Operator Next Steps
