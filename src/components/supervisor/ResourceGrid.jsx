@@ -22,7 +22,13 @@ import { DAYS_HE_SHORT, fromISODate, shortDate } from "../../lib/dates.js";
 import { subscribeTerms, termProfile } from "../../lib/terms.js";
 import { categoryTone, TONE_CLASSES } from "../../design/categoryPalette.js";
 
-export default function ResourceGrid({ rows = [], dates = [], guards = [], firstColLabel = "עמדה / קטגוריה" }) {
+export default function ResourceGrid({
+  rows = [],
+  dates = [],
+  guards = [],
+  firstColLabel = "עמדה / קטגוריה",
+  onRowClick,
+}) {
   // תחום הפעילות מוחל מ-subscribeTerms/termProfile, לא מפרופ (D-07) —
   // אותה קריאה בדיוק שהייתה קיימת ב-ResourceView, כדי שהצבע-לפי-קטגוריה
   // (רוטציה שתלויה ב-FOLDERS_BY_MODE של התחום) לא ייסחף משני מקורות אמת.
@@ -61,6 +67,11 @@ export default function ResourceGrid({ rows = [], dates = [], guards = [], first
         <tbody>
           {rows.map((row) => {
             const tone = TONE_CLASSES[categoryTone(row.category, mode)];
+            // onRowClick אופציונלי (WEEKBUILD-05) — כשמסופק, שם העמדה הופך
+            // לכפתור נגיש שפותח תצוגה ממוקדת אצל הקורא; שורת-רפאים
+            // (row.pending) אף פעם לא לחיצה — היא עדיין לא נשמרה, ואין לה
+            // מה "לצלול" אליו.
+            const clickable = typeof onRowClick === "function" && row.pending !== true;
             // row.key (כשקיים) גובר על category: קורא עשוי להזין שתי שורות
             // עם אותה תווית-קטגוריה בדיוק (למשל RosterWizard, ששורת-הרפאים
             // שלו יכולה לחלוק קטגוריה עם שורה שכבר נשמרה) — מפתח לפי
@@ -68,18 +79,31 @@ export default function ResourceGrid({ rows = [], dates = [], guards = [], first
             return (
               <tr key={row.key ?? row.category} className="border-t border-hairline">
                 <td className="sticky right-0 z-10 bg-surface px-3 py-2.5 align-top">
-                  <div className="flex items-center gap-1.5 font-bold text-content text-xs">
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${tone.dot}`} aria-hidden="true" />
-                    <Icon name={row.icon} size={14} className="text-muted flex-shrink-0" />
-                    {row.category}
-                    {row.pending === true && (
-                      // נצרך על ידי 06-02 (פאנל-תצוגה חי בזמן עריכת עמדות):
-                      // שורה שעדיין לא נשמרה, מסומנת "בעריכה" עד שתאושר.
-                      <span className="text-[9.5px] font-bold text-brand border border-dashed border-brand/50 rounded px-1 flex-shrink-0">
-                        בעריכה
-                      </span>
-                    )}
-                  </div>
+                  {clickable ? (
+                    <button
+                      type="button"
+                      onClick={() => onRowClick(row)}
+                      aria-label={`פתח תצוגה ממוקדת לעמדה ${row.category}`}
+                      className="flex items-center gap-1.5 font-bold text-content text-xs text-right w-full cursor-pointer hover:text-brand focus:outline-none focus:ring-2 focus:ring-brand/30 rounded transition-colors"
+                    >
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${tone.dot}`} aria-hidden="true" />
+                      <Icon name={row.icon} size={14} className="text-muted flex-shrink-0" />
+                      {row.category}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1.5 font-bold text-content text-xs">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${tone.dot}`} aria-hidden="true" />
+                      <Icon name={row.icon} size={14} className="text-muted flex-shrink-0" />
+                      {row.category}
+                      {row.pending === true && (
+                        // נצרך על ידי 06-02 (פאנל-תצוגה חי בזמן עריכת עמדות):
+                        // שורה שעדיין לא נשמרה, מסומנת "בעריכה" עד שתאושר.
+                        <span className="text-[9.5px] font-bold text-brand border border-dashed border-brand/50 rounded px-1 flex-shrink-0">
+                          בעריכה
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </td>
                 {row.days.map((day) => (
                   <td key={day.date} className="px-2 py-2 align-top border-r border-hairline/60">
