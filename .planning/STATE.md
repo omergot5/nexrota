@@ -83,7 +83,7 @@ None yet.
 ### Blockers/Concerns
 
 - **[v1.2 Phase 12] סתירה לעקרון ברזל קיים.** `CLAUDE.md` עקרון 3 קובע "ביטול במקום אישור — בלי `confirm()`"; בעל המוצר הפך זאת במפורש לפעולות הרסניות. Phase 12 חייבת להכריע אילו פעולות עוברות לאישור-מראש ואילו נשארות ב-`UndoBar`, ולעדכן את `CLAUDE.md` + `PROJECT.md` בהתאם.
-- **[v1.2 Phase 8] התנגשות שם קיימת.** `terms.js` כבר מגדיר `nav.board` במצב army כ"תמונת מצב שבועית" (מצביע על ה-UnifiedBoard מ-v1.1 Phase 5) — בדיוק השם שהמפרט מבקש למסך חדש. להכריע הרחבה מול מסך נפרד לפני התכנון.
+- **[v1.2 Phase 8] ✓ הוכרע מחדש (2026-09-22).** `UnifiedBoard.jsx` אינו מסך נפרד — הוא שלב 0 בתוך `WeekFlow.jsx` עצמה (`STEP_OF`: board→shifts→availability→assign→schedule). ההחלטה: להזיז את שלב `board` להיות **אחרי** `shifts`, לא לפניו — לא לבנות מסך/רכיב חדש ולא לשנות שם ל-UnifiedBoard. ר' ROADMAP.md Phase 8 לפירוט.
 - **[v1.2 Phase 12→13] CONFIRM-04 מחברת פעולה שבורה.** "ביטול הפצה" עדיין באג בזמן Phase 12; Phase 13 חייבת לאמת מחדש דרך הדיאלוג, לא במעקף שלו.
 - אין test runner בפרויקט. כל בדיקה חדשה חייבת להיות סקריפט Node עצמאי שמדפיס `ok`/`FAIL` ומחזיר קוד יציאה, מחובר ל-`npm test`. רלוונטי ישירות ל-BUG-04.
 - ⚠️ [v1.1] Phases 1-3's VERIFICATION.md files predate the current `status:` frontmatter contract — GSD tooling reports them "missing" on format alone; carried forward as a known override (see MILESTONES.md v1.1 entry). Consider backfilling frontmatter early in this milestone.
