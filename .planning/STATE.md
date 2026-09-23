@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: גימור להשקה
-current_phase: 10
-current_phase_name: "ביקורת תפריט \"עוד\" מול לוח הבקרה"
-status: executing
-stopped_at: Completed 10-03-PLAN.md
-last_updated: "2026-09-22T20:58:57.759Z"
-last_activity: 2026-09-22
-last_activity_desc: Phase 9 verified passed (5/5 success criteria); code review fixes applied and live-verified (incl. army-mode vocabulary bug); transitioned to Phase 10; 10-01/10-02 both executed and live-verified
-state_head: 870bf7f548d93429a2fadecdb446d3ec93959bbe
+current_phase: 11
+current_phase_name: "עריכה אינטואיטיבית + ניקוי הדגמה + באג \"מצב השבוע\""
+status: planning
+stopped_at: "Phase 10 closed: merged (10-01/10-02/10-03), code-reviewed (WR-01/WR-02 fixed), verified 3/3 by gsd-verifier; ready to plan Phase 11"
+last_updated: "2026-09-23T00:00:00.000Z"
+last_activity: 2026-09-23
+last_activity_desc: Phase 10 verified passed (3/3 success criteria); code review found 2 warnings (stale RosterWizard.jsx comments, stray untracked ResourceView.jsx) — both fixed and re-verified; transitioned to Phase 11
+state_head: c1e683d14729ee69a78d78b7a7b30a61997a2c05
 progress:
   total_phases: 8
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 14
   completed_plans: 14
-  percent: 50
+  percent: 63
 ---
 
 # Project State
@@ -25,16 +25,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-17)
 
 **Core value:** אדם שמקבל את האפליקציה לידיו מסיים סידור שבועי מלא בלי שאף אחד יסביר לו כלום — ומה שהמערכת אומרת לו על עצמה הוא נכון.
-**Current focus:** Phase 07 — צבעים וסדר משמרות
+**Current focus:** Phase 11 — עריכה אינטואיטיבית + ניקוי הדגמה
 
 ## Current Position
 
-Phase: 10 (ביקורת תפריט "עוד" מול לוח הבקרה)
-Plan: 3 of 3 executed (Wave 1 complete, live-verified), Wave 2 (10-03) next
-Status: Ready to execute
-Last activity: 2026-09-22 — 10-01/10-02 both executed, merged, and live-verified
+Phase: 11 (עריכה אינטואיטיבית + ניקוי הדגמה + באג "מצב השבוע")
+Plan: not yet planned
+Status: Ready to plan
+Last activity: 2026-09-23 — Phase 10 merged, code-reviewed, fixed, and verified 3/3
 
-Progress: [█████░░░░░] 50% (v1.2)
+Progress: [██████░░░░] 63% (v1.2)
 
 ## Performance Metrics
 
@@ -90,6 +90,7 @@ Progress: [█████░░░░░] 50% (v1.2)
 - [Phase 10]: 10-02: resources הוסר מ-moreItems()/views; ResourceView.jsx נמחק; 3 הערות היסטוריות (CalendarView.jsx, ResourceGrid.jsx, categories.js) נוסחו מחדש ללא המחרוזת המילולית ResourceView כדי לעמוד בשער האוטומטי של התוכנית עצמה
 - [Phase 10]: MORE-01 audit table anchored as a durable Hebrew comment above moreItems() in SupervisorApp.jsx, faithfully transferred from 10-CONTEXT.md, not re-derived.
 - [Phase 10]: All 5 original 'עוד' items + new analytics shortcut + 2 pre-existing dashboard shortcuts re-verified live in one integrated browser pass (gstack $B headless fallback), closing the gap left by 10-01/10-02 each verifying only their own slice.
+- [Phase 10]: Code review (post-merge, full 3-plan diff) found WR-01 (4 stale present-tense RosterWizard.jsx comments still describing the deleted "מסך משאבים" as existing) and WR-02 (a stray untracked byte-identical leftover copy of the already-deleted ResourceView.jsx sitting in the working tree) — both stemmed from the 10-02 verify gate only grepping the literal string "ResourceView", not the Hebrew display name or disk state. Fixed directly; gsd-verifier re-confirmed both fixes independently against current src/.
 
 ### Pending Todos
 
@@ -102,6 +103,7 @@ None yet.
 - **[v1.2 Phase 12] סתירה לעקרון ברזל קיים.** `CLAUDE.md` עקרון 3 קובע "ביטול במקום אישור — בלי `confirm()`"; בעל המוצר הפך זאת במפורש לפעולות הרסניות. Phase 12 חייבת להכריע אילו פעולות עוברות לאישור-מראש ואילו נשארות ב-`UndoBar`, ולעדכן את `CLAUDE.md` + `PROJECT.md` בהתאם.
 - **[v1.2 Phase 8] ✓ הושלם ואומת (2026-09-22).** שלושת התוכניות מוזגו, code review עלה 3 אזהרות (WR-01/02/03) שתוקנו ואומתו לייב בדפדפן, ו-`gsd-verifier` אישר 5/5 קריטריוני הצלחה. `UnifiedBoard.jsx` נשאר באותו שם, רק זז לשלב אחרי `shifts`.
 - **[v1.2 Phase 9] ✓ הושלם ואומת (2026-09-22).** שתי התוכניות מוזגו, code review עלה 1 Critical (מחרוזת "משמרות" קשיחה בדיאלוג ההדגמה שבירה את אוצר המילים במצב army) + 2 Warnings + 1 Info — כולם תוקנו ואומתו לייב בדפדפן (כולל רישום צוות-בדיקה נקי במצב army במיוחד כדי לתפוס את הבאג), ו-`gsd-verifier` אישר 5/5 קריטריוני הצלחה.
+- **[v1.2 Phase 10] ✓ הושלם ואומת (2026-09-23).** שלושת התוכניות מוזגו (10-01/10-02/10-03), code review על הדיף המלא העלה 0 Critical + 2 Warnings (הערות מיושנות ב-RosterWizard.jsx שעדיין תיארו את מסך המשאבים שנמחק כקיים, וקובץ ResourceView.jsx שנמחק מ-git אך נשאר untracked בעץ העבודה) + 1 Info — שתי האזהרות תוקנו ישירות, `npm test`/`npm run build` עברו נקי, ו-`gsd-verifier` אישר 3/3 קריטריוני הצלחה בבדיקה עצמאית מול הקוד הנוכחי.
 - **[v1.2 Phase 12→13] CONFIRM-04 מחברת פעולה שבורה.** "ביטול הפצה" עדיין באג בזמן Phase 12; Phase 13 חייבת לאמת מחדש דרך הדיאלוג, לא במעקף שלו.
 - אין test runner בפרויקט. כל בדיקה חדשה חייבת להיות סקריפט Node עצמאי שמדפיס `ok`/`FAIL` ומחזיר קוד יציאה, מחובר ל-`npm test`. רלוונטי ישירות ל-BUG-04.
 - ⚠️ [v1.1] Phases 1-3's VERIFICATION.md files predate the current `status:` frontmatter contract — GSD tooling reports them "missing" on format alone; carried forward as a known override (see MILESTONES.md v1.1 entry). Consider backfilling frontmatter early in this milestone.
@@ -124,12 +126,12 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-22T20:58:55.576Z
-Stopped at: Completed 10-03-PLAN.md
+Last session: 2026-09-23T00:00:00.000Z
+Stopped at: Phase 10 closed (merged + code-reviewed + fixed + verified 3/3); ready to plan Phase 11
 Resume file: None
 
 ## Operator Next Steps
 
-- Plan Phase 10 with `/gsd-plan-phase 10`
-- Phase 10 carries a UI hint — consider `/gsd-ui-phase 10` first
-- Phase 10 audits the "עוד" menu (currently exactly 5 items: swaps, tasks, positions, resources, analytics) against the Dashboard, adds relevant shortcuts, and removes redundancies without breaking any existing feature (MORE-01..03)
+- Plan Phase 11 with `/gsd-plan-phase 11`
+- Phase 11 carries a UI hint — consider `/gsd-ui-phase 11` first
+- Phase 11 adds inline add/delete inside "בניית שבוע", an `is_demo` flag distinguishing demo from real assignments, a "מחק נתוני הדגמה לשבוע זה" action scoped to the active week only, and fixes the existing "מצב השבוע" staleness bug (INLINE-01..04)
