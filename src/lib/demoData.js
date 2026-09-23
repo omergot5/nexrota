@@ -170,6 +170,7 @@ export async function seedDemoTeam({ teamCode, existingGuards = [], existingShif
         color: tpl.color,
         location: "כניסה ראשית",
         required_guards: 1,
+        is_demo: true,
       });
     }
   });
@@ -393,6 +394,7 @@ function positionPlanToShiftRow(row, teamCode) {
     position_id: row.positionId,
     type: "custom",
     published: false,
+    is_demo: true,
   };
 }
 

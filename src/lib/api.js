@@ -61,6 +61,9 @@ export const shiftFromRow = (row) => ({
   // עמדה קבועה שהמשמרת הזאת מומשה ממנה (Phase 4, POS-01/POS-03). `null`
   // כברירת מחדל — רוב המשמרות אינן מומשות מעמדה בכלל.
   positionId: row.position_id || null,
+  // דגל הדגמה (Phase 11, INLINE-02, מיגרציה 0022) — `Boolean()` כדי ששורה
+  // שנוצרה לפני המיגרציה (עמודה חסרה לגמרי) תיפול ל-`false` ולא תיקרוס.
+  isDemo: Boolean(row.is_demo),
 });
 
 export const shiftToRow = (shift, teamCode) => ({
@@ -85,6 +88,11 @@ export const shiftToRow = (shift, teamCode) => ({
   // `null` מפורש ולא השמטה: בלי המפתח בכיוון הכתיבה, עריכת משמרת דרך
   // הטופס הייתה מנתקת אותה בשקט מהעמדה הקבועה שלה (Phase 4).
   position_id: shift.positionId || null,
+  // דגל הדגמה (Phase 11, INLINE-02) — `Boolean(undefined)` הוא `false`,
+  // בדיוק כמו `published` למעלה, כך שכל כתיבה שלא מציינת `isDemo` (כל טופס
+  // עריכה של מנהל) ממשיכה לצאת `is_demo:false` בלי קוד נוסף. רק שתי נקודות
+  // ה-seed (demoData.js) מעבירות `isDemo:true` במפורש.
+  is_demo: Boolean(shift.isDemo),
 });
 
 export const profileFromRow = (row) => ({
@@ -206,7 +214,7 @@ export const positionToRow = (position, teamCode) => ({
 // can stay pointed at gs_work_items too, instead of duplicating this string.
 export const SHIFT_SELECT =
   "id, team_code, date:start_date, label:title, start_time, end_time, location, " +
-  "required_guards, type, color, published, category, position_id, created_at, " +
+  "required_guards, type, color, published, category, position_id, is_demo, created_at, " +
   "gs_assignments:gs_work_item_assignments(guard_id, source, score, reason, override_note)";
 
 // gs_tasks and gs_work_items already share every one of these column names
@@ -219,7 +227,13 @@ const TASK_SELECT =
   "due_date, start_time, end_time, override_note, position_id, created_at, " +
   "gs_work_item_assignments(guard_id)";
 
-/** shiftToRow(shift, teamCode)'s output, reshaped for gs_work_items. */
+/**
+ * shiftToRow(shift, teamCode)'s output, reshaped for gs_work_items.
+ *
+ * `is_demo` needs no special handling here — it's already a plain key on
+ * `...rest` the moment shiftToRow emits it (Phase 11, INLINE-02), so the
+ * spread carries it through unchanged, same as `published`/`category`.
+ */
 export const shiftRowToWorkItem = ({ date, label, ...rest }) => ({
   ...rest,
   kind: "shift",
