@@ -163,9 +163,12 @@ export default function WeekFlow({
         body: `בנה ${t("unit.shifts")} או משימות בשלב "${t("nav.shifts")}", והלוח ייבנה מעצמו.`,
       }}
       // עריכה רק כאן (BOARD-05): זה מסך הבנייה עצמו, לא היומן ולא הלוח של
-      // המשתתף — שני המסכים האחרים ממשיכים לקבל את הלוח בלי onMove, כלומר
-      // לקריאה בלבד בדיוק כמו קודם.
+      // המשתתף — שני המסכים האחרים ממשיכים לקבל את הלוח בלי onMove/
+      // onToggleAssignment, כלומר לקריאה בלבד בדיוק כמו קודם.
       onMove={actions.moveAssignment}
+      // "x"/"+" ישירות על הלוח (INLINE-01, אופציה ב, 11-CONTEXT.md) — אותה
+      // toggleAssignment הקיימת ש-AssignView כבר קוראת לה, בלי כתיבה חדשה.
+      onToggleAssignment={actions.toggleAssignment}
       mode={team?.mode || "security"}
     />,
     <AvailView key="avail" {...common} />,

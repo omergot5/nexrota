@@ -17,13 +17,15 @@
 // אחר זה. אותם breakpoints בדיוק כמו ה-WeekStrip של CalendarView.jsx, כדי
 // ששני המסכים ידברו את אותה שפת רשת ולא יסטו זה מזה על אותה שאלה.
 //
-// BOARD-05: `onMove` הוא היציאה היחידה מהחוזה read-only, ורשות בלבד — לא
-// עובר כלל אם הקורא לא מוסר אותו (ברירת המחדל `undefined`, כמו ב-GuardApp
-// וב"יומן"). כשהוא כן מגיע (WeekFlow.jsx, שלב "השבוע במבט אחד" בזמן בנייה),
-// גרירת אווטאר ממשמרת אחת ומשמרת אחרת קוראת לו — הלוח עצמו לא כותב שום
-// דבר, רק מדווח "רוצים להעביר X מ-A ל-B" ומשאיר את ההחלטה (ואת הכתיבה
-// בפועל, כולל בדיקת כשירות) לקורא. זו אותה הפרדה בדיוק ש-`empty` כבר
-// משתמשת בה — הלוח מדבר בפרופס, לא בהנחות על מי קורא לו.
+// BOARD-05: `onMove` ו-`onToggleAssignment` (INLINE-01) הן היציאות היחידות
+// מהחוזה read-only, ושתיהן רשות בלבד — לא עוברות כלל אם הקורא לא מוסר
+// אותן (ברירת המחדל `undefined`, כמו ב-GuardApp וב"יומן"). כשהן כן מגיעות
+// (WeekFlow.jsx, שלב "השבוע במבט אחד" בזמן בנייה), גרירת אווטאר בין שתי
+// משמרות קוראת ל-onMove, ו-"x"/"+" על כרטיס קוראים ל-onToggleAssignment —
+// הלוח עצמו לא כותב שום דבר, רק מדווח מה המנהל ביקש (להעביר/להוסיף/להסיר)
+// ומשאיר את ההחלטה (ואת הכתיבה בפועל, כולל בדיקת כשירות) לקורא. זו אותה
+// הפרדה בדיוק ש-`empty` כבר משתמשת בה — הלוח מדבר בפרופס, לא בהנחות על
+// מי קורא לו.
 // ============================================================
 
 import { useState } from "react";
@@ -64,7 +66,8 @@ const missingOfItem = (item) => {
 };
 
 export default function UnifiedBoard({
-  shifts = [], tasks = [], guards = [], dates = [], scopeGuardId = null, empty, onMove, mode = "security",
+  shifts = [], tasks = [], guards = [], dates = [], scopeGuardId = null, empty, onMove,
+  onToggleAssignment, mode = "security",
 }) {
   const merged = boardItemsForDates(shifts, tasks, dates);
 
@@ -116,14 +119,21 @@ export default function UnifiedBoard({
       )}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
         {days.map((day) => (
-          <DayColumn key={day.date} day={day} guards={guards} onMove={onMove} mode={mode} />
+          <DayColumn
+            key={day.date}
+            day={day}
+            guards={guards}
+            onMove={onMove}
+            onToggleAssignment={onToggleAssignment}
+            mode={mode}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function DayColumn({ day, guards, onMove, mode }) {
+function DayColumn({ day, guards, onMove, onToggleAssignment, mode }) {
   const iso = day.date;
   const today = isToday(iso);
   return (
@@ -145,6 +155,7 @@ function DayColumn({ day, guards, onMove, mode }) {
             item={item}
             guards={guards}
             onMove={onMove}
+            onToggleAssignment={onToggleAssignment}
             mode={mode}
           />
         ))}
@@ -162,7 +173,7 @@ function DayColumn({ day, guards, onMove, mode }) {
 // אחת, לא שתיים שעלולות להיסחף.
 export const DRAG_MIME = "application/x-nexrota-guard";
 
-function BoardCard({ item, guards, onMove, mode }) {
+function BoardCard({ item, guards, onMove, onToggleAssignment, mode }) {
   const timeless = Boolean(item.timeless);
   // חוסר איוש הוא מושג שקיים רק לפריט מתוזמן (D-08 — שורת עמדה עתידית אין
   // לה עוד ניצול; פריט timeless אין לו requiredGuards בכלל).
@@ -178,6 +189,12 @@ function BoardCard({ item, guards, onMove, mode }) {
   // עצמו (WeekFlow.jsx) — בכל מקום אחר (יומן, GuardApp) הוא undefined, אז
   // הכרטיס הזה נשאר קריאה-בלבד בדיוק כמו קודם.
   const draggableHere = Boolean(onMove) && !timeless;
+
+  // הסרה inline (INLINE-01, אופציה ב): אותו שער בדיוק כמו draggableHere —
+  // רשות בלבד, ולא קיים לכרטיס טיימלס (D-08, אין מושג "משובץ/לא-משובץ"
+  // לפריט בלי requiredGuards). כשהקורא לא מעביר onToggleAssignment (יומן,
+  // GuardApp) הכרטיס נשאר בדיוק read-only כמו קודם.
+  const canRemove = Boolean(onToggleAssignment) && !timeless;
 
   const dragProps = draggableHere
     ? {
@@ -263,6 +280,7 @@ function BoardCard({ item, guards, onMove, mode }) {
               ? (e, g) => e.dataTransfer.setData(DRAG_MIME, `${g.id}::${item.id}`)
               : undefined
           }
+          onRemove={canRemove ? (guardId) => onToggleAssignment(item.id, guardId) : undefined}
         />
       </div>
     </div>

@@ -1695,6 +1695,10 @@ export const People = ({
   // WhyModal, TaskRow...) ממשיך לקבל ערימת אווטארים רגילה, בלי draggable
   // בכלל, כי שום דבר שם לא נועד לזוז.
   onDragStart,
+  // הסרה inline (INLINE-01) — אותה תבנית פרופ-רשות בדיוק כמו onDragStart:
+  // מגיעה רק מ-UnifiedBoard כשהקורא (WeekFlow) מוסר onToggleAssignment.
+  // (guardId) => void.
+  onRemove,
 }) => {
   const people = ids.map((id) => guards.find((g) => g.id === id)).filter(Boolean);
   if (!people.length) return <span className="text-[11px] text-faint">אין משויכים</span>;
@@ -1708,13 +1712,34 @@ export const People = ({
           const blocked = isBlocked ? isBlocked(g) : false;
           if (!blocked) {
             return (
-              <div
-                key={g.id}
-                draggable={draggable}
-                onDragStart={draggable ? (e) => onDragStart(e, g) : undefined}
-                className={draggable ? "cursor-grab active:cursor-grabbing" : undefined}
-              >
-                <Avatar id={g.id} name={g.name} size={size} ring label={g.name} />
+              <div key={g.id} className="relative flex-shrink-0">
+                <div
+                  draggable={draggable}
+                  onDragStart={draggable ? (e) => onDragStart(e, g) : undefined}
+                  className={draggable ? "cursor-grab active:cursor-grabbing" : undefined}
+                >
+                  <Avatar id={g.id} name={g.name} size={size} ring label={g.name} />
+                </div>
+                {/* הסרה inline (INLINE-01) — תמיד גלוי, לא hover-only: כפתור
+                  * שתלוי ב-hover לא ניתן להגעה במסך מגע (ר' הערה זהה ליד
+                  * כפתור המחיקה של ShiftMgmt למעלה בקובץ הזה).
+                  * stopPropagation הכרחי: העטיפה draggable כש-onDragStart
+                  * מועבר, וקליק כאן לא אמור "לדלוף" לגרירה (BOARD-05). */}
+                {onRemove && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove(g.id);
+                    }}
+                    className="absolute -top-1 -left-1.5 min-w-[18px] h-[18px] px-0.5 flex items-center
+                      justify-center rounded-full ring-2 ring-surface bg-surface text-muted
+                      hover:bg-danger hover:text-white transition-colors cursor-pointer"
+                    aria-label={`הסר את ${g.name}`}
+                  >
+                    <Icon name="x" size={11} strokeWidth={2.5} />
+                  </button>
+                )}
               </div>
             );
           }
@@ -1744,6 +1769,24 @@ export const People = ({
               >
                 <Icon name="lock" size={11} strokeWidth={2.5} />
               </span>
+              {/* הסרה מותרת גם על אדם חסום-כשירות: toggleAssignment לעולם
+                * לא חוסמת הסרה, רק הוספה (useGuardian.js) — אותו "x" בדיוק,
+                * בפינה הנגדית למנעול כדי לא להתנגש איתו. */}
+              {onRemove && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove(g.id);
+                  }}
+                  className="absolute -top-1 -left-1.5 min-w-[18px] h-[18px] px-0.5 flex items-center
+                    justify-center rounded-full ring-2 ring-surface bg-surface text-muted
+                    hover:bg-danger hover:text-white transition-colors cursor-pointer"
+                  aria-label={`הסר את ${g.name}`}
+                >
+                  <Icon name="x" size={11} strokeWidth={2.5} />
+                </button>
+              )}
             </div>
           );
         })}
