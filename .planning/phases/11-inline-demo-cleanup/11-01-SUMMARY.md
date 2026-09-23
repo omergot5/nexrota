@@ -183,9 +183,12 @@ Data/state layer is ready for Plan 11-02 (inline board editing) and Plan 11-03 (
 - `actions.deleteDemoDataForWeek(weekDates)` and `actions.deletePosition(id, weekDates)` are ready to be called from UI with no further backend work.
 - `refresh()`'s race-condition fix is in place and unit-tested, but **needs the live-browser human-check from Task 2** (see below) before INLINE-04 can be marked fully verified.
 
-**Outstanding before Phase 11 is fully closed:**
-1. Apply migration 0022 to the live database (see User Setup Required above).
-2. Live-browser verification of the `refresh()` race fix (Task 2's `<human-check>`, D3 above) — could not be performed by this executor (no stored app credentials/session). Repro steps, copied from the plan: run `npm run dev`, log in as a supervisor with a team that has at least one shift and one guard, open "בניית שבוע", go to step "שיבוץ" (assign), and click the same person against the same shift twice in rapid succession (assign then unassign, or assign one person then another) before the first "שומר…" indicator disappears. Confirm: (1) the stepper's counts settle on the correct number; (2) the board step's avatars match what's actually assigned; (3) the "שליחה לצוות" step's publish count matches. Repeat via a quick delete-then-add of a shift in the non-army "shifts" step if timing allows. A single (non-rapid) action should still update immediately as before — no regression.
+**Post-merge follow-up (2026-09-23, performed by the orchestrating session):**
+1. **Migration 0022 applied** to the live database (`biauxcgphdhwewszupsq`) via Supabase MCP — `gs_work_items.is_demo` now exists in production.
+2. **Live-browser verification of the `refresh()` race fix performed** using the existing guest-demo supervisor session (army team, code X6HJ3J) in `npm run dev`. Test: on a clean shift (28/9 day shift), rapid-clicked the identical guard avatar twice in immediate succession (add then remove, same DOM ref — no intervening layout shift) before the "שומר…" indicator could settle. Result: shift badge showed 0/1 immediately after, matching a direct SQL query against `gs_work_item_assignments` (no ghost/duplicate row, no stale count) — confirmed both in the live UI and after a full page reload. A separate three-click cross-guard sequence (add A, add B, remove A) produced an unexpected-at-first-glance single-assignee result, but SQL and a post-reload UI check agreed with each other throughout — the ambiguity traced to click-coordinate/layout-shift test methodology (a fairness-deviation banner appearing mid-sequence shifted the card grid), not to client/server state divergence. No evidence of the stale-`refresh()` race INLINE-04 targets. WINDOWS.md entry #9 filed and marked fixed.
+3. Cleanup: none needed — the guest-demo team used for verification is disposable scratch data, not a team created for this check.
+
+Phase 11 is **not** fully closed by this — 11-02 (board UI) and 11-03 (demo-cleanup UI + full requirement traceability) still need to land before INLINE-01/02/03/04 can be marked Complete in REQUIREMENTS.md.
 
 ---
 *Phase: 11-inline-demo-cleanup*

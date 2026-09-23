@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 5
 waived_count: 0
-fixed_count: 3
-total_count: 8
-last_updated: 2026-09-22T20:10:00.000Z
+fixed_count: 4
+total_count: 9
+last_updated: 2026-09-23T08:40:00.000Z
 ---
 
 # Broken Windows Ledger
@@ -15,6 +15,7 @@ last_updated: 2026-09-22T20:10:00.000Z
 
 | id | phase | kind | file | line | description | status | reason | recorded_at | resolved_at |
 |----|-------|------|------|------|-------------|--------|--------|-------------|-------------|
+| 9 | 11 | unrun-verify | src/hooks/useGuardian.js | | 11-01 Task 2 human-check not run by executor (no browser tool in worktree): refresh() sequence-guard race-condition repro (rapid add/remove before "שומר…" clears) not observed live. Automated sequenceGuard.js unit coverage passes. | fixed | | 2026-09-23T08:10:00.000Z | 2026-09-23T08:40:00.000Z |
 | 1 | 04 | unrun-verify | .planning/phases/04-standing-positions/04-02-PLAN.md |  | Task 1 human-check not run: no chromium-cli/Playwright and no live-Supabase credentials in this worktree; POS-01 no-button materialization not observed in browser | open |  | 2026-08-27T08:14:25.005Z |  |
 | 2 | 04 | unrun-verify | .planning/phases/04-standing-positions/04-02-PLAN.md |  | Task 2/3 human-check not run: POS-05 four-channel visual distinction (greyscale/hand-covering tests) not observed in a real browser on either the supervisor or guard screen | open |  | 2026-08-27T08:14:31.385Z |  |
 | 3 | 05 | unrun-verify | src/components/supervisor/UnifiedBoard.jsx |  | Task 2 human-check (6 items) not run in a live browser — no browser tool available to this parallel worktree agent; data-level coverage passes via verify-board.mjs, but visual/click confirmation is outstanding (see 05-01-SUMMARY.md) | open |  | 2026-09-02T13:02:04.780Z |  |
@@ -121,6 +122,18 @@ last_updated: 2026-09-22T20:10:00.000Z
     "reason": "",
     "recorded_at": "2026-09-22T19:35:31.340Z",
     "resolved_at": "2026-09-22T20:10:00.000Z"
+  },
+  {
+    "id": 9,
+    "kind": "unrun-verify",
+    "phase": "11",
+    "file": "src/hooks/useGuardian.js",
+    "line": null,
+    "description": "11-01 Task 2 human-check not run by executor (no browser tool in worktree): refresh() sequence-guard race-condition repro (rapid add/remove before \"שומר…\" clears) not observed live. Automated sequenceGuard.js unit coverage passes.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-09-23T08:10:00.000Z",
+    "resolved_at": "2026-09-23T08:40:00.000Z"
   }
 ]
 ````
