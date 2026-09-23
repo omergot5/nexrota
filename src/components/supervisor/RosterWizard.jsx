@@ -11,9 +11,10 @@
 // שום מטריצת יחסים בין קטגוריות להגדיר — זה בכוונה. הבאנר רק מסביר את מה
 // שכבר קורה.
 //
-// פאנל התצוגה (06-02) מצייר מעתה את אותו דפוס משותף שמסך המשאבים והיומן
-// מציגים (ResourceGrid, D-04), מתוך פריטי העבודה בפועל של השבוע
-// (buildResourceRows על shifts/tasks) — לא מתוך העמדות הצפויות כפי שהיה קודם.
+// פאנל התצוגה (06-02) מצייר מעתה את אותו דפוס משותף שהיומן מציג (מסך
+// "מבט משאבים" הנפרד הוסר ב-Phase 10) — ResourceGrid, D-04 — מתוך פריטי
+// העבודה בפועל של השבוע (buildResourceRows על shifts/tasks) — לא מתוך
+// העמדות הצפויות כפי שהיה קודם.
 // ============================================================
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
@@ -142,7 +143,7 @@ export default function RosterWizard({
   // תחום הפעילות מוחל מ-subscribeTerms/termProfile (D-07) — לא ננעל
   // למחרוזת "army" למרות שהאשף הזה מוצג רק במצב הזה: buildResourceRows
   // (ולכן צביעת הקטגוריות ב-ResourceGrid) זקוק למקור אמת אחד, אותו אחד
-  // שמסך המשאבים והיומן קוראים ממנו.
+  // שהיומן קורא ממנו.
   const mode = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
 
   // רשימת הפריטים ברצועה: כל עמדה קיימת (פעילה) של הצוות, ואחריה כל זרע
@@ -311,7 +312,8 @@ export default function RosterWizard({
     await actions.ensurePositionsForWeek(weekDates[0]);
   };
 
-  // תצוגת השבוע: אותו מסלול נתונים בדיוק כמו "מבט משאבים" (D-02) —
+  // תצוגת השבוע: אותו מסלול נתונים בדיוק שהיומן משתמש בו (D-02, מסך "מבט
+  // משאבים" הנפרד הוסר ב-Phase 10) —
   // buildResourceRows מפַנה shifts/tasks בפועל לפי קטגוריה×יום. הבדל
   // מכוון מהרצועה הישנה: זה מדווח מה *קיים* בשבוע, לא מה *אמור* לרוץ
   // בו לפי העמדות השמורות (ר' J-2 באובייקטיב התוכנית).
@@ -444,7 +446,8 @@ export default function RosterWizard({
       </div>
 
       {/* הפאנל מציג מעתה את פריטי העבודה בפועל של השבוע דרך הרכיב המשותף
-        * ResourceGrid — אותו מבנה בדיוק שמסך המשאבים והיומן מציגים (D-04) —
+        * ResourceGrid — אותו מבנה בדיוק שהיומן מציג (D-04, מסך "מבט משאבים"
+        * הנפרד הוסר ב-Phase 10) —
         * והמשימה שבעריכה מופיעה בו כשורה מקווקוות עד שהיא נשמרת (pendingRows). */}
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr] items-start">
         <Card className="p-4 overflow-hidden">
