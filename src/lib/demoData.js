@@ -170,6 +170,7 @@ export async function seedDemoTeam({ teamCode, existingGuards = [], existingShif
         color: tpl.color,
         location: "כניסה ראשית",
         required_guards: 1,
+        is_demo: true,
       });
     }
   });
@@ -393,6 +394,7 @@ function positionPlanToShiftRow(row, teamCode) {
     position_id: row.positionId,
     type: "custom",
     published: false,
+    is_demo: true,
   };
 }
 
@@ -400,4 +402,18 @@ function positionPlanToShiftRow(row, teamCode) {
 function mergeById(primary, extra) {
   const seen = new Set(primary.map((x) => x.id));
   return [...primary, ...extra.filter((x) => !seen.has(x.id))];
+}
+
+/**
+ * מזהי משמרות-הדגמה של שבוע מסוים (Phase 11, INLINE-03).
+ *
+ * "שיבוץ הדגמה" נגזר מ-`isDemo` על שורת gs_work_items עצמה, לא דגל נפרד
+ * (11-CONTEXT.md open_questions מס' 2) — ה-cascade הקיים על
+ * gs_work_item_assignments/gs_availability/gs_swap_requests כבר מנקה
+ * שיבוצים/זמינות/בקשות-החלפה בחינם ברגע ששורת ה-gs_work_items הזו נמחקת,
+ * בלי צורך לגעת בטבלאות האלה ישירות.
+ */
+export function demoShiftIdsForWeek(shifts, weekDates) {
+  const weekSet = new Set(weekDates);
+  return shifts.filter((s) => s.isDemo && weekSet.has(s.date)).map((s) => s.id);
 }

@@ -28,7 +28,11 @@ import { chartTheme } from "../src/design/chartTheme.js";
 // api.js imports the Supabase client at module load — that construction is
 // synchronous and makes no network call, so this import stays offline like
 // every other module this script imports (UNIF-01, Phase 2 Plan 02-02 Task 2).
-import { taskColumns, taskFromRow, profileFromRow, shiftFromRow, shiftToRow } from "../src/lib/api.js";
+import {
+  taskColumns, taskFromRow, profileFromRow, shiftFromRow, shiftToRow, shiftRowToWorkItem,
+} from "../src/lib/api.js";
+import { createSequenceGuard } from "../src/lib/sequenceGuard.js";
+import { demoShiftIdsForWeek } from "../src/lib/demoData.js";
 
 let failures = 0;
 const check = (label, cond, extra = "") => {
@@ -927,6 +931,82 @@ check("QUAL-03 · shiftToRow לא מספק fallback string לקטגוריה חס
 const shiftRoundTrip = shiftToRow(shiftWithCategory, "T1");
 check("QUAL-03 · shiftToRow על אובייקט שמופה מ-shiftFromRow משחזר את עמודת הקטגוריה בדיוק (round trip)",
   shiftRoundTrip.category === "מטבח");
+
+// ---------- Phase 11 (INLINE-02) · is_demo round-trip (api.js) ----------
+
+const shiftDemoTrue = shiftFromRow({ ...shiftRowBase, is_demo: true });
+check("INLINE-02 · shiftFromRow על שורה עם is_demo:true מחזיר isDemo:true",
+  shiftDemoTrue.isDemo === true);
+
+const shiftDemoFalse = shiftFromRow({ ...shiftRowBase, is_demo: false });
+check("INLINE-02 · shiftFromRow על שורה עם is_demo:false מחזיר isDemo:false",
+  shiftDemoFalse.isDemo === false);
+
+const shiftDemoMissing = shiftFromRow({ ...shiftRowBase });
+check("INLINE-02 · shiftFromRow על שורה בלי is_demo בכלל (לפני המיגרציה) מחזיר isDemo:false ולא נופל",
+  shiftDemoMissing.isDemo === false);
+
+const shiftDemoRoundTrip = shiftToRow(shiftDemoTrue, "T1");
+check("INLINE-02 · shiftToRow על אובייקט שמופה מ-shiftFromRow עם is_demo:true משחזר is_demo:true (round trip)",
+  shiftDemoRoundTrip.is_demo === true);
+
+const shiftNoIsDemoField = { id: "s1", date: mon, label: "בוקר", startTime: "07:00", endTime: "19:00" };
+check("INLINE-02 · shiftToRow על משמרת בלי isDemo בכלל (טופס עריכה של מנהל) מפיק is_demo:false",
+  shiftToRow(shiftNoIsDemoField, "T1").is_demo === false);
+
+const shiftDemoWorkItem = shiftRowToWorkItem(shiftDemoRoundTrip);
+check("INLINE-02 · shiftRowToWorkItem על שורת is_demo:true עדיין נושא is_demo:true (rest spread בלי מיפוי מפורש)",
+  shiftDemoWorkItem.is_demo === true);
+
+// ---------- Phase 11 (INLINE-04) · sequenceGuard.js ----------
+
+const seqGuard = createSequenceGuard();
+const tokenA = seqGuard.next();
+const tokenB = seqGuard.next();
+check("INLINE-04 · next() מחזירה ערכים עולים",
+  tokenB > tokenA);
+
+check("INLINE-04 · isCurrent() על הטוקן העדכני ביותר מחזירה true",
+  seqGuard.isCurrent(tokenB) === true);
+
+check("INLINE-04 · isCurrent() על טוקן שהוחלף ע\"י טוקן חדש יותר מחזירה false (resolve לא-לפי-סדר)",
+  seqGuard.isCurrent(tokenA) === false);
+
+// מדמה בדיוק את תרחיש ה-race: tokenA הונפק ראשון (הבקשה הישנה), tokenB
+// הונפק אחריו (הבקשה החדשה) — אבל isCurrent(tokenA) נבדק *אחרי* שtokenB
+// כבר קיים, בלי קשר לאיזו מהבקשות בפועל "מגיעה" ראשונה (resolve).
+const seqGuard2 = createSequenceGuard();
+const oldToken = seqGuard2.next();
+const newToken = seqGuard2.next();
+check("INLINE-04 · טוקן ישן שנבדק אחרי שטוקן חדש כבר הונפק לא נחשב עדכני, גם אם הוא 'resolve' קודם",
+  seqGuard2.isCurrent(oldToken) === false && seqGuard2.isCurrent(newToken) === true);
+
+// ---------- Phase 11 (INLINE-03) · demoData.js — demoShiftIdsForWeek ----------
+
+const weekDates = [mon, addDays(mon, 1), addDays(mon, 2)];
+const otherWeekDate = addDays(mon, 30);
+const mixedShifts = [
+  { id: "demo-1", date: weekDates[0], isDemo: true },
+  { id: "demo-2", date: weekDates[2], isDemo: true },
+  { id: "real-1", date: weekDates[1], isDemo: false },
+  { id: "demo-other-week", date: otherWeekDate, isDemo: true },
+];
+const demoIdsThisWeek = demoShiftIdsForWeek(mixedShifts, weekDates);
+
+check("INLINE-03 · demoShiftIdsForWeek מחזירה רק את מזהי שיבוצי-ההדגמה של השבוע המבוקש",
+  demoIdsThisWeek.length === 2 &&
+  demoIdsThisWeek.includes("demo-1") &&
+  demoIdsThisWeek.includes("demo-2"),
+  JSON.stringify(demoIdsThisWeek));
+
+check("INLINE-03 · demoShiftIdsForWeek לא כוללת שיבוץ אמיתי מאותו שבוע",
+  !demoIdsThisWeek.includes("real-1"));
+
+check("INLINE-03 · demoShiftIdsForWeek לא כוללת שיבוץ-הדגמה משבוע אחר",
+  !demoIdsThisWeek.includes("demo-other-week"));
+
+check("INLINE-03 · demoShiftIdsForWeek על שבוע בלי נתוני-הדגמה מחזירה מערך ריק",
+  demoShiftIdsForWeek(mixedShifts, [addDays(mon, 60)]).length === 0);
 
 // ---------- שלב 5 (מחזור האיחוד) · fairnessWindow.js ----------
 

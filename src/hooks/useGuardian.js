@@ -20,7 +20,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient.js";
 import * as api from "../lib/api.js";
-import { seedDemoTeam, seedArmyRoster } from "../lib/demoData.js";
+import { seedDemoTeam, seedArmyRoster, demoShiftIdsForWeek } from "../lib/demoData.js";
 import { setTermProfile } from "../lib/terms.js";
 // שכבת ה-state הראשונה שנוגעת במנוע (Phase 3, QUAL-04 מסלול 4): שיבוץ ידני
 // מבצע כתיבה ישירה, ולכן חייב לשאול את אותה שאלה שהמנוע שואל לפני שהוא
@@ -30,6 +30,12 @@ import { checkQualification } from "../lib/autoAssign.js";
 // אותו עיקרון ש-checkQualification כבר נוהג בו כאן: שכבת ה-state קוראת
 // למנוע, לא מדמה אותו.
 import { missingRowsForWeek } from "../lib/positions.js";
+// Phase 11 (INLINE-04): refresh() has no sequencing today — two overlapping
+// loadTeam() calls (any two quick actions, or an action racing the realtime
+// subscription firing on its own write) can resolve out of order and let a
+// stale response overwrite a fresher one. createSequenceGuard is the fix,
+// scoped to this single choke point — see sequenceGuard.js's header.
+import { createSequenceGuard } from "../lib/sequenceGuard.js";
 
 const EMPTY = {
   team: null,
@@ -110,6 +116,10 @@ export function useGuardian() {
     dataRef.current = data;
   }, [data]);
 
+  // Phase 11 (INLINE-04) — see sequenceGuard.js and the comment on refresh()
+  // below. One guard for the life of the hook, not per-call.
+  const refreshSeqRef = useRef(createSequenceGuard());
+
   // StrictMode mounts, unmounts and remounts in dev. The flag has to be raised
   // again on every mount, or the cleanup from the first pass leaves it false
   // and every setState below is silently skipped.
@@ -183,13 +193,23 @@ export function useGuardian() {
   const refresh = useCallback(async () => {
     const teamCode = dataRef.current.team?.code;
     if (!teamCode) return;
+    // Phase 11 (INLINE-04): a token issued *before* the fetch, checked
+    // *after* it resolves — on both the success and failure branches. If a
+    // later refresh() call has already issued a newer token by the time
+    // this one resolves, this response is stale and must not paint state,
+    // no matter which one actually resolves first. This single choke point
+    // covers all ~12 call sites and the realtime subscription without
+    // touching any of them.
+    const token = refreshSeqRef.current.next();
     try {
       const team = await api.loadTeam(teamCode);
+      if (!refreshSeqRef.current.isCurrent(token)) return;
       if (mounted.current) {
         setData(team);
         setOffline(false);
       }
     } catch (e) {
+      if (!refreshSeqRef.current.isCurrent(token)) return;
       if (mounted.current) setError(e.message);
     }
   }, []);
@@ -697,6 +717,24 @@ export function useGuardian() {
           () => api.clearAssignments(shiftIds)
         ),
 
+      /**
+       * "מחק נתוני הדגמה לשבוע זה" (Phase 11, INLINE-03) — מוחקת רק שורות
+       * gs_work_items עם isDemo=true בטווח השבוע שהועבר. בלי endpoint חדש:
+       * demoShiftIdsForWeek (טהורה, demoData.js) מצמצמת לקבוצת ה-id, ו-
+       * api.deleteShifts הקיימת (RLS + ספירת-שורות) עושה את הכתיבה. שער
+       * DoS זהה ל-ensurePositionsForWeek: בלי נתוני-הדגמה בשבוע — return
+       * מיידי, בלי כתיבה ובלי deferred.
+       */
+      deleteDemoDataForWeek: (weekDates) => {
+        const ids = demoShiftIdsForWeek(dataRef.current.shifts, weekDates);
+        if (!ids.length) return;
+        return deferred(
+          "נתוני ההדגמה נמחקו",
+          (d) => ({ ...d, shifts: d.shifts.filter((s) => !ids.includes(s.id)) }),
+          () => api.deleteShifts(ids)
+        );
+      },
+
       setAvailability: (shiftId, guardId, status, comment) =>
         optimistic(
           (d) => ({
@@ -865,11 +903,20 @@ export function useGuardian() {
           await refresh();
         }),
 
-      deletePosition: (id) =>
+      // weekDates (Phase 11, INLINE-01 army FK safety net): כשעמדה כבר
+      // מומשה לשבוע המוצג, deletePosition הגולמי נופל על הפרת מפתח-זר
+      // (gs_work_items.position_id בלי cascade). unmaterializePositionWeek
+      // מבטלת רק את מימוש השבוע הזה, בלבד, לפני המחיקה — ברירת המחדל `[]`
+      // שומרת על התנהגות זהה לקוראים הקיימים (RosterWizard/PositionsScreen)
+      // שעדיין לא מעבירים שבוע.
+      deletePosition: (id, weekDates = []) =>
         deferred(
           "העמדה נמחקה",
           (d) => ({ ...d, positions: d.positions.filter((p) => p.id !== id) }),
-          () => api.deletePosition(id)
+          async () => {
+            if (weekDates.length) await api.unmaterializePositionWeek(id, weekDates);
+            await api.deletePosition(id);
+          }
         ),
 
       /**
