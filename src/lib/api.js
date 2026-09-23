@@ -1060,6 +1060,26 @@ export async function deletePosition(id) {
 }
 
 /**
+ * Phase 11 (INLINE-01/army FK safety net): gs_work_items.position_id has no
+ * `on delete cascade` (0017_work_items.sql) — deleting a position that
+ * already has this week's shifts materialized from it fails on a live
+ * foreign-key violation instead of a clean error. This unmaterializes only
+ * the given week's rows before deletePosition runs, so the DELETE above
+ * never has to hit that FK.
+ *
+ * Mirrors clearAssignments' convention, not deleteShift's: no `.select()`
+ * and no row-count check. Zero rows deleted is legitimate here — the
+ * position may not have been materialized for this week at all yet — not a
+ * failure like deleting a shift the caller already knows exists.
+ */
+export async function unmaterializePositionWeek(positionId, dates) {
+  if (!dates?.length) return;
+  const { error } = await supabase
+    .from("gs_work_items").delete().eq("position_id", positionId).in("start_date", dates);
+  if (error) throw new Error(error.message);
+}
+
+/**
  * הנתיב היחיד שכותב שורות שבועיות שהתממשו מעמדת תבנית (Pattern 1,
  * 04-RESEARCH.md). `ignoreDuplicates: true` הופך קריאה שנייה על אותו שבוע
  * ל-no-op בטוח-לתחרות ברמת ה-DB — האינדקס הייחודי על (position_id, date)

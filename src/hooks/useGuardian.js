@@ -20,7 +20,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient.js";
 import * as api from "../lib/api.js";
-import { seedDemoTeam, seedArmyRoster } from "../lib/demoData.js";
+import { seedDemoTeam, seedArmyRoster, demoShiftIdsForWeek } from "../lib/demoData.js";
 import { setTermProfile } from "../lib/terms.js";
 // שכבת ה-state הראשונה שנוגעת במנוע (Phase 3, QUAL-04 מסלול 4): שיבוץ ידני
 // מבצע כתיבה ישירה, ולכן חייב לשאול את אותה שאלה שהמנוע שואל לפני שהוא
@@ -717,6 +717,24 @@ export function useGuardian() {
           () => api.clearAssignments(shiftIds)
         ),
 
+      /**
+       * "מחק נתוני הדגמה לשבוע זה" (Phase 11, INLINE-03) — מוחקת רק שורות
+       * gs_work_items עם isDemo=true בטווח השבוע שהועבר. בלי endpoint חדש:
+       * demoShiftIdsForWeek (טהורה, demoData.js) מצמצמת לקבוצת ה-id, ו-
+       * api.deleteShifts הקיימת (RLS + ספירת-שורות) עושה את הכתיבה. שער
+       * DoS זהה ל-ensurePositionsForWeek: בלי נתוני-הדגמה בשבוע — return
+       * מיידי, בלי כתיבה ובלי deferred.
+       */
+      deleteDemoDataForWeek: (weekDates) => {
+        const ids = demoShiftIdsForWeek(dataRef.current.shifts, weekDates);
+        if (!ids.length) return;
+        return deferred(
+          "נתוני ההדגמה נמחקו",
+          (d) => ({ ...d, shifts: d.shifts.filter((s) => !ids.includes(s.id)) }),
+          () => api.deleteShifts(ids)
+        );
+      },
+
       setAvailability: (shiftId, guardId, status, comment) =>
         optimistic(
           (d) => ({
@@ -885,11 +903,20 @@ export function useGuardian() {
           await refresh();
         }),
 
-      deletePosition: (id) =>
+      // weekDates (Phase 11, INLINE-01 army FK safety net): כשעמדה כבר
+      // מומשה לשבוע המוצג, deletePosition הגולמי נופל על הפרת מפתח-זר
+      // (gs_work_items.position_id בלי cascade). unmaterializePositionWeek
+      // מבטלת רק את מימוש השבוע הזה, בלבד, לפני המחיקה — ברירת המחדל `[]`
+      // שומרת על התנהגות זהה לקוראים הקיימים (RosterWizard/PositionsScreen)
+      // שעדיין לא מעבירים שבוע.
+      deletePosition: (id, weekDates = []) =>
         deferred(
           "העמדה נמחקה",
           (d) => ({ ...d, positions: d.positions.filter((p) => p.id !== id) }),
-          () => api.deletePosition(id)
+          async () => {
+            if (weekDates.length) await api.unmaterializePositionWeek(id, weekDates);
+            await api.deletePosition(id);
+          }
         ),
 
       /**
