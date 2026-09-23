@@ -31,6 +31,7 @@ import { chartTheme } from "../src/design/chartTheme.js";
 import {
   taskColumns, taskFromRow, profileFromRow, shiftFromRow, shiftToRow, shiftRowToWorkItem,
 } from "../src/lib/api.js";
+import { createSequenceGuard } from "../src/lib/sequenceGuard.js";
 
 let failures = 0;
 const check = (label, cond, extra = "") => {
@@ -955,6 +956,29 @@ check("INLINE-02 · shiftToRow על משמרת בלי isDemo בכלל (טופס 
 const shiftDemoWorkItem = shiftRowToWorkItem(shiftDemoRoundTrip);
 check("INLINE-02 · shiftRowToWorkItem על שורת is_demo:true עדיין נושא is_demo:true (rest spread בלי מיפוי מפורש)",
   shiftDemoWorkItem.is_demo === true);
+
+// ---------- Phase 11 (INLINE-04) · sequenceGuard.js ----------
+
+const seqGuard = createSequenceGuard();
+const tokenA = seqGuard.next();
+const tokenB = seqGuard.next();
+check("INLINE-04 · next() מחזירה ערכים עולים",
+  tokenB > tokenA);
+
+check("INLINE-04 · isCurrent() על הטוקן העדכני ביותר מחזירה true",
+  seqGuard.isCurrent(tokenB) === true);
+
+check("INLINE-04 · isCurrent() על טוקן שהוחלף ע\"י טוקן חדש יותר מחזירה false (resolve לא-לפי-סדר)",
+  seqGuard.isCurrent(tokenA) === false);
+
+// מדמה בדיוק את תרחיש ה-race: tokenA הונפק ראשון (הבקשה הישנה), tokenB
+// הונפק אחריו (הבקשה החדשה) — אבל isCurrent(tokenA) נבדק *אחרי* שtokenB
+// כבר קיים, בלי קשר לאיזו מהבקשות בפועל "מגיעה" ראשונה (resolve).
+const seqGuard2 = createSequenceGuard();
+const oldToken = seqGuard2.next();
+const newToken = seqGuard2.next();
+check("INLINE-04 · טוקן ישן שנבדק אחרי שטוקן חדש כבר הונפק לא נחשב עדכני, גם אם הוא 'resolve' קודם",
+  seqGuard2.isCurrent(oldToken) === false && seqGuard2.isCurrent(newToken) === true);
 
 // ---------- שלב 5 (מחזור האיחוד) · fairnessWindow.js ----------
 

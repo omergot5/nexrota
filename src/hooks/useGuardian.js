@@ -30,6 +30,12 @@ import { checkQualification } from "../lib/autoAssign.js";
 // אותו עיקרון ש-checkQualification כבר נוהג בו כאן: שכבת ה-state קוראת
 // למנוע, לא מדמה אותו.
 import { missingRowsForWeek } from "../lib/positions.js";
+// Phase 11 (INLINE-04): refresh() has no sequencing today — two overlapping
+// loadTeam() calls (any two quick actions, or an action racing the realtime
+// subscription firing on its own write) can resolve out of order and let a
+// stale response overwrite a fresher one. createSequenceGuard is the fix,
+// scoped to this single choke point — see sequenceGuard.js's header.
+import { createSequenceGuard } from "../lib/sequenceGuard.js";
 
 const EMPTY = {
   team: null,
@@ -110,6 +116,10 @@ export function useGuardian() {
     dataRef.current = data;
   }, [data]);
 
+  // Phase 11 (INLINE-04) — see sequenceGuard.js and the comment on refresh()
+  // below. One guard for the life of the hook, not per-call.
+  const refreshSeqRef = useRef(createSequenceGuard());
+
   // StrictMode mounts, unmounts and remounts in dev. The flag has to be raised
   // again on every mount, or the cleanup from the first pass leaves it false
   // and every setState below is silently skipped.
@@ -183,13 +193,23 @@ export function useGuardian() {
   const refresh = useCallback(async () => {
     const teamCode = dataRef.current.team?.code;
     if (!teamCode) return;
+    // Phase 11 (INLINE-04): a token issued *before* the fetch, checked
+    // *after* it resolves — on both the success and failure branches. If a
+    // later refresh() call has already issued a newer token by the time
+    // this one resolves, this response is stale and must not paint state,
+    // no matter which one actually resolves first. This single choke point
+    // covers all ~12 call sites and the realtime subscription without
+    // touching any of them.
+    const token = refreshSeqRef.current.next();
     try {
       const team = await api.loadTeam(teamCode);
+      if (!refreshSeqRef.current.isCurrent(token)) return;
       if (mounted.current) {
         setData(team);
         setOffline(false);
       }
     } catch (e) {
+      if (!refreshSeqRef.current.isCurrent(token)) return;
       if (mounted.current) setError(e.message);
     }
   }, []);
