@@ -20,7 +20,7 @@
 // ============================================================
 
 import { useMemo, useState } from "react";
-import { Btn, PrimaryAction, Segmented } from "../ui.jsx";
+import { Btn, ConfirmDialog, PrimaryAction, Segmented } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import SmartAssign from "../SmartAssign.jsx";
 import UnifiedBoard from "./UnifiedBoard.jsx";
@@ -59,6 +59,11 @@ export default function WeekFlow({
   // ברירת המחדל היא השיבוץ האוטומטי. הידני יושב לצידו בתוך אותו שלב — הוא
   // תיקון של התוצאה, לא מסך מתחרה.
   const [assignMode, setAssignMode] = useState("auto");
+
+  // מצב-אישור משותף לשני הכפתורים ההרסניים של המסך הזה: ה-CTA לפרסום
+  // (נקודת-הכניסה הרביעית לפרסום, CONFIRM-02/04) ו"מחק נתוני הדגמה לשבוע
+  // זה" (CONFIRM-03) — מופע ConfirmDialog אחד בסוף הרכיב, לא שניים.
+  const [confirmState, setConfirmState] = useState(null);
 
   const weekShifts = useMemo(
     () => shifts.filter((s) => weekDates.includes(s.date)),
@@ -289,7 +294,19 @@ export default function WeekFlow({
       children: hasShifts && published === weekShifts.length ? "הסידור אצל הצוות" : t("action.publish"),
       icon: "send",
       variant: "accent",
-      onClick: () => actions.publish(weekShifts.map((s) => s.id), true),
+      // נקודת-הכניסה הרביעית לפרסום (12-CONTEXT.md §2) — כפולה-פעולה ל-
+      // ScheduleMgmt's "פרסם הכל" אבל נקודת-UI נפרדת, אז מקבלת חיווט משלה.
+      // הכפתור הזה אף פעם לא קורא ל-publish(ids, false) (מנוטרל כש-published
+      // === weekShifts.length), אז אין צורך ב-helper משותף כמו askPublish
+      // ב-12-03 — נקודת-כניסה אחת, לא שלוש.
+      onClick: () =>
+        setConfirmState({
+          title: "לשלוח את הסידור לצוות?",
+          body: `${weekShifts.length} ${t("unit.shifts")} ייראו מיד אצל כל ${t("noun.memberPlural")} המשובצים.`,
+          confirmLabel: t("action.publish"),
+          tone: "accent",
+          onConfirm: () => actions.publish(weekShifts.map((s) => s.id), true),
+        }),
       loading: busy,
       disabled: !hasShifts || published === weekShifts.length,
       hint: !hasShifts
@@ -362,6 +379,17 @@ export default function WeekFlow({
       {body}
 
       <PrimaryAction {...action} />
+
+      <ConfirmDialog
+        open={Boolean(confirmState)}
+        onClose={() => setConfirmState(null)}
+        onConfirm={confirmState?.onConfirm}
+        title={confirmState?.title}
+        body={confirmState?.body}
+        confirmLabel={confirmState?.confirmLabel}
+        tone={confirmState?.tone}
+        busy={busy}
+      />
     </div>
   );
 }
