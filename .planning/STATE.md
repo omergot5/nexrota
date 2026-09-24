@@ -5,16 +5,16 @@ milestone_name: גימור להשקה
 current_phase: 11
 current_phase_name: "עריכה אינטואיטיבית + ניקוי הדגמה + באג \"מצב השבוע\""
 status: planning
-stopped_at: Completed 11-01-PLAN.md (data/state layer); migration 0022 needs live application; Task 2 human-check (refresh race) needs live browser verification
-last_updated: "2026-09-23T07:47:40.596Z"
-last_activity: 2026-09-23
-last_activity_desc: Phase 10 verified passed (3/3 success criteria); code review found 2 warnings (stale RosterWizard.jsx comments, stray untracked ResourceView.jsx) — both fixed and re-verified; transitioned to Phase 11
-state_head: fdac24d815692a93cb69549169c9b17129d41a78
+stopped_at: Completed 11-02-PLAN.md (inline board x/+ editing + army position-delete FK wiring); live-verified all 3 human-check points; 11-03 (Wave 3 of 3) still pending before INLINE-01..04 can be marked Complete
+last_updated: "2026-09-24T06:02:44.557Z"
+last_activity: 2026-09-24
+last_activity_desc: Plan 11-02 (inline board "x"/"+" editing + army position-delete FK wiring) completed and live-verified 3/3 human-check points; Wave 2 of 3 for Phase 11 — 11-03 (Wave 3 of 3) still pending
+state_head: 18f5efedb6702990cf12ccd2f2fc13e9f366c9b4
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 17
-  completed_plans: 15
+  completed_plans: 16
   percent: 63
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 ## Current Position
 
 Phase: 11 (עריכה אינטואיטיבית + ניקוי הדגמה + באג "מצב השבוע")
-Plan: not yet planned
-Status: Ready to plan
-Last activity: 2026-09-23 — Phase 10 merged, code-reviewed, fixed, and verified 3/3
+Plan: 02 of 03 complete (Wave 2 of 3)
+Status: In progress — 11-03 (Wave 3 of 3) still pending
+Last activity: 2026-09-24 — 11-02 completed (inline board x/+ editing + army position-delete FK wiring), live-verified 3/3
 
 Progress: [██████░░░░] 63% (v1.2)
 
@@ -73,6 +73,7 @@ Progress: [██████░░░░] 63% (v1.2)
 | Phase 10 P02 | ~15min | 1 tasks | 6 files |
 | Phase 10 P03 | 55min | 1 tasks | 1 files |
 | Phase 11 P01 | 35min | 3 tasks | 6 files |
+| Phase 11 P02 | ~25min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -93,6 +94,7 @@ Progress: [██████░░░░] 63% (v1.2)
 - [Phase 10]: All 5 original 'עוד' items + new analytics shortcut + 2 pre-existing dashboard shortcuts re-verified live in one integrated browser pass (gstack $B headless fallback), closing the gap left by 10-01/10-02 each verifying only their own slice.
 - [Phase 10]: Code review (post-merge, full 3-plan diff) found WR-01 (4 stale present-tense RosterWizard.jsx comments still describing the deleted "מסך משאבים" as existing) and WR-02 (a stray untracked byte-identical leftover copy of the already-deleted ResourceView.jsx sitting in the working tree) — both stemmed from the 10-02 verify gate only grepping the literal string "ResourceView", not the Hebrew display name or disk state. Fixed directly; gsd-verifier re-confirmed both fixes independently against current src/.
 - [Phase 11]: [Phase 11] 11-01: is_demo placement (gs_work_items only, derived demo-assignment) and army FK safety-net order (unmaterializePositionWeek before deletePosition) implemented exactly as locked in 11-CONTEXT.md — no deviation
+- [Phase 11]: [Phase 11] 11-02: Inline board "x"/"+" follows the exact onMove/onDragStart optional-prop precedent (no new wiring mechanism); "+" picker deliberately scoped to toggleAssignment's own qualification-only gate, not AssignView's fuller overlap/rest-hours check, per 11-CONTEXT.md's documented scope boundary.
 
 ### Pending Todos
 
@@ -110,7 +112,8 @@ None yet.
 - אין test runner בפרויקט. כל בדיקה חדשה חייבת להיות סקריפט Node עצמאי שמדפיס `ok`/`FAIL` ומחזיר קוד יציאה, מחובר ל-`npm test`. רלוונטי ישירות ל-BUG-04.
 - ⚠️ [v1.1] Phases 1-3's VERIFICATION.md files predate the current `status:` frontmatter contract — GSD tooling reports them "missing" on format alone; carried forward as a known override (see MILESTONES.md v1.1 entry). Consider backfilling frontmatter early in this milestone.
 - ⚠️ [v1.1] Pre-existing NUL-byte separator in `conflicts.js`'s `pairKey` — acknowledged tech debt, no observed impact (see Deferred Items below).
-- [Phase 11] 11-01: Supabase migration 0022 (gs_work_items.is_demo) written and committed but NOT applied to the live database — this executor had no Supabase MCP/CLI/DB credentials available. Apply via SQL editor/CLI/MCP before Plan 11-03's demo-cleanup UI is tested live.
+- [Phase 11] 11-01: Supabase migration 0022 (gs_work_items.is_demo) written and committed but NOT applied to the live database — this executor had no Supabase MCP/CLI/DB credentials available. Apply via SQL editor/CLI/MCP before Plan 11-03's demo-cleanup UI is tested live. **Resolved 2026-09-23 (post-merge follow-up, see 11-01-SUMMARY.md): migration applied live via Supabase MCP.**
+- **[v1.2 Phase 11] 11-02 complete and live-verified (2026-09-24).** Inline board "x"/"+" editing (INLINE-01 UI half) and army position-delete FK wiring both live-verified 3/3 human-check points by the orchestrating session. `REQUIREMENTS.md` INLINE-01..04 checkboxes deliberately left unchecked — Plan 11-03 (Wave 3 of 3) still pending; whichever of 11-02/11-03 finishes last should run `requirements mark-complete`.
 
 ### Quick Tasks Completed
 
@@ -129,8 +132,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-23T07:47:38.853Z
-Stopped at: Completed 11-01-PLAN.md (data/state layer); migration 0022 needs live application; Task 2 human-check (refresh race) needs live browser verification
+Last session: 2026-09-24T06:02:35.844Z
+Stopped at: Completed 11-02-PLAN.md (inline board x/+ editing + army position-delete FK wiring); live-verified all 3 human-check points; 11-03 (Wave 3 of 3) still pending before INLINE-01..04 can be marked Complete
 Resume file: None
 
 ## Operator Next Steps
