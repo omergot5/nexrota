@@ -547,15 +547,16 @@ export function useGuardian() {
         ),
 
       /**
-       * מחיקת אצווה — למשל כל השבוע. עוברת דרך `deferred` בדיוק כמו מחיקה
-       * בודדת, ולכן מקבלים שמונה שניות של "ביטול" במקום דיאלוג אישור.
+       * מחיקת אצווה — למשל כל השבוע. `deleteShift` (יחיד) נשארת `deferred()`
+       * עם UndoBar, אבל זו (אצווה) עברה לכתיבה מיידית (Phase 12, CONFIRM-03):
+       * הפעולה הזו נקראת אחרי אישור מפורש בדיאלוג (Wave 2, 12-CONTEXT.md
+       * `<decisions>`) — פרה-אישור מחליף את חלון ה-8 שניות, לא מצטבר עליו.
        */
-      deleteShifts: (ids, label = "המשמרות נמחקו") =>
-        deferred(
-          label,
-          (d) => ({ ...d, shifts: d.shifts.filter((s) => !ids.includes(s.id)) }),
-          () => api.deleteShifts(ids)
-        ),
+      deleteShifts: (ids) =>
+        run(async () => {
+          await api.deleteShifts(ids);
+          await refresh();
+        }),
 
       /**
        * החלפת תוכן השבוע: מה שהיה יורד, ומה שנבחר עולה במקומו.
