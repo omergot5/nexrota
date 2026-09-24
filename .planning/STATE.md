@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: גימור להשקה
 current_phase: 12
-current_phase_name: "אישורי פעולות קריטיות"
+current_phase_name: אישורי פעולות קריטיות
 status: planning
-stopped_at: "Phase 11 closed: merged (11-01/11-02/11-03), code-reviewed (2 Critical + 2 Warning fixed), verified 4/4 by gsd-verifier; ready to plan Phase 12"
-last_updated: "2026-09-24T07:00:00.000Z"
+stopped_at: Completed 12-01-PLAN.md (ConfirmDialog infra, CONFIRM-01)
+last_updated: "2026-09-24T16:07:34.869Z"
 last_activity: 2026-09-24
-last_activity_desc: "Phase 11 verified passed (4/4 success criteria); code review found CR-01 (task-card metadata corruption via UnifiedBoard's inline +/x), CR-02 (non-atomic deletePosition fake-rollback), WR-01 (avatar z-index), WR-02 (imprecise toast) — all fixed and re-verified by gsd-verifier against current code; transitioned to Phase 12"
-state_head: bbc867a
+last_activity_desc: Phase 11 verified passed (4/4 success criteria); code review found CR-01 (task-card metadata corruption via UnifiedBoard's inline +/x), CR-02 (non-atomic deletePosition fake-rollback), WR-01 (avatar z-index), WR-02 (imprecise toast) — all fixed and re-verified by gsd-verifier against current code; transitioned to Phase 12
+state_head: 957a6cfabc4e12e21f39c41316a869329cfeb648
 progress:
   total_phases: 8
   completed_phases: 6
-  total_plans: 17
-  completed_plans: 17
+  total_plans: 23
+  completed_plans: 18
   percent: 75
 ---
 
@@ -34,7 +34,7 @@ Plan: not yet planned
 Status: Ready to plan
 Last activity: 2026-09-24 — Phase 11 merged, code-reviewed, fixed (2 Critical + 2 Warning), and verified 4/4
 
-Progress: [███████░░░] 75% (v1.2)
+Progress: [████████░░] 75% (v1.2)
 
 ## Performance Metrics
 
@@ -75,6 +75,7 @@ Progress: [███████░░░] 75% (v1.2)
 | Phase 11 P01 | 35min | 3 tasks | 6 files |
 | Phase 11 P02 | ~25min | 3 tasks | 5 files |
 | Phase 11 P03 | 20min | 1 tasks | 1 files |
+| Phase 12 P01 | 10min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,7 @@ Progress: [███████░░░] 75% (v1.2)
 - [Phase 11]: [Phase 11] 11-01: is_demo placement (gs_work_items only, derived demo-assignment) and army FK safety-net order (unmaterializePositionWeek before deletePosition) implemented exactly as locked in 11-CONTEXT.md — no deviation
 - [Phase 11]: [Phase 11] 11-02: Inline board "x"/"+" follows the exact onMove/onDragStart optional-prop precedent (no new wiring mechanism); "+" picker deliberately scoped to toggleAssignment's own qualification-only gate, not AssignView's fuller overlap/rest-hours check, per 11-CONTEXT.md's documented scope boundary.
 - [Phase 11]: [Phase 11] 11-03: demo-cleanup button wired to existing deleteDemoDataForWeek/demoShiftIdsForWeek (11-01) inside WeekFlow's shared board step; closing integration pass re-ran INLINE-04's race-condition repro through the NEW 11-02 board +/x affordances stacked with the new delete-demo action, not just the pre-existing AssignView path from Wave 1 — no bugs found, all 7 human-check points pass
+- [Phase 12]: [Phase 12] 12-01: ConfirmDialog גנרי (CONFIRM-01) הוסף ל-ui.jsx לצד Modal — tone נופל ישירות ל-Btn variant, pending חוסם סגירה בזמן onConfirm, בלי צרכן עדיין (Wave 2 מחווטת)
 
 ### Pending Todos
 
@@ -134,8 +136,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-24T07:00:00.000Z
-Stopped at: Phase 11 closed (merged + code-reviewed + fixed + verified 4/4); ready to plan Phase 12
+Last session: 2026-09-24T16:07:33.101Z
+Stopped at: Completed 12-01-PLAN.md (ConfirmDialog infra, CONFIRM-01)
 Resume file: None
 
 ## Operator Next Steps
