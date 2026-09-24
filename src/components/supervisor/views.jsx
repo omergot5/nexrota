@@ -1424,6 +1424,24 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
   const publishedCount = weekShifts.filter((s) => s.published).length;
   const unassigned = weekShifts.filter((s) => s.assignedGuards.length < s.requiredGuards).length;
 
+  const [confirmState, setConfirmState] = useState(null);
+
+  // עוטף שלוש נקודות-כניסה נפרדות (פרסם-הכל, בטל-פרסום-הכל, טוגל-יום) כדי
+  // שלוגיקת-הפתיחה לא תשוכפל שלוש פעמים (12-CONTEXT.md §5ב). לא נוגע ב-
+  // actions.publish/api.setPublished עצמם — הבאג הידוע ב"ביטול הפצה"
+  // (STATE.md, Phase 13) נשאר כפי שהוא; זו רק שער-UI לפני הקריאה הקיימת.
+  function askPublish({ ids, publish, scopeLabel, confirmLabel }) {
+    setConfirmState({
+      title: publish ? "לפרסם את הסידור?" : "לבטל את הפרסום?",
+      body: publish
+        ? `${scopeLabel} ${t("unit.shifts")} ייראו מיד אצל כל ${t("noun.memberPlural")} המשובצים.`
+        : `${scopeLabel} ${t("unit.shifts")} יחזרו למצב טיוטה — ${t("noun.memberPlural")} לא יראו אותן יותר כמפורסמות.`,
+      confirmLabel,
+      tone: publish ? "accent" : "outline",
+      onConfirm: () => actions.publish(ids, publish),
+    });
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -1432,12 +1450,25 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
         actions={
           <>
             {publishedCount < weekShifts.length && (
-              <Btn variant="accent" icon="share" onClick={() => actions.publish(allIds, true)} loading={busy}>
+              <Btn
+                variant="accent"
+                icon="share"
+                onClick={() =>
+                  askPublish({ ids: allIds, publish: true, scopeLabel: "כל השבוע", confirmLabel: t("action.publishAll") })
+                }
+                loading={busy}
+              >
                 {t("action.publishAll")}
               </Btn>
             )}
             {publishedCount > 0 && (
-              <Btn variant="outline" onClick={() => actions.publish(allIds, false)} loading={busy}>
+              <Btn
+                variant="outline"
+                onClick={() =>
+                  askPublish({ ids: allIds, publish: false, scopeLabel: "כל השבוע", confirmLabel: t("action.unpublish") })
+                }
+                loading={busy}
+              >
                 {t("action.unpublish")}
               </Btn>
             )}
@@ -1478,7 +1509,14 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
                     <Btn
                       size="sm"
                       variant={allPub ? "outline" : "primary"}
-                      onClick={() => actions.publish(dayShifts.map((s) => s.id), !allPub)}
+                      onClick={() =>
+                        askPublish({
+                          ids: dayShifts.map((s) => s.id),
+                          publish: !allPub,
+                          scopeLabel: formatDateHe(date),
+                          confirmLabel: allPub ? t("action.unpublishShort") : t("action.publishDay"),
+                        })
+                      }
                     >
                       {allPub ? t("action.unpublishShort") : t("action.publishDay")}
                     </Btn>
@@ -1540,6 +1578,17 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
           })}
         </>
       )}
+
+      <ConfirmDialog
+        open={Boolean(confirmState)}
+        onClose={() => setConfirmState(null)}
+        onConfirm={confirmState?.onConfirm}
+        title={confirmState?.title}
+        body={confirmState?.body}
+        confirmLabel={confirmState?.confirmLabel}
+        tone={confirmState?.tone}
+        busy={busy}
+      />
     </div>
   );
 }
