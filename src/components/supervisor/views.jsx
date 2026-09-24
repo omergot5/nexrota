@@ -506,7 +506,13 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
    * ל-3 היה משאיר את השתיים הישנות ומוסיף שלוש — חמש משמרות ביום שאיש
    * לא ביקש. מי שבוחר מבנה שבוע מצהיר איך השבוע נראה, ולא מבקש תוספת.
    */
-  const fillWeek = async (pattern) => {
+  /**
+   * "מלא שבוע" מבקש אישור **רק כשיש כבר תוכן לדרוס** (CONFIRM-05) — שבוע
+   * ריק (המקרה שקורה מתוך EmptyState's choices) הוא יצירה טהורה, לא
+   * דריסה, ולכן ממשיך ליצור מיד בלי דיאלוג. `replaceShifts` כותבת מיד
+   * ברגע שהיא נקראת (12-02) — אין UndoBar יותר על הפעולה הזו.
+   */
+  const fillWeek = (pattern) => {
     const rows = [];
     for (const date of weekDates) {
       for (const tpl of pattern.shifts) {
@@ -518,7 +524,18 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
         });
       }
     }
-    actions.replaceShifts(weekShifts.map((s) => s.id), rows);
+    const apply = () => actions.replaceShifts(weekShifts.map((s) => s.id), rows);
+    if (weekShifts.length > 0) {
+      setConfirmState({
+        title: "להחליף את תוכן השבוע?",
+        body: `${weekShifts.length} ${t("unit.shifts")} קיימות (כולל שיבוצים) יימחקו, ו-${rows.length} ${t("unit.shifts")} חדשות יוצרו במקומן.`,
+        confirmLabel: "החלף שבוע",
+        tone: "danger",
+        onConfirm: apply,
+      });
+    } else {
+      apply();
+    }
     setShowFill(false);
   };
 
@@ -2742,6 +2759,9 @@ export function TeamView({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [demoDialogOpen, setDemoDialogOpen] = useState(false);
+  // מחזיק את האדם שנבחר להסרה (לא רק id) כדי שגוף הדיאלוג יוכל להציג את
+  // שמו — null סוגר את הדיאלוג (CONFIRM-05).
+  const [guardToRemove, setGuardToRemove] = useState(null);
 
   // ---- עורך כשירות (QUAL-01, QUAL-02, D-03, D-04) ----
   // אותה טקסונומיה בדיוק שטופס המשמרת וטופס המשימה קוראים ממנה (D-01),
@@ -3043,7 +3063,7 @@ export function TeamView({
                     label={`הסר את ${g.name} מהצוות`}
                     size="sm"
                     className="hover:text-danger"
-                    onClick={() => actions.removeGuard(g.id)}
+                    onClick={() => setGuardToRemove(g)}
                   />
                 </div>
               </li>
@@ -3158,6 +3178,17 @@ export function TeamView({
         open={demoDialogOpen}
         onClose={() => setDemoDialogOpen(false)}
         onConfirm={onSeedDemo}
+        busy={busy}
+      />
+
+      <ConfirmDialog
+        open={Boolean(guardToRemove)}
+        onClose={() => setGuardToRemove(null)}
+        onConfirm={() => actions.removeGuard(guardToRemove.id)}
+        title={guardToRemove ? `להסיר את ${guardToRemove.name} מהצוות?` : ""}
+        body={`${guardToRemove?.name || ""} יוסר/תוסר מהצוות, כולל השיבוצים, הזמינות ובקשות ההחלפה שדיווח/ה. הפעולה לא הפיכה.`}
+        confirmLabel="הסר מהצוות"
+        tone="danger"
         busy={busy}
       />
     </div>
