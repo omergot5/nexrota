@@ -165,14 +165,25 @@ export default function WeekFlow({
     // לזמינות — הפניה בשם הכפתור הישן הייתה מטעה.
     <div key="board" className="space-y-3">
       {/* "מחק נתוני הדגמה לשבוע זה" (INLINE-03) — מוצג רק כשיש נתוני-הדגמה
-        * בשבוע המוצג (demoIds), בדיוק אותה מוסכמה כמו "מחק שבוע" ב-ShiftMgmt:
-        * בלי דיאלוג אישור, UndoBar בלבד (עקרון ברזל 3). */}
+        * בשבוע המוצג (demoIds). עברה לפרה-אישור (CONFIRM-03): הכפתור עצמו
+        * רק פותח ConfirmDialog (מצב משותף מוגדר בראש הרכיב) — רק אישור בו
+        * קורא בפועל ל-actions.deleteDemoDataForWeek, שכותבת מיד אחרי אישור
+        * (12-02), בלי UndoBar יותר. בדיוק אותה מוסכמה כמו "מחק שבוע"
+        * ב-ShiftMgmt (12-03). */}
       {demoIds.length > 0 && (
         <div className="flex justify-end">
           <Btn
             variant="ghost"
             icon="trash"
-            onClick={() => actions.deleteDemoDataForWeek(weekDates)}
+            onClick={() =>
+              setConfirmState({
+                title: "למחוק את נתוני ההדגמה של השבוע?",
+                body: `${demoIds.length} רשומות הדגמה יימחקו מהשבוע הזה. שיבוצים אמיתיים באותו שבוע ונתוני הדגמה בשבועות אחרים לא ייפגעו.`,
+                confirmLabel: "מחק נתוני הדגמה",
+                tone: "danger",
+                onConfirm: () => actions.deleteDemoDataForWeek(weekDates),
+              })
+            }
             disabled={busy}
           >
             מחק נתוני הדגמה לשבוע זה
