@@ -308,6 +308,10 @@ export function useGuardian() {
    *
    * המחיר: הכתיבה חייבת להישלח גם אם עוזבים את המסך. `flush` נקרא לפני כל
    * פעולה נדחית חדשה, ובפריקת הרכיב.
+   *
+   * לא כל קריאה ל-`deferred()` בקובץ הזה נהנית מהנימוק "בלי חלונית אישור"
+   * באותה מידה יותר: חלק מהפעולות שהיו כאן עברו לפרה-אישור (Phase 12) —
+   * ר' טבלת-הביקורת CONFIRM-05 מעל `actions` למטה.
    */
   const pendingRef = useRef(null);
   // `flush` נקרא מתוך טיימר שנוצר לפניו — הפניה דרך ref שוברת את המעגל.
@@ -500,6 +504,32 @@ export function useGuardian() {
   // current dataset is read through `dataRef` at call time instead. That
   // keeps this object identical across renders.
 
+  /**
+   * CONFIRM-05 — טבלת ביקורת הפעולות ההרסניות (Phase 12, 12-CONTEXT.md findings §1).
+   *
+   * ביקורת מלאה, מבוססת קוד, על כל תשע הפעולות שהיו `deferred()` (UndoBar)
+   * בזמן הסקירה, ועוד פעולה עשירית (`removeRoleCompatibility`) שנמצאה בלי
+   * שום הגנה בכלל. לכל שורה: מצב-החיבור שנקבע בסוף Phase 12 Wave 1, והנימוק.
+   *
+   * | פעולה | מצב חיבור | נימוק |
+   * |---|---|---|
+   * | `deleteShift` | stays-UndoBar | מחיקת-פריט-בודד תכופה, חומרה נמוכה — עקבי עם עקרון UndoBar לפעולות הפיכות-בקלות |
+   * | `deleteShifts` | in-scope-for-pre-confirm | CONFIRM-03, נקוב במפורש |
+   * | `replaceShifts` | in-scope-for-pre-confirm | דריסת תוכן שבוע שלם — הדוגמה המפורשת ל"דריסות" בטקסט CONFIRM-05 עצמו |
+   * | `clearAssignments` | stays-UndoBar | אין נקודת-UI חיה שקוראת לה כרגע (12-CONTEXT.md אישר) — נשארת מוגנת-UndoBar לכשתחובר |
+   * | `deleteDemoDataForWeek` | in-scope-for-pre-confirm | CONFIRM-03, נקוב במפורש |
+   * | `removeGuard` | in-scope-for-pre-confirm | מסיר אדם מהצוות; cascade לשיבוצים/זמינות/בקשות-החלפה שלו |
+   * | `decideSwap` | stays-UndoBar | הערת-קוד קיימת (useGuardian.js, ליד הפעולה) כבר דנה במפורש ונגד confirm() עבור אישור/דחיית-החלפה — נשמר כתקדים מודע |
+   * | `deleteTask` | stays-UndoBar | מחיקת-פריט-בודד תכופה, חומרה נמוכה — כמו `deleteShift` |
+   * | `deletePosition` | in-scope-for-pre-confirm | מוחקת עמדה קבועה; cascade על שיבוצי-השבוע הנוכחי כשהיא ממומשת |
+   * | `removeRoleCompatibility` | newly-protected (UndoBar, לא pre-confirm) | פער אמיתי שנמצא — לא הייתה לה שום הגנה. הרף המינימלי שנקבע הוא "לפחות UndoBar", לא פרה-אישור מלא |
+   *
+   * Wave 2 (12-03/04/05) מחווט כל אחת מחמש השורות "in-scope-for-pre-confirm"
+   * מאחורי `ConfirmDialog` (12-01) בפועל. `removeRoleCompatibility` לא
+   * דורשת שום שינוי UI נוסף — ה-`UndoBar` הגלובלי (`SupervisorApp.jsx`,
+   * מוזן מ-`pending`/`undo` שמוחזרים מהוק זה) כבר יציג אותה אוטומטית ברגע
+   * שהמנגנון שלה השתנה כאן.
+   */
   const actions = useMemo(
     () => ({
       // army מקבל מסלול הדגמה נפרד (seedArmyRoster): סד"כ מלא — חמש
@@ -756,11 +786,15 @@ export function useGuardian() {
           await refresh();
         }),
 
+      // Phase 12 (CONFIRM-05, טבלת-ביקורת מעל `actions`): הפעם הראשונה
+      // שהפעולה הזו מקבלת רשת-ביטחון כלשהי — קודם הייתה `run()` רגילה, בלי
+      // UndoBar ובלי דיאלוג, פער-הגנה אמיתי שנמצא בסקירת הקוד של הפאזה.
       removeRoleCompatibility: (id) =>
-        run(async () => {
-          await api.removeRoleCompatibility(id);
-          await refresh();
-        }),
+        deferred(
+          "החסימה הוסרה",
+          (d) => ({ ...d, compatibility: d.compatibility.filter((c) => c.id !== id) }),
+          () => api.removeRoleCompatibility(id)
+        ),
 
       setGuardExempt: (id, exempt) =>
         optimistic(
