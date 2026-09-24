@@ -20,7 +20,7 @@
 // ============================================================
 
 import { useMemo, useState } from "react";
-import { PrimaryAction, Segmented } from "../ui.jsx";
+import { Btn, PrimaryAction, Segmented } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import SmartAssign from "../SmartAssign.jsx";
 import UnifiedBoard from "./UnifiedBoard.jsx";
@@ -28,6 +28,7 @@ import RosterWizard from "./RosterWizard.jsx";
 import { ShiftMgmt, AvailView, AssignView, ScheduleMgmt } from "./views.jsx";
 import { availStatus } from "../../lib/autoAssign.js";
 import { boardItemsForDates } from "../../lib/dates.js";
+import { demoShiftIdsForWeek } from "../../lib/demoData.js";
 import { t } from "../../lib/terms.js";
 
 /**
@@ -97,6 +98,10 @@ export default function WeekFlow({
     return merged.days.reduce((sum, d) => sum + d.timeless.length + d.timed.length, 0);
   }, [shifts, tasks, weekDates]);
 
+  // מזהי משמרות-הדגמה של השבוע המוצג (Phase 11, INLINE-03) — קובעים אם
+  // כפתור "מחק נתוני הדגמה" מוצג בכלל. שער-נראות טהור, בלי כתיבה.
+  const demoIds = useMemo(() => demoShiftIdsForWeek(shifts, weekDates), [shifts, weekDates]);
+
   const meta = [
     {
       id: "shifts",
@@ -153,24 +158,40 @@ export default function WeekFlow({
     // "בניית שבוע" (ר' empty.body למטה), לא בשם כפתור ספציפי: אחרי ההזזה
     // הכפתור שמתחת ללוח (action[1] למטה) כבר לא בונה משמרות, הוא מוביל
     // לזמינות — הפניה בשם הכפתור הישן הייתה מטעה.
-    <UnifiedBoard
-      key="board"
-      shifts={shifts}
-      tasks={tasks}
-      guards={guards}
-      dates={weekDates}
-      empty={{
-        body: `בנה ${t("unit.shifts")} או משימות בשלב "${t("nav.shifts")}", והלוח ייבנה מעצמו.`,
-      }}
-      // עריכה רק כאן (BOARD-05): זה מסך הבנייה עצמו, לא היומן ולא הלוח של
-      // המשתתף — שני המסכים האחרים ממשיכים לקבל את הלוח בלי onMove/
-      // onToggleAssignment, כלומר לקריאה בלבד בדיוק כמו קודם.
-      onMove={actions.moveAssignment}
-      // "x"/"+" ישירות על הלוח (INLINE-01, אופציה ב, 11-CONTEXT.md) — אותה
-      // toggleAssignment הקיימת ש-AssignView כבר קוראת לה, בלי כתיבה חדשה.
-      onToggleAssignment={actions.toggleAssignment}
-      mode={team?.mode || "security"}
-    />,
+    <div key="board" className="space-y-3">
+      {/* "מחק נתוני הדגמה לשבוע זה" (INLINE-03) — מוצג רק כשיש נתוני-הדגמה
+        * בשבוע המוצג (demoIds), בדיוק אותה מוסכמה כמו "מחק שבוע" ב-ShiftMgmt:
+        * בלי דיאלוג אישור, UndoBar בלבד (עקרון ברזל 3). */}
+      {demoIds.length > 0 && (
+        <div className="flex justify-end">
+          <Btn
+            variant="ghost"
+            icon="trash"
+            onClick={() => actions.deleteDemoDataForWeek(weekDates)}
+            disabled={busy}
+          >
+            מחק נתוני הדגמה לשבוע זה
+          </Btn>
+        </div>
+      )}
+      <UnifiedBoard
+        shifts={shifts}
+        tasks={tasks}
+        guards={guards}
+        dates={weekDates}
+        empty={{
+          body: `בנה ${t("unit.shifts")} או משימות בשלב "${t("nav.shifts")}", והלוח ייבנה מעצמו.`,
+        }}
+        // עריכה רק כאן (BOARD-05): זה מסך הבנייה עצמו, לא היומן ולא הלוח של
+        // המשתתף — שני המסכים האחרים ממשיכים לקבל את הלוח בלי onMove/
+        // onToggleAssignment, כלומר לקריאה בלבד בדיוק כמו קודם.
+        onMove={actions.moveAssignment}
+        // "x"/"+" ישירות על הלוח (INLINE-01, אופציה ב, 11-CONTEXT.md) — אותה
+        // toggleAssignment הקיימת ש-AssignView כבר קוראת לה, בלי כתיבה חדשה.
+        onToggleAssignment={actions.toggleAssignment}
+        mode={team?.mode || "security"}
+      />
+    </div>,
     <AvailView key="avail" {...common} />,
     <div key="assign" className="space-y-5">
       <Segmented
