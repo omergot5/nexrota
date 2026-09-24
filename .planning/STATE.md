@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: גימור להשקה
-current_phase: 11
-current_phase_name: "עריכה אינטואיטיבית + ניקוי הדגמה + באג \"מצב השבוע\""
+current_phase: 12
+current_phase_name: "אישורי פעולות קריטיות"
 status: planning
-stopped_at: Completed 11-03-PLAN.md (demo-cleanup button + full cross-plan integration re-verification); all 4 INLINE-01..04 requirements live-verified and marked complete; Phase 11 closed out
-last_updated: "2026-09-24T06:21:29.994Z"
+stopped_at: "Phase 11 closed: merged (11-01/11-02/11-03), code-reviewed (2 Critical + 2 Warning fixed), verified 4/4 by gsd-verifier; ready to plan Phase 12"
+last_updated: "2026-09-24T07:00:00.000Z"
 last_activity: 2026-09-24
-last_activity_desc: "Plan 11-03 (demo-cleanup button + full cross-plan integration re-verification) completed and live-verified 7/7 human-check points; Phase 11 (all 3 waves) complete, INLINE-01..04 all marked complete in REQUIREMENTS.md"
-state_head: 6203a2a7a8267ede9c4bad17273dff0b8dd0f1cb
+last_activity_desc: "Phase 11 verified passed (4/4 success criteria); code review found CR-01 (task-card metadata corruption via UnifiedBoard's inline +/x), CR-02 (non-atomic deletePosition fake-rollback), WR-01 (avatar z-index), WR-02 (imprecise toast) — all fixed and re-verified by gsd-verifier against current code; transitioned to Phase 12"
+state_head: bbc867a
 progress:
   total_phases: 8
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 17
   completed_plans: 17
-  percent: 63
+  percent: 75
 ---
 
 # Project State
@@ -25,16 +25,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-17)
 
 **Core value:** אדם שמקבל את האפליקציה לידיו מסיים סידור שבועי מלא בלי שאף אחד יסביר לו כלום — ומה שהמערכת אומרת לו על עצמה הוא נכון.
-**Current focus:** Phase 11 — עריכה אינטואיטיבית + ניקוי הדגמה
+**Current focus:** Phase 12 — אישורי פעולות קריטיות
 
 ## Current Position
 
-Phase: 11 (עריכה אינטואיטיבית + ניקוי הדגמה + באג "מצב השבוע") — Complete (all 3/3 plans executed and live-verified)
-Plan: 3 of 3 complete
-Status: Phase 11 complete — INLINE-01..04 all marked complete in REQUIREMENTS.md; ready to plan Phase 12
-Last activity: 2026-09-24 — 11-03 completed (demo-cleanup button + full cross-plan integration re-verification, including INLINE-04 re-repro through the new 11-02 board affordances), live-verified 7/7
+Phase: 12 (אישורי פעולות קריטיות)
+Plan: not yet planned
+Status: Ready to plan
+Last activity: 2026-09-24 — Phase 11 merged, code-reviewed, fixed (2 Critical + 2 Warning), and verified 4/4
 
-Progress: [██████░░░░] 63% (v1.2)
+Progress: [███████░░░] 75% (v1.2)
 
 ## Performance Metrics
 
@@ -115,7 +115,7 @@ None yet.
 - ⚠️ [v1.1] Phases 1-3's VERIFICATION.md files predate the current `status:` frontmatter contract — GSD tooling reports them "missing" on format alone; carried forward as a known override (see MILESTONES.md v1.1 entry). Consider backfilling frontmatter early in this milestone.
 - ⚠️ [v1.1] Pre-existing NUL-byte separator in `conflicts.js`'s `pairKey` — acknowledged tech debt, no observed impact (see Deferred Items below).
 - [Phase 11] 11-01: Supabase migration 0022 (gs_work_items.is_demo) written and committed but NOT applied to the live database — this executor had no Supabase MCP/CLI/DB credentials available. Apply via SQL editor/CLI/MCP before Plan 11-03's demo-cleanup UI is tested live. **Resolved 2026-09-23 (post-merge follow-up, see 11-01-SUMMARY.md): migration applied live via Supabase MCP.**
-- **[v1.2 Phase 11] ✓ הושלם ואומת (2026-09-24).** כל שלוש התוכניות (11-01 שכבת נתונים/state, 11-02 עריכת "x"/"+" על הלוח + תיקון FK-army, 11-03 כפתור "מחק נתוני הדגמה" + סבב אימות-אינטגרציה סוגר) בוצעו, אומתו לייב בדפדפן (7/7 נקודות human-check ב-11-03 בלבד, מעבר לנקודות שאומתו כבר ב-11-01/11-02), ו-`REQUIREMENTS.md` INLINE-01..04 כולן סומנו הושלמו (checkbox + טבלת traceability). ה-repro של הבאג INLINE-04 אומת מחדש דווקא דרך ה-affordances **החדשים** של הלוח (11-02), לא רק דרך המסלול הישן (AssignView) שנבדק בגל 1.
+- **[v1.2 Phase 11] ✓ הושלם ואומת (2026-09-24).** כל שלוש התוכניות (11-01 שכבת נתונים/state, 11-02 עריכת "x"/"+" על הלוח + תיקון FK-army, 11-03 כפתור "מחק נתוני הדגמה" + סבב אימות-אינטגרציה סוגר) בוצעו, אומתו לייב בדפדפן (7/7 נקודות human-check ב-11-03 בלבד, מעבר לנקודות שאומתו כבר ב-11-01/11-02), ו-`REQUIREMENTS.md` INLINE-01..04 כולן סומנו הושלמו (checkbox + טבלת traceability). ה-repro של הבאג INLINE-04 אומת מחדש דווקא דרך ה-affordances **החדשים** של הלוח (11-02), לא רק דרך המסלול הישן (AssignView) שנבדק בגל 1. code review על הדיף המלא (10 קבצים) העלה 2 Critical: CR-01 — כפתורי "x"/"+" החדשים על הלוח יכלו לפגוע בשקט במטא-דאטה של שיבוץ-משימה (לא-משמרת) כי toggleAssignment מחפש רק ב-data.shifts; CR-02 — deletePosition הדו-שלבי לא אטומי, וכישלון בשלב השני היה מצייר rollback-מזויף על מצב שכבר נמחק בפועל בשרת. שתי הבעיות תוקנו (item.type !== "task" gate; refresh()+setError() במקום rethrow) + 2 Warnings (z-index על ערימת אווטארים, תווית-toast ספציפית) — כולן אומתו מחדש ב-קוד (לא רק בטענה) על ידי `gsd-verifier`, שאישר 4/4 קריטריוני הצלחה.
 
 ### Quick Tasks Completed
 
@@ -134,13 +134,12 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-24T06:21:21.121Z
-Stopped at: Completed 11-03-PLAN.md (demo-cleanup button + full cross-plan integration re-verification); all 4 INLINE-01..04 requirements live-verified and marked complete; Phase 11 closed out
+Last session: 2026-09-24T07:00:00.000Z
+Stopped at: Phase 11 closed (merged + code-reviewed + fixed + verified 4/4); ready to plan Phase 12
 Resume file: None
 
 ## Operator Next Steps
 
-- Phase 11 (עריכה אינטואיטיבית + ניקוי הדגמה + באג "מצב השבוע") is complete — INLINE-01..04 all live-verified and marked complete.
 - Plan Phase 12 with `/gsd-plan-phase 12`
 - Phase 12 carries a UI hint — consider `/gsd-ui-phase 12` first
 - Phase 12 must resolve the CLAUDE.md Iron Principle 3 conflict flagged above (UndoBar-only vs. product-owner-mandated confirm dialogs for destructive actions) before/while wiring CONFIRM-01..06
