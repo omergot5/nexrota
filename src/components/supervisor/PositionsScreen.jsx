@@ -135,7 +135,7 @@ export default function PositionsScreen({
               tasks={tasks}
               weekDates={weekDates}
               onEdit={() => openEdit(p)}
-              onDelete={() => actions.deletePosition(p.id)}
+              onDelete={() => actions.deletePosition(p.id, weekDates)}
             />
           ))}
         </div>

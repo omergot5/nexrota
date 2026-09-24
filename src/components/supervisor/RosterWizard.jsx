@@ -278,7 +278,10 @@ export default function RosterWizard({
 
   const removeItem = (item) => {
     if (item.position) {
-      actions.deletePosition(item.position.id);
+      // weekDates מועבר כדי ש-deletePosition (11-01) יוכל לבטל-מימוש/למחוק
+      // קודם את שורות gs_work_items של השבוע הנוכחי המקושרות לעמדה הזו —
+      // בלי זה, מחיקת עמדה שהשבוע שלה כבר ממומש נכשלת בהפרת מפתח-זר גולמית.
+      actions.deletePosition(item.position.id, weekDates);
     } else if (item.seed.id) {
       setDraftSeeds((d) => d.filter((s) => s.id !== item.seed.id));
     }
