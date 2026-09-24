@@ -29,7 +29,7 @@
 // ============================================================
 
 import { useState } from "react";
-import { Badge, EmptyState } from "../ui.jsx";
+import { Badge, EmptyState, Modal, Avatar } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import {
   DAYS_HE_SHORT, boardItemsForDates, fromISODate, isToday, rangeTextHe, shortDate,
@@ -196,6 +196,15 @@ function BoardCard({ item, guards, onMove, onToggleAssignment, mode }) {
   // GuardApp) הכרטיס נשאר בדיוק read-only כמו קודם.
   const canRemove = Boolean(onToggleAssignment) && !timeless;
 
+  // הוספה inline (INLINE-01, Task 2) — אותו שער בדיוק, בתוספת "יש מקום":
+  // אין טעם בכפתור "+" על משבצת שכבר מלאה (missing === 0). missing כבר
+  // מחושב מעל, לא נגזר כאן שוב.
+  const canAdd = Boolean(onToggleAssignment) && !timeless && missing > 0;
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // רק שומרים שעדיין לא ב-item.assignedGuards — בורר הוספה, לא בורר-כל-הצוות.
+  const assignedSet = new Set(item.assignedGuards || []);
+  const pickable = guards.filter((g) => !assignedSet.has(g.id));
+
   const dragProps = draggableHere
     ? {
         onDragOver: (e) => {
@@ -265,7 +274,7 @@ function BoardCard({ item, guards, onMove, onToggleAssignment, mode }) {
         * בנפרד; התוצאה לא נשמרת ולא נגזרת מחדש מהרשימה הגולמית על האדם. אותו
         * קוד בדיוק רץ בין אם item הוא משמרת ובין אם הוא משימה — אין כאן ענף
         * לפי סוג הפריט (BOARD-03). */}
-      <div className="mt-1.5">
+      <div className="mt-1.5 flex items-center gap-1.5">
         <People
           ids={item.assignedGuards || []}
           guards={guards}
@@ -282,7 +291,64 @@ function BoardCard({ item, guards, onMove, onToggleAssignment, mode }) {
           }
           onRemove={canRemove ? (guardId) => onToggleAssignment(item.id, guardId) : undefined}
         />
+        {/* הוספה inline (INLINE-01, Task 2) — אותה תבנית-פרופ-רשות כמו "x":
+          * לא קיים כשלא הועבר onToggleAssignment (יומן, GuardApp), ולא קיים
+          * כשאין עוד מקום פנוי (canAdd כבר בודק missing > 0). */}
+        {canAdd && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPickerOpen(true);
+            }}
+            className="flex-shrink-0 min-w-[20px] h-[20px] px-0.5 flex items-center
+              justify-center rounded-full ring-1 ring-inset ring-hairline-strong bg-surface
+              text-muted hover:bg-brand hover:text-white hover:ring-brand transition-colors cursor-pointer"
+            aria-label={`הוסף ${t("noun.memberPlural")} ל${item.label}`}
+          >
+            <Icon name="plus" size={12} strokeWidth={2.5} />
+          </button>
+        )}
       </div>
+      {/* בורר-הוספה קצר (INLINE-01, Task 2) — גדור בדיוק ל-checkQualification
+        * דרך isQualified, בדיוק כמו toggleAssignment עצמה (useGuardian.js) —
+        * לא checkAssignment המלאה (חפיפה/מנוחה) של AssignView; זה פער קיים
+        * ומתועד במפורש כמחוץ לסקופ הפאזה הזו (11-CONTEXT.md). */}
+      {canAdd && (
+        <Modal open={pickerOpen} onClose={() => setPickerOpen(false)} title={item.label}>
+          <div className="space-y-1">
+            {pickable.length === 0 ? (
+              <p className="text-muted text-sm text-center py-4">
+                {guards.length === 0
+                  ? `אין ${t("noun.memberPlural")} בצוות`
+                  : "כל מי שיש כבר משובץ כאן"}
+              </p>
+            ) : (
+              pickable.map((g) => {
+                const qualified = isQualified(g, item.category);
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    disabled={!qualified}
+                    title={!qualified ? qualRefusal(item.category) : undefined}
+                    onClick={() => {
+                      onToggleAssignment(item.id, g.id);
+                      setPickerOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2 p-2 rounded-lg ring-1 ring-inset
+                      ring-hairline text-right transition-colors hover:ring-hairline-strong
+                      disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Avatar id={g.id} name={g.name} size={24} />
+                    <span className="truncate font-semibold text-content">{g.name}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
