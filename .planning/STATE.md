@@ -4,17 +4,17 @@ milestone: v1.2
 milestone_name: גימור להשקה
 current_phase: 12
 current_phase_name: אישורי פעולות קריטיות
-status: planning
-stopped_at: Completed 12-01-PLAN.md (ConfirmDialog infra, CONFIRM-01)
-last_updated: "2026-09-24T16:07:34.869Z"
+status: executing
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-09-24T16:16:13.504Z"
 last_activity: 2026-09-24
 last_activity_desc: Phase 11 verified passed (4/4 success criteria); code review found CR-01 (task-card metadata corruption via UnifiedBoard's inline +/x), CR-02 (non-atomic deletePosition fake-rollback), WR-01 (avatar z-index), WR-02 (imprecise toast) — all fixed and re-verified by gsd-verifier against current code; transitioned to Phase 12
-state_head: 957a6cfabc4e12e21f39c41316a869329cfeb648
+state_head: 0fcb71392e085667d1009a2c3ca460e27d04a1b2
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 23
-  completed_plans: 18
+  completed_plans: 19
   percent: 75
 ---
 
@@ -30,8 +30,8 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 ## Current Position
 
 Phase: 12 (אישורי פעולות קריטיות)
-Plan: 1 of 6 complete (Wave 1: 12-01 done, 12-02 next)
-Status: Executing
+Plan: 2 of 6 complete (Wave 1: 12-01 done, 12-02 next)
+Status: Ready to execute
 Last activity: 2026-09-24 — 12-01 (generic ConfirmDialog, CONFIRM-01) merged, no UI consumer yet
 
 Progress: [████████░░] 75% (v1.2)
@@ -76,6 +76,7 @@ Progress: [████████░░] 75% (v1.2)
 | Phase 11 P02 | ~25min | 3 tasks | 5 files |
 | Phase 11 P03 | 20min | 1 tasks | 1 files |
 | Phase 12 P01 | 10min | 1 tasks | 1 files |
+| Phase 12 P02 | 25min | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,8 @@ Progress: [████████░░] 75% (v1.2)
 - [Phase 11]: [Phase 11] 11-02: Inline board "x"/"+" follows the exact onMove/onDragStart optional-prop precedent (no new wiring mechanism); "+" picker deliberately scoped to toggleAssignment's own qualification-only gate, not AssignView's fuller overlap/rest-hours check, per 11-CONTEXT.md's documented scope boundary.
 - [Phase 11]: [Phase 11] 11-03: demo-cleanup button wired to existing deleteDemoDataForWeek/demoShiftIdsForWeek (11-01) inside WeekFlow's shared board step; closing integration pass re-ran INLINE-04's race-condition repro through the NEW 11-02 board +/x affordances stacked with the new delete-demo action, not just the pre-existing AssignView path from Wave 1 — no bugs found, all 7 human-check points pass
 - [Phase 12]: [Phase 12] 12-01: ConfirmDialog גנרי (CONFIRM-01) הוסף ל-ui.jsx לצד Modal — tone נופל ישירות ל-Btn variant, pending חוסם סגירה בזמן onConfirm, בלי צרכן עדיין (Wave 2 מחווטת)
+- [Phase 12]: Pre-confirm REPLACES UndoBar for deleteShifts/deleteDemoDataForWeek/replaceShifts/removeGuard/deletePosition — no mechanism stacking
+- [Phase 12]: removeRoleCompatibility promoted from unprotected run() to deferred()/UndoBar — closes a real safety gap found in Phase 12 codebase review
 
 ### Pending Todos
 
@@ -136,8 +139,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-24T16:07:33.101Z
-Stopped at: Completed 12-01-PLAN.md (ConfirmDialog infra, CONFIRM-01)
+Last session: 2026-09-24T16:16:11.793Z
+Stopped at: Completed 12-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
