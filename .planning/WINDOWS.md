@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 5
+open_count: 8
 waived_count: 0
 fixed_count: 4
-total_count: 9
-last_updated: 2026-09-23T08:40:00.000Z
+total_count: 12
+last_updated: 2026-09-24T16:33:54.642Z
 ---
 
 # Broken Windows Ledger
@@ -15,7 +15,6 @@ last_updated: 2026-09-23T08:40:00.000Z
 
 | id | phase | kind | file | line | description | status | reason | recorded_at | resolved_at |
 |----|-------|------|------|------|-------------|--------|--------|-------------|-------------|
-| 9 | 11 | unrun-verify | src/hooks/useGuardian.js | | 11-01 Task 2 human-check not run by executor (no browser tool in worktree): refresh() sequence-guard race-condition repro (rapid add/remove before "שומר…" clears) not observed live. Automated sequenceGuard.js unit coverage passes. | fixed | | 2026-09-23T08:10:00.000Z | 2026-09-23T08:40:00.000Z |
 | 1 | 04 | unrun-verify | .planning/phases/04-standing-positions/04-02-PLAN.md |  | Task 1 human-check not run: no chromium-cli/Playwright and no live-Supabase credentials in this worktree; POS-01 no-button materialization not observed in browser | open |  | 2026-08-27T08:14:25.005Z |  |
 | 2 | 04 | unrun-verify | .planning/phases/04-standing-positions/04-02-PLAN.md |  | Task 2/3 human-check not run: POS-05 four-channel visual distinction (greyscale/hand-covering tests) not observed in a real browser on either the supervisor or guard screen | open |  | 2026-08-27T08:14:31.385Z |  |
 | 3 | 05 | unrun-verify | src/components/supervisor/UnifiedBoard.jsx |  | Task 2 human-check (6 items) not run in a live browser — no browser tool available to this parallel worktree agent; data-level coverage passes via verify-board.mjs, but visual/click confirmation is outstanding (see 05-01-SUMMARY.md) | open |  | 2026-09-02T13:02:04.780Z |  |
@@ -24,6 +23,10 @@ last_updated: 2026-09-23T08:40:00.000Z
 | 6 | 07 | unrun-verify | scripts/verify-share-image.mjs |  | Task 1 human-check (7 live-browser points incl. downloaded PNG width, phone WhatsApp-preview legibility) not run by the executor: sandboxed worktree Bash tool blocks launching any browser automation binary (aside not installed; gstack $B blocked by worktree-isolation guard). Automated dimension/scale/logical-unit assertions in verify-share-image.mjs all pass; needs a human to run npm run dev and verify the 7 points in 07-02-PLAN.md Task 1. | fixed |  | 2026-09-22T08:56:58.546Z | 2026-09-22T09:20:04.961Z |
 | 7 | 09 | unrun-verify | src/components/supervisor/views.jsx |  | 09-02 Task 1 human-check not run (no browser tool available): TeamView empty-state SeedDemoDialog live-browser verification (5 points) outstanding | fixed |  | 2026-09-22T19:35:28.027Z | 2026-09-22T20:10:00.000Z |
 | 8 | 09 | unrun-verify | src/components/supervisor/views.jsx |  | 09-02 Task 2 human-check not run (no browser tool available): SupDashboard onboarding-card SeedDemoDialog live-browser verification (5 points) outstanding | fixed |  | 2026-09-22T19:35:31.340Z | 2026-09-22T20:10:00.000Z |
+| 9 | 11 | unrun-verify | src/hooks/useGuardian.js |  | 11-01 Task 2 human-check not run by executor (no browser tool in worktree): refresh() sequence-guard race-condition repro (rapid add/remove before "שומר…" clears) not observed live. Automated sequenceGuard.js unit coverage passes. | fixed |  | 2026-09-23T08:10:00.000Z | 2026-09-23T08:40:00.000Z |
+| 10 | 12 | unrun-verify | src/components/supervisor/views.jsx |  | ScheduleMgmt publish/unpublish ConfirmDialog wiring (D3, 12-03) not yet live-browser verified — no Supabase credentials in worktree | open |  | 2026-09-24T16:33:47.727Z |  |
+| 11 | 12 | unrun-verify | src/components/supervisor/views.jsx |  | ShiftMgmt fillWeek overwrite-gate ConfirmDialog (D2, 12-03) not yet live-browser verified — no Supabase credentials in worktree | open |  | 2026-09-24T16:33:51.143Z |  |
+| 12 | 12 | unrun-verify | src/components/supervisor/views.jsx |  | TeamView remove-guard ConfirmDialog (D4, 12-03) not yet live-browser verified — no Supabase credentials in worktree | open |  | 2026-09-24T16:33:54.642Z |  |
 
 ````json
 [
@@ -134,6 +137,42 @@ last_updated: 2026-09-23T08:40:00.000Z
     "reason": "",
     "recorded_at": "2026-09-23T08:10:00.000Z",
     "resolved_at": "2026-09-23T08:40:00.000Z"
+  },
+  {
+    "id": 10,
+    "kind": "unrun-verify",
+    "phase": "12",
+    "file": "src/components/supervisor/views.jsx",
+    "line": null,
+    "description": "ScheduleMgmt publish/unpublish ConfirmDialog wiring (D3, 12-03) not yet live-browser verified — no Supabase credentials in worktree",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-24T16:33:47.727Z",
+    "resolved_at": null
+  },
+  {
+    "id": 11,
+    "kind": "unrun-verify",
+    "phase": "12",
+    "file": "src/components/supervisor/views.jsx",
+    "line": null,
+    "description": "ShiftMgmt fillWeek overwrite-gate ConfirmDialog (D2, 12-03) not yet live-browser verified — no Supabase credentials in worktree",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-24T16:33:51.143Z",
+    "resolved_at": null
+  },
+  {
+    "id": 12,
+    "kind": "unrun-verify",
+    "phase": "12",
+    "file": "src/components/supervisor/views.jsx",
+    "line": null,
+    "description": "TeamView remove-guard ConfirmDialog (D4, 12-03) not yet live-browser verified — no Supabase credentials in worktree",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-24T16:33:54.642Z",
+    "resolved_at": null
   }
 ]
 ````

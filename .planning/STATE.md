@@ -5,16 +5,16 @@ milestone_name: גימור להשקה
 current_phase: 12
 current_phase_name: אישורי פעולות קריטיות
 status: executing
-stopped_at: Completed 12-02-PLAN.md
-last_updated: "2026-09-24T16:16:13.504Z"
+stopped_at: Completed 12-03-PLAN.md
+last_updated: "2026-09-24T16:34:50.715Z"
 last_activity: 2026-09-24
 last_activity_desc: Phase 11 verified passed (4/4 success criteria); code review found CR-01 (task-card metadata corruption via UnifiedBoard's inline +/x), CR-02 (non-atomic deletePosition fake-rollback), WR-01 (avatar z-index), WR-02 (imprecise toast) — all fixed and re-verified by gsd-verifier against current code; transitioned to Phase 12
-state_head: 0fcb71392e085667d1009a2c3ca460e27d04a1b2
+state_head: b4aa7bb3709662ca5934fbd9ad3a380f6d2cd562
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 23
-  completed_plans: 19
+  completed_plans: 20
   percent: 75
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 ## Current Position
 
 Phase: 12 (אישורי פעולות קריטיות)
-Plan: 2 of 6 complete (Wave 1: 12-01 done, 12-02 next)
+Plan: 3 of 6 complete (Wave 1: 12-01 done, 12-02 next)
 Status: Ready to execute
 Last activity: 2026-09-24 — 12-01 (generic ConfirmDialog, CONFIRM-01) merged, no UI consumer yet
 
@@ -77,6 +77,7 @@ Progress: [████████░░] 75% (v1.2)
 | Phase 11 P03 | 20min | 1 tasks | 1 files |
 | Phase 12 P01 | 10min | 1 tasks | 1 files |
 | Phase 12 P02 | 25min | 3 tasks | 1 files |
+| Phase 12 P03 | 15min | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -102,6 +103,9 @@ Progress: [████████░░] 75% (v1.2)
 - [Phase 12]: [Phase 12] 12-01: ConfirmDialog גנרי (CONFIRM-01) הוסף ל-ui.jsx לצד Modal — tone נופל ישירות ל-Btn variant, pending חוסם סגירה בזמן onConfirm, בלי צרכן עדיין (Wave 2 מחווטת)
 - [Phase 12]: Pre-confirm REPLACES UndoBar for deleteShifts/deleteDemoDataForWeek/replaceShifts/removeGuard/deletePosition — no mechanism stacking
 - [Phase 12]: removeRoleCompatibility promoted from unprotected run() to deferred()/UndoBar — closes a real safety gap found in Phase 12 codebase review
+- [Phase 12]: 12-03: fillWeek gates confirmation only when weekShifts.length > 0 — empty week (EmptyState path) still creates immediately, no dialog
+- [Phase 12]: 12-03: ScheduleMgmt publish/unpublish gated via shared askPublish() helper across all 3 UI call sites; no changes to actions.publish/api.setPublished — known unpublish bug left for Phase 13
+- [Phase 12]: 12-03: clearWeek's delete call extracted into named confirmDeleteWeek helper (not inline lambda) so it doesn't trip the plan's own literal forward-scan verify-check
 
 ### Pending Todos
 
@@ -121,6 +125,7 @@ None yet.
 - ⚠️ [v1.1] Pre-existing NUL-byte separator in `conflicts.js`'s `pairKey` — acknowledged tech debt, no observed impact (see Deferred Items below).
 - [Phase 11] 11-01: Supabase migration 0022 (gs_work_items.is_demo) written and committed but NOT applied to the live database — this executor had no Supabase MCP/CLI/DB credentials available. Apply via SQL editor/CLI/MCP before Plan 11-03's demo-cleanup UI is tested live. **Resolved 2026-09-23 (post-merge follow-up, see 11-01-SUMMARY.md): migration applied live via Supabase MCP.**
 - **[v1.2 Phase 11] ✓ הושלם ואומת (2026-09-24).** כל שלוש התוכניות (11-01 שכבת נתונים/state, 11-02 עריכת "x"/"+" על הלוח + תיקון FK-army, 11-03 כפתור "מחק נתוני הדגמה" + סבב אימות-אינטגרציה סוגר) בוצעו, אומתו לייב בדפדפן (7/7 נקודות human-check ב-11-03 בלבד, מעבר לנקודות שאומתו כבר ב-11-01/11-02), ו-`REQUIREMENTS.md` INLINE-01..04 כולן סומנו הושלמו (checkbox + טבלת traceability). ה-repro של הבאג INLINE-04 אומת מחדש דווקא דרך ה-affordances **החדשים** של הלוח (11-02), לא רק דרך המסלול הישן (AssignView) שנבדק בגל 1. code review על הדיף המלא (10 קבצים) העלה 2 Critical: CR-01 — כפתורי "x"/"+" החדשים על הלוח יכלו לפגוע בשקט במטא-דאטה של שיבוץ-משימה (לא-משמרת) כי toggleAssignment מחפש רק ב-data.shifts; CR-02 — deletePosition הדו-שלבי לא אטומי, וכישלון בשלב השני היה מצייר rollback-מזויף על מצב שכבר נמחק בפועל בשרת. שתי הבעיות תוקנו (item.type !== "task" gate; refresh()+setError() במקום rethrow) + 2 Warnings (z-index על ערימת אווטארים, תווית-toast ספציפית) — כולן אומתו מחדש ב-קוד (לא רק בטענה) על ידי `gsd-verifier`, שאישר 4/4 קריטריוני הצלחה.
+- 12-03: ScheduleMgmt publish/unpublish (all 3 dialogs), ShiftMgmt fillWeek overwrite-gate, and TeamView remove-guard dialogs still need live-browser verification (worktree lacks Supabase credentials) — same pattern as Task 1's clearWeek, which the coordinator already verified live after merging 8326776
 
 ### Quick Tasks Completed
 
@@ -139,8 +144,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-24T16:16:11.793Z
-Stopped at: Completed 12-02-PLAN.md
+Last session: 2026-09-24T16:34:48.963Z
+Stopped at: Completed 12-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
