@@ -3,7 +3,7 @@ import { SHIFT_TONES } from "../../design/shiftPalette.js";
 import { AVAIL } from "../../design/availability.js";
 import { loadTable } from "../../lib/loadTable.js";
 import {
-  Alert, Avatar, Badge, Btn, Card, EmptyState, Field, guardColor, IconBtn, initials, Input, Meter,
+  Alert, Avatar, Badge, Btn, Card, ConfirmDialog, EmptyState, Field, guardColor, IconBtn, initials, Input, Meter,
   Modal, PageHeader, readableInk, Segmented, Select, StatCard,
 } from "../ui.jsx";
 import { Dot, Icon } from "../icons.jsx";
@@ -476,6 +476,9 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
   const [spreadFrom, setSpreadFrom] = useState(null); // date whose layout is being copied
   const [spreadTo, setSpreadTo] = useState([]);
   const [showFill, setShowFill] = useState(false);
+  // מצב-אישור משותף ל"מחק שבוע" ול"מלא שבוע" (כשדורס) — מופע ConfirmDialog
+  // אחד בסוף הרכיב, לא שניים (CONFIRM-03/05).
+  const [confirmState, setConfirmState] = useState(null);
 
   const weekShifts = shifts.filter((s) => weekDates.includes(s.date));
 
@@ -515,21 +518,29 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
         });
       }
     }
-    actions.replaceShifts(
-      weekShifts.map((s) => s.id),
-      rows,
-      `השבוע נבנה מחדש — ${rows.length} משמרות`
-    );
+    actions.replaceShifts(weekShifts.map((s) => s.id), rows);
     setShowFill(false);
   };
 
-  /** מחיקת השבוע כולו. `deleteShifts` נותן UndoBar, ולכן אין דיאלוג אישור. */
+  // הכתיבה עצמה מבודדת מ-clearWeek, כדי ש-clearWeek יישאר רק "פתח דיאלוג" —
+  // לעולם לא נקודת-כניסה שקוראת ל-actions.deleteShifts בלי אישור קודם.
+  const confirmDeleteWeek = () => actions.deleteShifts(weekShifts.map((s) => s.id));
+
+  /**
+   * מחיקת השבוע כולו. עברה לפרה-אישור (CONFIRM-03) — הכפתור עצמו רק פותח
+   * את ה-ConfirmDialog; רק אישור בו קורא בפועל ל-`actions.deleteShifts`
+   * (דרך `confirmDeleteWeek`), שכותבת מיד בלי UndoBar אחרי 12-02 (במקום
+   * `deferred()` הקודם).
+   */
   const clearWeek = () => {
     if (!weekShifts.length) return;
-    actions.deleteShifts(
-      weekShifts.map((s) => s.id),
-      `${weekShifts.length} משמרות נמחקו`
-    );
+    setConfirmState({
+      title: "למחוק את כל השבוע?",
+      body: `${weekShifts.length} ${t("unit.shifts")} יימחקו לצמיתות מהשבוע הזה — כולל שיבוצים שכבר בוצעו. הפעולה לא הפיכה.`,
+      confirmLabel: "מחק שבוע",
+      tone: "danger",
+      onConfirm: confirmDeleteWeek,
+    });
   };
 
   /**
@@ -884,6 +895,16 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
         </div>
       </Modal>
 
+      <ConfirmDialog
+        open={Boolean(confirmState)}
+        onClose={() => setConfirmState(null)}
+        onConfirm={confirmState?.onConfirm}
+        title={confirmState?.title}
+        body={confirmState?.body}
+        confirmLabel={confirmState?.confirmLabel}
+        tone={confirmState?.tone}
+        busy={busy}
+      />
     </div>
   );
 }
