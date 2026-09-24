@@ -7,7 +7,7 @@
 // than as a class-name soup at the call site.
 // ============================================================
 
-import { cloneElement, isValidElement, useEffect, useId, useRef } from "react";
+import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from "react";
 import { Icon } from "./icons.jsx";
 
 /* ------------------------------------------------------------------ *
@@ -640,6 +640,67 @@ export const Modal = ({ open, onClose, title, subtitle, children, wide = false, 
         )}
       </div>
     </div>
+  );
+};
+
+/**
+ * דיאלוג-אישור גנרי (CONFIRM-01) — הבסיס היחיד לכל אישור-לפני-פעולה
+ * בפרויקט. מכליל את `SeedDemoDialog` (views.jsx, Phase 9) ל-props
+ * דינמיים במקום title/body קבועים; שום מסך לא בונה לוגיקת-אישור משלו.
+ *
+ * שני דברים שכדאי לדעת לפני שקוראים לו:
+ * (1) "ביטול" (ובאותה מידה Escape/קליק-רקע/X) **לעולם לא** קורא ל-
+ *     `onConfirm` — אף אחת מהפעולות שהרכיב הזה עוטף לא מציירת patch
+ *     אופטימי לפני שהמשתמש מאשר (CONFIRM-06, 12-CONTEXT.md open_questions
+ *     #4), אז "ביטול" הוא תמיד ניקוי-state טהור, לא ביטול של פעולה
+ *     שכבר קרתה.
+ * (2) `pending` הוא הכללה של הדפוס שכבר הוכח ב-`SeedDemoDialog`
+ *     (pending → חוסם סגירה בזמן שהכתיבה בתהליך), לא מנגנון חדש.
+ */
+export const ConfirmDialog = ({
+  open,
+  onClose,
+  onConfirm,
+  title,
+  body,
+  confirmLabel = "אישור",
+  cancelLabel = "ביטול",
+  tone = "danger",
+  busy,
+}) => {
+  const [pending, setPending] = useState(false);
+
+  const confirm = async () => {
+    setPending(true);
+    try {
+      await onConfirm();
+    } finally {
+      setPending(false);
+    }
+    onClose();
+  };
+  const closeUnlessPending = () => {
+    if (!pending) onClose();
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={closeUnlessPending}
+      title={title}
+      footer={
+        <>
+          <Btn variant={tone} onClick={confirm} loading={busy || pending} className="flex-1">
+            {confirmLabel}
+          </Btn>
+          <Btn variant="secondary" onClick={closeUnlessPending} disabled={pending}>
+            {cancelLabel}
+          </Btn>
+        </>
+      }
+    >
+      <div className="text-sm text-content">{body}</div>
+    </Modal>
   );
 };
 
