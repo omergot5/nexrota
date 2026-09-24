@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 ## Current Position
 
 Phase: 12 (אישורי פעולות קריטיות)
-Plan: not yet planned
-Status: Ready to plan
-Last activity: 2026-09-24 — Phase 11 merged, code-reviewed, fixed (2 Critical + 2 Warning), and verified 4/4
+Plan: 1 of 6 complete (Wave 1: 12-01 done, 12-02 next)
+Status: Executing
+Last activity: 2026-09-24 — 12-01 (generic ConfirmDialog, CONFIRM-01) merged, no UI consumer yet
 
 Progress: [████████░░] 75% (v1.2)
 
