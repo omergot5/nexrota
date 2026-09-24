@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 8
+open_count: 5
 waived_count: 0
-fixed_count: 4
+fixed_count: 7
 total_count: 12
-last_updated: 2026-09-24T16:33:54.642Z
+last_updated: 2026-09-24T17:15:00.000Z
 ---
 
 # Broken Windows Ledger
@@ -24,9 +24,9 @@ last_updated: 2026-09-24T16:33:54.642Z
 | 7 | 09 | unrun-verify | src/components/supervisor/views.jsx |  | 09-02 Task 1 human-check not run (no browser tool available): TeamView empty-state SeedDemoDialog live-browser verification (5 points) outstanding | fixed |  | 2026-09-22T19:35:28.027Z | 2026-09-22T20:10:00.000Z |
 | 8 | 09 | unrun-verify | src/components/supervisor/views.jsx |  | 09-02 Task 2 human-check not run (no browser tool available): SupDashboard onboarding-card SeedDemoDialog live-browser verification (5 points) outstanding | fixed |  | 2026-09-22T19:35:31.340Z | 2026-09-22T20:10:00.000Z |
 | 9 | 11 | unrun-verify | src/hooks/useGuardian.js |  | 11-01 Task 2 human-check not run by executor (no browser tool in worktree): refresh() sequence-guard race-condition repro (rapid add/remove before "שומר…" clears) not observed live. Automated sequenceGuard.js unit coverage passes. | fixed |  | 2026-09-23T08:10:00.000Z | 2026-09-23T08:40:00.000Z |
-| 10 | 12 | unrun-verify | src/components/supervisor/views.jsx |  | ScheduleMgmt publish/unpublish ConfirmDialog wiring (D3, 12-03) not yet live-browser verified — no Supabase credentials in worktree | open |  | 2026-09-24T16:33:47.727Z |  |
-| 11 | 12 | unrun-verify | src/components/supervisor/views.jsx |  | ShiftMgmt fillWeek overwrite-gate ConfirmDialog (D2, 12-03) not yet live-browser verified — no Supabase credentials in worktree | open |  | 2026-09-24T16:33:51.143Z |  |
-| 12 | 12 | unrun-verify | src/components/supervisor/views.jsx |  | TeamView remove-guard ConfirmDialog (D4, 12-03) not yet live-browser verified — no Supabase credentials in worktree | open |  | 2026-09-24T16:33:54.642Z |  |
+| 10 | 12 | unrun-verify | src/components/supervisor/views.jsx |  | ScheduleMgmt publish/unpublish ConfirmDialog wiring (D3, 12-03) not yet live-browser verified — no Supabase credentials in worktree | fixed |  | 2026-09-24T16:33:47.727Z | 2026-09-24T17:15:00.000Z |
+| 11 | 12 | unrun-verify | src/components/supervisor/views.jsx |  | ShiftMgmt fillWeek overwrite-gate ConfirmDialog (D2, 12-03) not yet live-browser verified — no Supabase credentials in worktree | fixed |  | 2026-09-24T16:33:51.143Z | 2026-09-24T17:15:00.000Z |
+| 12 | 12 | unrun-verify | src/components/supervisor/views.jsx |  | TeamView remove-guard ConfirmDialog (D4, 12-03) not yet live-browser verified — no Supabase credentials in worktree | fixed |  | 2026-09-24T16:33:54.642Z | 2026-09-24T17:15:00.000Z |
 
 ````json
 [
@@ -145,10 +145,10 @@ last_updated: 2026-09-24T16:33:54.642Z
     "file": "src/components/supervisor/views.jsx",
     "line": null,
     "description": "ScheduleMgmt publish/unpublish ConfirmDialog wiring (D3, 12-03) not yet live-browser verified — no Supabase credentials in worktree",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-09-24T16:33:47.727Z",
-    "resolved_at": null
+    "resolved_at": "2026-09-24T17:15:00.000Z"
   },
   {
     "id": 11,
@@ -157,10 +157,10 @@ last_updated: 2026-09-24T16:33:54.642Z
     "file": "src/components/supervisor/views.jsx",
     "line": null,
     "description": "ShiftMgmt fillWeek overwrite-gate ConfirmDialog (D2, 12-03) not yet live-browser verified — no Supabase credentials in worktree",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-09-24T16:33:51.143Z",
-    "resolved_at": null
+    "resolved_at": "2026-09-24T17:15:00.000Z"
   },
   {
     "id": 12,
@@ -169,10 +169,10 @@ last_updated: 2026-09-24T16:33:54.642Z
     "file": "src/components/supervisor/views.jsx",
     "line": null,
     "description": "TeamView remove-guard ConfirmDialog (D4, 12-03) not yet live-browser verified — no Supabase credentials in worktree",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-09-24T16:33:54.642Z",
-    "resolved_at": null
+    "resolved_at": "2026-09-24T17:15:00.000Z"
   }
 ]
 ````

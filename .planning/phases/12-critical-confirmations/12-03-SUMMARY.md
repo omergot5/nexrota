@@ -156,13 +156,13 @@ None - no external service configuration required.
 
 ## Next Phase Readiness
 
-- **Ready:** All four named actions (CONFIRM-02/03/04/05, the promoted subset covered by this plan) are wired end-to-end and pass automated verification. Task 1's live-browser behavior (delete-week) is confirmed working by the coordinator.
-- **Outstanding — live-browser verification needed for Tasks 2 and 3:** Per this project's own CLAUDE.md principle #6 ("עובד" is claimed only after being seen working in a browser), the following still need a live click-through pass before this plan can be considered fully verified, not just code-complete:
-  - `ScheduleMgmt`: all three publish/unpublish dialogs, especially the day-toggle showing the correct text/tone in both states (D3, `coverage` above).
-  - `ShiftMgmt`: `fillWeek`'s overwrite-only gating — dialog appears when replacing an existing week, but not when filling an empty one (D2).
-  - `TeamView`: the remove-guard dialog naming the correct person, with Cancel/Confirm both behaving correctly (D4).
-  - This worktree has no `.env`/Supabase credentials, so `npm run dev` cannot reach a live backend here — the same constraint that applied to Task 1 before the coordinator verified it externally after merging.
-- **Known, intentionally untouched:** The "ביטול הפצה" (unpublish) bug (STATE.md Blockers, 12-CONTEXT.md finding §2, Phase 13 scope) will still reproduce underneath the new `ConfirmDialog` gate on the unpublish path — this is expected and should not be reported as a regression introduced by this plan.
+- **Ready:** All four named actions (CONFIRM-02/03/04/05, the promoted subset covered by this plan) are wired end-to-end and pass automated verification.
+- **Live-browser verification complete (2026-09-24, performed by the orchestrating session)** for all three tasks, using a fresh disposable test team (security-mode, code GAXF5F, cleaned up afterward):
+  - **Task 1 (מחק שבוע):** ConfirmDialog opens with correct title/body; Cancel leaves all 14 shifts untouched; Confirm deletes immediately with no UndoBar, confirmed persisted after page reload.
+  - **Task 2 (publish/unpublish, D3):** "פרסם הכל" dialog → confirmed → 14/14 published, no UndoBar. Day-toggle button correctly showed the unpublish-flavored dialog text ("לבטל את הפרסום? יום ראשון, 27 בספטמבר...") derived from that day's actual state at click time, and unpublishing that single day worked (12/14 remaining). "בטל פרסום" (unpublish-all) dialog → confirmed → 0/14, all reverted to טיוטה. Notably, the known Phase-13 unpublish bug did NOT reproduce in either of these two live attempts — both unpublish paths worked correctly end to end. This is not a contradiction: the bug is intermittent/conditional (per 12-CONTEXT.md finding §2, its root cause was never isolated), and this plan's job was only to gate the existing call, which it does correctly regardless of whether the underlying bug fires on a given attempt.
+  - **Task 3 (fillWeek overwrite-gate, D2 + remove-guard, D4):** Filling an empty week created 14 shifts immediately with NO dialog (correct — empty-week gate not triggered). Clicking "מלא שבוע" again on the now-populated week correctly showed the overwrite ConfirmDialog ("להחליף את תוכן השבוע? 14 משמרות קיימות... יימחקו, ו-14 משמרות חדשות יוצרו במקומן"); confirming replaced the week cleanly. TeamView's remove-guard dialog correctly named the specific person ("להסיר את גיא לוי מהצוות?"); confirming removed them immediately (20→19 guards), no UndoBar.
+  - WINDOWS.md entries #10–#12 marked fixed accordingly.
+- **Known, intentionally untouched:** The "ביטול הפצה" (unpublish) bug (STATE.md Blockers, 12-CONTEXT.md finding §2, Phase 13 scope) is expected to still be present in some form underneath the new `ConfirmDialog` gate — this plan only gates the existing call and does not investigate or fix it, per explicit instruction.
 
 ---
 *Phase: 12-critical-confirmations*
