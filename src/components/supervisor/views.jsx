@@ -1712,7 +1712,11 @@ export const People = ({
           const blocked = isBlocked ? isBlocked(g) : false;
           if (!blocked) {
             return (
-              <div key={g.id} className="relative flex-shrink-0">
+              // hover:z-10 focus-within:z-10 (WR-01, 11-REVIEW.md): בערימה
+              // חופפת (-space-x, "מטבעות ערמה") ה-x של אווטאר קודם יכול
+              // להיות מכוסה חלקית על ידי הבא בתור בלי z-index מפורש — הרמה
+              // רק בזמן hover/focus, לא תמיד, כדי לא לשבש את סדר הערמה הרגיל.
+              <div key={g.id} className="relative flex-shrink-0 hover:z-10 focus-within:z-10">
                 <div
                   draggable={draggable}
                   onDragStart={draggable ? (e) => onDragStart(e, g) : undefined}

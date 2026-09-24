@@ -909,15 +909,37 @@ export function useGuardian() {
       // מבטלת רק את מימוש השבוע הזה, בלבד, לפני המחיקה — ברירת המחדל `[]`
       // שומרת על התנהגות זהה לקוראים הקיימים (RosterWizard/PositionsScreen)
       // שעדיין לא מעבירים שבוע.
-      deletePosition: (id, weekDates = []) =>
-        deferred(
-          "העמדה נמחקה",
+      deletePosition: (id, weekDates = []) => {
+        // תווית ספציפית כש-unmaterializePositionWeek הולך גם למחוק משמרות
+        // השבוע הנוכחי (WR-02, 11-REVIEW.md) — בלי זה המשתמש רואה רק "העמדה
+        // נמחקה" ולא יודע שגם שיבוצים/זמינות/בקשות-החלפה שהוגשו השבוע נמחקים
+        // איתה (cascade, לא רק תבנית עתידית).
+        const weekSet = new Set(weekDates);
+        const hasMaterializedWeek = dataRef.current.shifts.some(
+          (s) => s.positionId === id && weekSet.has(s.date)
+        );
+        return deferred(
+          hasMaterializedWeek ? "העמדה נמחקה — כולל המשמרות שהוקצו לה השבוע" : "העמדה נמחקה",
           (d) => ({ ...d, positions: d.positions.filter((p) => p.id !== id) }),
           async () => {
             if (weekDates.length) await api.unmaterializePositionWeek(id, weekDates);
-            await api.deletePosition(id);
+            try {
+              await api.deletePosition(id);
+            } catch (e) {
+              // unmaterializePositionWeek עשוי כבר להיות committed בשרת —
+              // אם נזרוק מכאן, ה-catch החיצוני של flush() ידרוס את המצב
+              // האמיתי בחזרה ל-snapshot הישן (deferred/flush, CR-02 ב-
+              // 11-REVIEW.md), ויציג מחדש משמרות/שיבוצים שכבר נמחקו בפועל.
+              // refresh() כאן מביא את המצב האמיתי; לא זורקים הלאה כדי
+              // שה-rollback החיצוני לא יצייר שקר מעליו — setError במקום
+              // זאת מדווח את הכישלון (CLAUDE.md: "כל פעולה מדווחת כישלון").
+              await refresh();
+              if (mounted.current) setError(e.message || "מחיקת העמדה נכשלה חלקית — נטען מחדש");
+              return;
+            }
           }
-        ),
+        );
+      },
 
       /**
        * מממש שורות שבועיות חסרות לכל עמדה פעילה — גם template (לתוך gs_shifts)

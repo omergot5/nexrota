@@ -194,12 +194,19 @@ function BoardCard({ item, guards, onMove, onToggleAssignment, mode }) {
   // רשות בלבד, ולא קיים לכרטיס טיימלס (D-08, אין מושג "משובץ/לא-משובץ"
   // לפריט בלי requiredGuards). כשהקורא לא מעביר onToggleAssignment (יומן,
   // GuardApp) הכרטיס נשאר בדיוק read-only כמו קודם.
-  const canRemove = Boolean(onToggleAssignment) && !timeless;
+  //
+  // item.type !== "task" מונע הפעלה על משימה-מתוזמנת-ל-מנוע (taskAsShiftShape,
+  // dates.js) — actions.toggleAssignment מחפש shiftId רק בתוך data.shifts
+  // (useGuardian.js), אז id של משימה תמיד ייחשב "לא משובץ" ויגרום ל-re-upsert
+  // שקט במקום הסרה אמיתית (CR-01, 11-REVIEW.md). toggleAssignment לא יודע
+  // לטפל במשימות — עד שהוא ילמד, הכפתורים האלה מוגבלים למשמרות בלבד.
+  const isShiftItem = !timeless && item.type !== "task";
+  const canRemove = Boolean(onToggleAssignment) && isShiftItem;
 
   // הוספה inline (INLINE-01, Task 2) — אותו שער בדיוק, בתוספת "יש מקום":
   // אין טעם בכפתור "+" על משבצת שכבר מלאה (missing === 0). missing כבר
   // מחושב מעל, לא נגזר כאן שוב.
-  const canAdd = Boolean(onToggleAssignment) && !timeless && missing > 0;
+  const canAdd = Boolean(onToggleAssignment) && isShiftItem && missing > 0;
   const [pickerOpen, setPickerOpen] = useState(false);
   // רק שומרים שעדיין לא ב-item.assignedGuards — בורר הוספה, לא בורר-כל-הצוות.
   const assignedSet = new Set(item.assignedGuards || []);
