@@ -5,16 +5,16 @@ milestone_name: גימור להשקה
 current_phase: 11
 current_phase_name: "עריכה אינטואיטיבית + ניקוי הדגמה + באג \"מצב השבוע\""
 status: planning
-stopped_at: Completed 11-02-PLAN.md (inline board x/+ editing + army position-delete FK wiring); live-verified all 3 human-check points; 11-03 (Wave 3 of 3) still pending before INLINE-01..04 can be marked Complete
-last_updated: "2026-09-24T06:02:44.557Z"
+stopped_at: Completed 11-03-PLAN.md (demo-cleanup button + full cross-plan integration re-verification); all 4 INLINE-01..04 requirements live-verified and marked complete; Phase 11 closed out
+last_updated: "2026-09-24T06:21:29.994Z"
 last_activity: 2026-09-24
-last_activity_desc: Plan 11-02 (inline board "x"/"+" editing + army position-delete FK wiring) completed and live-verified 3/3 human-check points; Wave 2 of 3 for Phase 11 — 11-03 (Wave 3 of 3) still pending
-state_head: 18f5efedb6702990cf12ccd2f2fc13e9f366c9b4
+last_activity_desc: "Plan 11-03 (demo-cleanup button + full cross-plan integration re-verification) completed and live-verified 7/7 human-check points; Phase 11 (all 3 waves) complete, INLINE-01..04 all marked complete in REQUIREMENTS.md"
+state_head: 6203a2a7a8267ede9c4bad17273dff0b8dd0f1cb
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 17
-  completed_plans: 16
+  completed_plans: 17
   percent: 63
 ---
 
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 
 ## Current Position
 
-Phase: 11 (עריכה אינטואיטיבית + ניקוי הדגמה + באג "מצב השבוע")
-Plan: 02 of 03 complete (Wave 2 of 3)
-Status: In progress — 11-03 (Wave 3 of 3) still pending
-Last activity: 2026-09-24 — 11-02 completed (inline board x/+ editing + army position-delete FK wiring), live-verified 3/3
+Phase: 11 (עריכה אינטואיטיבית + ניקוי הדגמה + באג "מצב השבוע") — Complete (all 3/3 plans executed and live-verified)
+Plan: 3 of 3 complete
+Status: Phase 11 complete — INLINE-01..04 all marked complete in REQUIREMENTS.md; ready to plan Phase 12
+Last activity: 2026-09-24 — 11-03 completed (demo-cleanup button + full cross-plan integration re-verification, including INLINE-04 re-repro through the new 11-02 board affordances), live-verified 7/7
 
 Progress: [██████░░░░] 63% (v1.2)
 
@@ -74,6 +74,7 @@ Progress: [██████░░░░] 63% (v1.2)
 | Phase 10 P03 | 55min | 1 tasks | 1 files |
 | Phase 11 P01 | 35min | 3 tasks | 6 files |
 | Phase 11 P02 | ~25min | 3 tasks | 5 files |
+| Phase 11 P03 | 20min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,7 @@ Progress: [██████░░░░] 63% (v1.2)
 - [Phase 10]: Code review (post-merge, full 3-plan diff) found WR-01 (4 stale present-tense RosterWizard.jsx comments still describing the deleted "מסך משאבים" as existing) and WR-02 (a stray untracked byte-identical leftover copy of the already-deleted ResourceView.jsx sitting in the working tree) — both stemmed from the 10-02 verify gate only grepping the literal string "ResourceView", not the Hebrew display name or disk state. Fixed directly; gsd-verifier re-confirmed both fixes independently against current src/.
 - [Phase 11]: [Phase 11] 11-01: is_demo placement (gs_work_items only, derived demo-assignment) and army FK safety-net order (unmaterializePositionWeek before deletePosition) implemented exactly as locked in 11-CONTEXT.md — no deviation
 - [Phase 11]: [Phase 11] 11-02: Inline board "x"/"+" follows the exact onMove/onDragStart optional-prop precedent (no new wiring mechanism); "+" picker deliberately scoped to toggleAssignment's own qualification-only gate, not AssignView's fuller overlap/rest-hours check, per 11-CONTEXT.md's documented scope boundary.
+- [Phase 11]: [Phase 11] 11-03: demo-cleanup button wired to existing deleteDemoDataForWeek/demoShiftIdsForWeek (11-01) inside WeekFlow's shared board step; closing integration pass re-ran INLINE-04's race-condition repro through the NEW 11-02 board +/x affordances stacked with the new delete-demo action, not just the pre-existing AssignView path from Wave 1 — no bugs found, all 7 human-check points pass
 
 ### Pending Todos
 
@@ -113,7 +115,7 @@ None yet.
 - ⚠️ [v1.1] Phases 1-3's VERIFICATION.md files predate the current `status:` frontmatter contract — GSD tooling reports them "missing" on format alone; carried forward as a known override (see MILESTONES.md v1.1 entry). Consider backfilling frontmatter early in this milestone.
 - ⚠️ [v1.1] Pre-existing NUL-byte separator in `conflicts.js`'s `pairKey` — acknowledged tech debt, no observed impact (see Deferred Items below).
 - [Phase 11] 11-01: Supabase migration 0022 (gs_work_items.is_demo) written and committed but NOT applied to the live database — this executor had no Supabase MCP/CLI/DB credentials available. Apply via SQL editor/CLI/MCP before Plan 11-03's demo-cleanup UI is tested live. **Resolved 2026-09-23 (post-merge follow-up, see 11-01-SUMMARY.md): migration applied live via Supabase MCP.**
-- **[v1.2 Phase 11] 11-02 complete and live-verified (2026-09-24).** Inline board "x"/"+" editing (INLINE-01 UI half) and army position-delete FK wiring both live-verified 3/3 human-check points by the orchestrating session. `REQUIREMENTS.md` INLINE-01..04 checkboxes deliberately left unchecked — Plan 11-03 (Wave 3 of 3) still pending; whichever of 11-02/11-03 finishes last should run `requirements mark-complete`.
+- **[v1.2 Phase 11] ✓ הושלם ואומת (2026-09-24).** כל שלוש התוכניות (11-01 שכבת נתונים/state, 11-02 עריכת "x"/"+" על הלוח + תיקון FK-army, 11-03 כפתור "מחק נתוני הדגמה" + סבב אימות-אינטגרציה סוגר) בוצעו, אומתו לייב בדפדפן (7/7 נקודות human-check ב-11-03 בלבד, מעבר לנקודות שאומתו כבר ב-11-01/11-02), ו-`REQUIREMENTS.md` INLINE-01..04 כולן סומנו הושלמו (checkbox + טבלת traceability). ה-repro של הבאג INLINE-04 אומת מחדש דווקא דרך ה-affordances **החדשים** של הלוח (11-02), לא רק דרך המסלול הישן (AssignView) שנבדק בגל 1.
 
 ### Quick Tasks Completed
 
@@ -132,12 +134,13 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-24T06:02:35.844Z
-Stopped at: Completed 11-02-PLAN.md (inline board x/+ editing + army position-delete FK wiring); live-verified all 3 human-check points; 11-03 (Wave 3 of 3) still pending before INLINE-01..04 can be marked Complete
+Last session: 2026-09-24T06:21:21.121Z
+Stopped at: Completed 11-03-PLAN.md (demo-cleanup button + full cross-plan integration re-verification); all 4 INLINE-01..04 requirements live-verified and marked complete; Phase 11 closed out
 Resume file: None
 
 ## Operator Next Steps
 
-- Plan Phase 11 with `/gsd-plan-phase 11`
-- Phase 11 carries a UI hint — consider `/gsd-ui-phase 11` first
-- Phase 11 adds inline add/delete inside "בניית שבוע", an `is_demo` flag distinguishing demo from real assignments, a "מחק נתוני הדגמה לשבוע זה" action scoped to the active week only, and fixes the existing "מצב השבוע" staleness bug (INLINE-01..04)
+- Phase 11 (עריכה אינטואיטיבית + ניקוי הדגמה + באג "מצב השבוע") is complete — INLINE-01..04 all live-verified and marked complete.
+- Plan Phase 12 with `/gsd-plan-phase 12`
+- Phase 12 carries a UI hint — consider `/gsd-ui-phase 12` first
+- Phase 12 must resolve the CLAUDE.md Iron Principle 3 conflict flagged above (UndoBar-only vs. product-owner-mandated confirm dialogs for destructive actions) before/while wiring CONFIRM-01..06
