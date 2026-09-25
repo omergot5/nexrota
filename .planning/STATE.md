@@ -4,18 +4,18 @@ milestone: v1.2
 milestone_name: גימור להשקה
 current_phase: 13
 current_phase_name: "באג — ביטול הפצה אחרי פרסום"
-status: planning
-stopped_at: "Phase 12 fully closed: merged (12-01..12-06), doc contradiction resolved (CLAUDE.md x2 + PROJECT.md), CONFIRM-06 live-verified (cancel-then-reload across 2 dialog types), gsd-verifier gap (deleteDemoDataForWeek missing rethrow) found and fixed + live-verified (commit cbc514a); ready to plan Phase 13"
-last_updated: "2026-09-25T02:00:00.000Z"
+status: milestone_complete
+stopped_at: "Phase 13 closed via /gsd-debug (BUG-01..04 all complete): root-caused as an AND of two faults — a stale in-flight refresh() racing the optimistic unpublish paint, and a realtime publication that had ZERO tables in it (verified empty via pg_publication_tables), so the guard's view never resynced without a cold reload. Fixed + live-verified end-to-end (supervisor DB state + guard-side view, both directions). v1.2 (גימור להשקה) milestone is now fully complete — all 8 phases done."
+last_updated: "2026-09-25T03:30:00.000Z"
 last_activity: 2026-09-25
-last_activity_desc: "12-06 (doc reconciliation + closing integration verification) merged. Root CLAUDE.md, .claude/CLAUDE.md (applied directly — gitignored, no commit), and PROJECT.md all updated to describe both UndoBar-default and pre-confirm-closed-list tracks, resolving the Iron-Principle-3 contradiction. gsd-verifier's goal-backward pass then found one real residual gap — deleteDemoDataForWeek was the one ConfirmDialog-wired action missing { rethrow: true } from the WR-01 fix pass; fixed, live-verified (fresh test team, seeded demo data, confirmed delete succeeds and dialog closes correctly with no regression), 12-REVIEW.md/12-VERIFICATION.md updated to match. Phase 12 (CONFIRM-01..06) fully complete; transitioned to Phase 13"
-state_head: d43bb0da418e96ce4a409a15cf8118f0a383f257
+last_activity_desc: "Ran /gsd-debug for Phase 13. gsd-debugger root-caused the unpublish bug as two compounding faults in useGuardian.js: (1) optimistic() didn't invalidate in-flight refresh() calls issued before the write, so a stale read could resolve after the optimistic unpublish paint and repaint 'published'; (2) the realtime channel never resynced on reconnect or tab-resume. Fix: sequenceGuard.js gained sequencedRefresh()/optimisticWrite() (refresh()/optimistic()'s bodies, moved so the race is testable in Node); publish now uses { reconcile: true } to invalidate in-flight reads and re-read after write; the realtime effect resyncs on every channel (re)join and on visibilitychange. New regression script scripts/verify-publish-sync.mjs (17 checks) wired into npm test. While investigating, discovered the realtime publication had never had any tables in it at all (a separate, deeper cause of guard-side staleness) — applied migration 0023 to add the five subscribed tables live via Supabase MCP. Live-verified in-browser + DB: registered a fresh team, unpublish flipped 14/14→0 published shifts immediately and correctly, a real guard account's 'התורנויות שלי' correctly hid the schedule; re-published and the guard's view correctly showed it again. Found during review that 0023 opened a cross-team realtime DELETE leak (Postgres only sends REPLICA IDENTITY columns on delete, so RLS couldn't filter deletes without team_code in the replica identity) — closed via migration 0024 (REPLICA IDENTITY FULL on the five tables). npm test (468 ok) and npm run build both pass throughout. Debug session archived at .planning/debug/resolved/unpublish-fails-after-publish.md. BUG-01..04 and Phase 13 marked complete in ROADMAP.md/REQUIREMENTS.md — this was v1.2's last phase, so the milestone is done."
+state_head: c32387f
 progress:
   total_phases: 8
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 23
   completed_plans: 23
-  percent: 88
+  percent: 100
 ---
 
 # Project State
@@ -25,16 +25,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-17)
 
 **Core value:** אדם שמקבל את האפליקציה לידיו מסיים סידור שבועי מלא בלי שאף אחד יסביר לו כלום — ומה שהמערכת אומרת לו על עצמה הוא נכון.
-**Current focus:** Phase 13 — באג ביטול הפצה אחרי פרסום
+**Current focus:** v1.2 (גימור להשקה) milestone complete — all 8 phases done
 
 ## Current Position
 
-Phase: 13 (באג — ביטול הפצה אחרי פרסום)
-Plan: not yet planned
-Status: Ready to plan
-Last activity: 2026-09-25 — Phase 12 merged, doc contradiction resolved, verified (CONFIRM-01 code-scan + CONFIRM-06 live cancel-then-reload)
+Phase: 13 (באג — ביטול הפצה אחרי פרסום) — complete, milestone closed
+Plan: /gsd-debug (no phase plan files; bug workflow instead)
+Status: Milestone complete
+Last activity: 2026-09-25 — Phase 13 (BUG-01..04) fixed and live-verified via /gsd-debug; v1.2 done
 
-Progress: [█████████░] 88% (v1.2)
+Progress: [██████████] 100% (v1.2)
 
 ## Performance Metrics
 
@@ -113,6 +113,10 @@ Progress: [█████████░] 88% (v1.2)
 - [Phase 12]: 12-05: RosterWizard's removeItem only opens ConfirmDialog for the item.position branch (real, saved positions) — item.seed (unsaved draft) stays immediate, no dialog, since nothing exists server-side yet to confirm deleting; setActiveKey(null) moved inside onConfirm so it only runs after the delete actually succeeds
 - [Phase 12]: 12-06: `.claude/CLAUDE.md` is fully gitignored (`.gitignore` line 8, no exception) — worktree executors can never commit edits to it; the orchestrating session must apply such edits directly in the main checkout. Applied here for the Undo/pre-confirm pattern description and the third write-mechanism (`run()`) note.
 - [Phase 12]: 12-06: CONFIRM-06 verified specifically via Cancel-then-full-page-reload (not just visual dismissal) across two structurally different dialogs (delete-week, publish/unpublish-all) — both confirmed byte-identical to pre-click state via direct SQL, closing the exact verification gap the phase was scoped to catch
+- [Phase 13]: Root cause was an AND of two faults, not one — a stale in-flight refresh() racing the optimistic unpublish paint (dormant until realtime existed at all), AND a realtime publication with zero tables ever added to it, discovered mid-investigation by directly querying pg_publication_tables. Both needed fixing; fixing only the race would have left the guard-side view stale forever, and fixing only the publication would have left the race latent and exploitable.
+- [Phase 13]: sequenceGuard.js's refresh()/optimistic() bodies were extracted into sequencedRefresh()/optimisticWrite() specifically so the race condition is testable in Node (scripts/verify-publish-sync.mjs) on the exact code useGuardian.js runs, not a reimplementation — same pattern as the file's pre-existing INLINE-04 guard.
+- [Phase 13]: publish() is the only action given { reconcile: true } — it invalidates in-flight reads and re-reads after the write. Not applied to every optimistic() call: a write without a guaranteed following read (no reconcile) would drop someone else's concurrent change if it invalidated in-flight reads too.
+- [Phase 13]: Migration 0023 (add 5 tables to supabase_realtime publication) immediately created a second issue found in review — Postgres only sends REPLICA IDENTITY columns on DELETE, so RLS couldn't filter delete events by team_code without it in the replica identity, meaning deletes briefly broadcast cross-team (opaque row ids only, not content). Closed same-session via migration 0024 (REPLICA IDENTITY FULL on the same 5 tables).
 
 ### Pending Todos
 
@@ -126,7 +130,7 @@ None yet.
 - **[v1.2 Phase 8] ✓ הושלם ואומת (2026-09-22).** שלושת התוכניות מוזגו, code review עלה 3 אזהרות (WR-01/02/03) שתוקנו ואומתו לייב בדפדפן, ו-`gsd-verifier` אישר 5/5 קריטריוני הצלחה. `UnifiedBoard.jsx` נשאר באותו שם, רק זז לשלב אחרי `shifts`.
 - **[v1.2 Phase 9] ✓ הושלם ואומת (2026-09-22).** שתי התוכניות מוזגו, code review עלה 1 Critical (מחרוזת "משמרות" קשיחה בדיאלוג ההדגמה שבירה את אוצר המילים במצב army) + 2 Warnings + 1 Info — כולם תוקנו ואומתו לייב בדפדפן (כולל רישום צוות-בדיקה נקי במצב army במיוחד כדי לתפוס את הבאג), ו-`gsd-verifier` אישר 5/5 קריטריוני הצלחה.
 - **[v1.2 Phase 10] ✓ הושלם ואומת (2026-09-23).** שלושת התוכניות מוזגו (10-01/10-02/10-03), code review על הדיף המלא העלה 0 Critical + 2 Warnings (הערות מיושנות ב-RosterWizard.jsx שעדיין תיארו את מסך המשאבים שנמחק כקיים, וקובץ ResourceView.jsx שנמחק מ-git אך נשאר untracked בעץ העבודה) + 1 Info — שתי האזהרות תוקנו ישירות, `npm test`/`npm run build` עברו נקי, ו-`gsd-verifier` אישר 3/3 קריטריוני הצלחה בבדיקה עצמאית מול הקוד הנוכחי.
-- **[v1.2 Phase 12→13] CONFIRM-04 מחברת פעולה שבורה.** "ביטול הפצה" עדיין באג בזמן Phase 12; Phase 13 חייבת לאמת מחדש דרך הדיאלוג, לא במעקף שלו.
+- **[v1.2 Phase 13] ✓ הושלם ואומת (2026-09-25).** BUG-01..04 כולן נסגרו דרך `/gsd-debug` (לא GSD plan רגיל — זה workflow דיבאג). שורש: שני תקלות ביחד — refresh() ישן שיכול להתחרות בציור האופטימי של ביטול-הפצה, ופרסום realtime (`supabase_realtime`) שמעולם לא הכיל אף טבלה (התגלה תוך כדי חקירה, לא היה ידוע מראש). תוקן: `sequenceGuard.js` קיבל `sequencedRefresh`/`optimisticWrite` הניתנים לבדיקה ב-Node (`scripts/verify-publish-sync.mjs`, 17 בדיקות, מחובר ל-`npm test`); `publish` מקבל `{ reconcile: true }`; ה-realtime effect מתאזן מחדש ב-(re)subscribe וב-`visibilitychange`. Migration 0023 (הוספת 5 טבלאות לפרסום) הופעלה לייב, ומיד גילתה בעיה נוספת — DELETE לא מסונן RLS בלי `REPLICA IDENTITY FULL` — שנסגרה ב-migration 0024 באותה ישיבה. אומת לייב: פרסום→ביטול־פרסום דרך UI אמיתי, מצב DB נבדק ישירות אחרי כל קליק, וחשבון שומר אמיתי (לא סינתטי) אומת משני הכיוונים ("טרם פורסם" → מציג את הסידור המלא). זו הפאזה האחרונה ב-v1.2 — האבן-דרך כולה נסגרה.
 - אין test runner בפרויקט. כל בדיקה חדשה חייבת להיות סקריפט Node עצמאי שמדפיס `ok`/`FAIL` ומחזיר קוד יציאה, מחובר ל-`npm test`. רלוונטי ישירות ל-BUG-04.
 - ⚠️ [v1.1] Phases 1-3's VERIFICATION.md files predate the current `status:` frontmatter contract — GSD tooling reports them "missing" on format alone; carried forward as a known override (see MILESTONES.md v1.1 entry). Consider backfilling frontmatter early in this milestone.
 - ⚠️ [v1.1] Pre-existing NUL-byte separator in `conflicts.js`'s `pairKey` — acknowledged tech debt, no observed impact (see Deferred Items below).
@@ -151,13 +155,12 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-25T01:00:00.000Z
-Stopped at: Phase 12 closed (merged + doc-reconciled + verified); ready to plan Phase 13
+Last session: 2026-09-25T03:30:00.000Z
+Stopped at: Phase 13 closed (fixed + live-verified via /gsd-debug); v1.2 milestone fully complete
 Resume file: None
 
 ## Operator Next Steps
 
-- Plan Phase 13 with `/gsd-plan-phase 13`
-- Phase 13 fixes the "ביטול הפצה" (unpublish) bug (BUG-01..04) — reproduce, find root cause, fix, and add regression coverage
-- Per 12-CONTEXT.md finding §2 (Phase 12's investigation): `api.setPublished` in `api.js` is already correct (`.select()` + row-count check) — the bug lives in the UI/state flow above it, not the DB layer. Phase 12 gated the existing (buggy) unpublish call behind `ConfirmDialog` without touching or masking it, so Phase 13 should reproduce and fix through that same dialog, not around it.
-- Note from live verification during Phase 12: the unpublish bug did NOT reproduce in either of the two live attempts made while testing CONFIRM-04's dialog wiring (both day-level and all-shifts unpublish worked correctly) — the bug is evidently intermittent or conditional, not a hard failure on every attempt. Phase 13 will need a more targeted repro scenario than "click unpublish once."
+- v1.2 (גימור להשקה) is done — all 8 phases (6-13) complete. Next step is starting a new milestone (`/gsd-new-milestone`) when there's a new scope to define, not phase work in this one.
+- Not yet verified live (flagged by the debugger, non-blocking since the underlying mechanism is shared and already tested at the unit + integration level): army mode's 62-shift week, the single-day "בטל" toggle button, the WeekFlow bottom-CTA publish path, and a guard whose app is already open staying live-updated (only cold-reload/rejoin was verified, not an in-foreground WS push).
+- Known pre-existing issues surfaced during Phase 13 but out of its scope, left for a future phase/milestone to triage: (1) non-army demo weeks seed shifts already published=true (DB default, not the seeder's intent); (2) editing a shift form opened before an unpublish can re-publish it on save; (3) an unsplit 24/7 army position becomes a task, and tasks have no `published` flag so soldiers can see them regardless of publish state; (4) a write touching N rows now triggers N full reloads per connected client — works correctly but could be batched/debounced for efficiency at scale; (5) migration 0023 isn't safely re-runnable (`alter publication ... add table` errors if a table is already published) — fine as a one-shot historical migration, but worth an idempotent rewrite if migrations are ever replayed.
