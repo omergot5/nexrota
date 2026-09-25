@@ -745,10 +745,16 @@ export function useGuardian() {
       deleteDemoDataForWeek: (weekDates) => {
         const ids = demoShiftIdsForWeek(dataRef.current.shifts, weekDates);
         if (!ids.length) return;
-        return run(async () => {
-          await api.deleteShifts(ids);
-          await refresh();
-        });
+        return run(
+          async () => {
+            await api.deleteShifts(ids);
+            await refresh();
+          },
+          // rethrow (Phase 12, gap found by gsd-verifier after the WR-01 fix
+          // pass): מוחסר כאן, זהה לכל האחיות שלה (deleteShifts וכו') — בלעדיו
+          // ה-ConfirmDialog היה נסגר בשקט גם כשהמחיקה נכשלה בפועל.
+          { rethrow: true }
+        );
       },
 
       setAvailability: (shiftId, guardId, status, comment) =>
