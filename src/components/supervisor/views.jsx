@@ -1447,12 +1447,16 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
   // שלוגיקת-הפתיחה לא תשוכפל שלוש פעמים (12-CONTEXT.md §5ב). לא נוגע ב-
   // actions.publish/api.setPublished עצמם — הבאג הידוע ב"ביטול הפצה"
   // (STATE.md, Phase 13) נשאר כפי שהוא; זו רק שער-UI לפני הקריאה הקיימת.
-  function askPublish({ ids, publish, scopeLabel, confirmLabel }) {
+  // scopeShiftsPhrase כבר מרכיב את unit.shifts בתוכו בסדר מילים תקין
+  // (לדוגמה "כל משמרות השבוע" / "משמרות יום ראשון, 5 באוקטובר") — לא
+  // הדבקה גולמית של scopeLabel לפני unit.shifts (WR-02, 12-REVIEW.md,
+  // הדבקה כזו שברה את התחביר בעברית לשני התרחישים).
+  function askPublish({ ids, publish, scopeShiftsPhrase, confirmLabel }) {
     setConfirmState({
       title: publish ? "לפרסם את הסידור?" : "לבטל את הפרסום?",
       body: publish
-        ? `${scopeLabel} ${t("unit.shifts")} ייראו מיד אצל כל ${t("noun.memberPlural")} המשובצים.`
-        : `${scopeLabel} ${t("unit.shifts")} יחזרו למצב טיוטה — ${t("noun.memberPlural")} לא יראו אותן יותר כמפורסמות.`,
+        ? `${scopeShiftsPhrase} ייראו מיד אצל כל ה${t("noun.memberPlural")} המשובצים.`
+        : `${scopeShiftsPhrase} יחזרו למצב טיוטה — ה${t("noun.memberPlural")} לא יראו אותן יותר כמפורסמות.`,
       confirmLabel,
       tone: publish ? "accent" : "outline",
       onConfirm: () => actions.publish(ids, publish),
@@ -1471,7 +1475,12 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
                 variant="accent"
                 icon="share"
                 onClick={() =>
-                  askPublish({ ids: allIds, publish: true, scopeLabel: "כל השבוע", confirmLabel: t("action.publishAll") })
+                  askPublish({
+                    ids: allIds,
+                    publish: true,
+                    scopeShiftsPhrase: `כל ${t("unit.shifts")} השבוע`,
+                    confirmLabel: t("action.publishAll"),
+                  })
                 }
                 loading={busy}
               >
@@ -1482,7 +1491,12 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
               <Btn
                 variant="outline"
                 onClick={() =>
-                  askPublish({ ids: allIds, publish: false, scopeLabel: "כל השבוע", confirmLabel: t("action.unpublish") })
+                  askPublish({
+                    ids: allIds,
+                    publish: false,
+                    scopeShiftsPhrase: `כל ${t("unit.shifts")} השבוע`,
+                    confirmLabel: t("action.unpublish"),
+                  })
                 }
                 loading={busy}
               >
@@ -1526,11 +1540,12 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
                     <Btn
                       size="sm"
                       variant={allPub ? "outline" : "primary"}
+                      loading={busy}
                       onClick={() =>
                         askPublish({
                           ids: dayShifts.map((s) => s.id),
                           publish: !allPub,
-                          scopeLabel: formatDateHe(date),
+                          scopeShiftsPhrase: `${t("unit.shifts")} ${formatDateHe(date)}`,
                           confirmLabel: allPub ? t("action.unpublishShort") : t("action.publishDay"),
                         })
                       }

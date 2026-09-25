@@ -656,6 +656,11 @@ export const Modal = ({ open, onClose, title, subtitle, children, wide = false, 
  *     שכבר קרתה.
  * (2) `pending` הוא הכללה של הדפוס שכבר הוכח ב-`SeedDemoDialog`
  *     (pending → חוסם סגירה בזמן שהכתיבה בתהליך), לא מנגנון חדש.
+ * (3) הדיאלוג נסגר אחרי `onConfirm` רק אם הוא **לא** זרק. `onConfirm`
+ *     חייב לדחות (reject) על כישלון כדי שהמשתמש לא יראה "הצלחה" מדומה —
+ *     קורא שעוטף פעולת `useGuardian.js` חייב להעביר `{ rethrow: true }`
+ *     ל-`run()`/`optimistic()` שלה (ברירת המחדל בולעת שגיאות). על כישלון
+ *     הדיאלוג פשוט נשאר פתוח; באנר-השגיאה הכללי כבר מסביר מה נכשל.
  */
 export const ConfirmDialog = ({
   open,
@@ -674,9 +679,15 @@ export const ConfirmDialog = ({
     setPending(true);
     try {
       await onConfirm();
-    } finally {
+    } catch {
+      // הדיאלוג נשאר פתוח בכישלון (Phase 12, WR-01 ב-12-REVIEW.md) — onConfirm
+      // חייב לזרוק (rethrow: true) כדי שהמשתמש לא יראה את הדיאלוג נסגר בשקט
+      // כאילו הפעולה הצליחה. באנר-השגיאה הכללי (SupervisorApp) כבר מסביר מה
+      // נכשל; לא כופלים כאן הודעת-שגיאה נוספת.
       setPending(false);
+      return;
     }
+    setPending(false);
     onClose();
   };
   const closeUnlessPending = () => {

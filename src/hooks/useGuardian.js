@@ -283,7 +283,7 @@ export function useGuardian() {
    * change the server rejected.
    */
   const optimistic = useCallback(
-    (patch, work) =>
+    (patch, work, options) =>
       run(async () => {
         const snapshot = dataRef.current;
         setData(patch);
@@ -293,7 +293,7 @@ export function useGuardian() {
           if (mounted.current) setData(snapshot);
           throw e;
         }
-      }),
+      }, options),
     [run]
   );
 
@@ -583,10 +583,13 @@ export function useGuardian() {
        * `<decisions>`) — פרה-אישור מחליף את חלון ה-8 שניות, לא מצטבר עליו.
        */
       deleteShifts: (ids) =>
-        run(async () => {
-          await api.deleteShifts(ids);
-          await refresh();
-        }),
+        run(
+          async () => {
+            await api.deleteShifts(ids);
+            await refresh();
+          },
+          { rethrow: true }
+        ),
 
       /**
        * החלפת תוכן השבוע: מה שהיה יורד, ומה שנבחר עולה במקומו.
@@ -597,11 +600,14 @@ export function useGuardian() {
        * 12-CONTEXT.md `<decisions>` — פרה-אישור מחליף UndoBar, לא נערם עליו.
        */
       replaceShifts: (ids, rows) =>
-        run(async () => {
-          if (ids.length) await api.deleteShifts(ids);
-          if (rows.length) await api.createShifts(rows, dataRef.current.team?.code);
-          await refresh();
-        }),
+        run(
+          async () => {
+            if (ids.length) await api.deleteShifts(ids);
+            if (rows.length) await api.createShifts(rows, dataRef.current.team?.code);
+            await refresh();
+          },
+          { rethrow: true }
+        ),
 
       publish: (shiftIds, published) =>
         optimistic(
@@ -609,7 +615,8 @@ export function useGuardian() {
             ...d,
             shifts: d.shifts.map((s) => (shiftIds.includes(s.id) ? { ...s, published } : s)),
           }),
-          () => api.setPublished(shiftIds, published)
+          () => api.setPublished(shiftIds, published),
+          { rethrow: true }
         ),
 
       // overrideNote (שלב 6): מועבר רק כשהקריאה מגיעה מכפתור "שבץ בכל זאת"
@@ -766,10 +773,13 @@ export function useGuardian() {
       // מהצוות, עם cascade לשיבוצים/זמינות/בקשות-החלפה שלו, ולכן נקראת אחרי
       // אישור מפורש בדיאלוג (Wave 2) במקום חלון-ביטול.
       removeGuard: (id) =>
-        run(async () => {
-          await api.removeGuard(id);
-          await refresh();
-        }),
+        run(
+          async () => {
+            await api.removeGuard(id);
+            await refresh();
+          },
+          { rethrow: true }
+        ),
 
       updateTeamSettings: (patch) =>
         optimistic(
@@ -930,21 +940,27 @@ export function useGuardian() {
       // המיוחדת ל-UndoBar (WR-02, 11-REVIEW.md) הוסר — אין יותר UndoBar
       // שצריך תווית בשבילו; ה-ConfirmDialog (Wave 2) מנסח את האזהרה מראש.
       deletePosition: (id, weekDates = []) =>
-        run(async () => {
-          if (weekDates.length) await api.unmaterializePositionWeek(id, weekDates);
-          try {
-            await api.deletePosition(id);
-          } catch (e) {
-            // unmaterializePositionWeek עשוי כבר להיות committed. לא רגרסיה
-            // של CR-02 (11-REVIEW.md): שם refresh()+setError() מנעו rollback
-            // חיצוני מלדרוס מצב אמיתי. ב-run() אין snapshot לצייר-מחדש בכלל,
-            // אז refresh() ואז throw בטוח — המצב האמיתי כבר מוצג לפני ש-run()
-            // עצמה קוראת ל-setError (בלי כפילות קוד).
+        run(
+          async () => {
+            if (weekDates.length) await api.unmaterializePositionWeek(id, weekDates);
+            try {
+              await api.deletePosition(id);
+            } catch (e) {
+              // unmaterializePositionWeek עשוי כבר להיות committed. לא רגרסיה
+              // של CR-02 (11-REVIEW.md): שם refresh()+setError() מנעו rollback
+              // חיצוני מלדרוס מצב אמיתי. ב-run() אין snapshot לצייר-מחדש בכלל,
+              // אז refresh() ואז throw בטוח — המצב האמיתי כבר מוצג לפני ש-run()
+              // עצמה קוראת ל-setError (בלי כפילות קוד).
+              await refresh();
+              throw e;
+            }
             await refresh();
-            throw e;
-          }
-          await refresh();
-        }),
+          },
+          // rethrow (Phase 12, WR-04 ב-12-REVIEW.md): בלי זה removeItem
+          // ב-RosterWizard.jsx סוגר את פאנל העריכה גם כשהמחיקה נכשלה, כי
+          // run() בולע שגיאות כברירת מחדל.
+          { rethrow: true }
+        ),
 
       /**
        * מממש שורות שבועיות חסרות לכל עמדה פעילה — גם template (לתוך gs_shifts)

@@ -313,7 +313,9 @@ export default function WeekFlow({
       onClick: () =>
         setConfirmState({
           title: "לשלוח את הסידור לצוות?",
-          body: `${weekShifts.length} ${t("unit.shifts")} ייראו מיד אצל כל ${t("noun.memberPlural")} המשובצים.`,
+          // "כל ה${...}" ולא "כל ${...}" (WR-02, 12-REVIEW.md): שם עצם
+          // בלתי-מיודע לפני תואר מיודע ("כל שומרים המשובצים") לא תקין בעברית.
+          body: `${weekShifts.length} ${t("unit.shifts")} ייראו מיד אצל כל ה${t("noun.memberPlural")} המשובצים.`,
           confirmLabel: t("action.publish"),
           tone: "accent",
           onConfirm: () => actions.publish(weekShifts.map((s) => s.id), true),
