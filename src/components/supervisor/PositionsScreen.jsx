@@ -12,7 +12,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import {
-  Badge, Btn, Card, EmptyState, Field, IconBtn, Input, Modal, PageHeader, Segmented, Select,
+  Badge, Btn, Card, ConfirmDialog, EmptyState, Field, IconBtn, Input, Modal, PageHeader, Segmented, Select,
 } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import { DAYS_HE_SHORT, addDays, rangeLabelHe, shortDate, weekFrom } from "../../lib/dates.js";
@@ -53,6 +53,7 @@ export default function PositionsScreen({
   const categories = categoryOptions(shifts, tasks, mode);
   const [editing, setEditing] = useState(null); // "new" | position object | null
   const [form, setForm] = useState(null);
+  const [confirmTarget, setConfirmTarget] = useState(null); // CONFIRM-05: position object | null — נפתח לפני deletePosition
 
   const openNew = () => {
     setForm(emptyForm(categories[0]));
@@ -135,7 +136,7 @@ export default function PositionsScreen({
               tasks={tasks}
               weekDates={weekDates}
               onEdit={() => openEdit(p)}
-              onDelete={() => actions.deletePosition(p.id, weekDates)}
+              onDelete={() => setConfirmTarget(p)}
             />
           ))}
         </div>
@@ -257,6 +258,17 @@ export default function PositionsScreen({
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(confirmTarget)}
+        onClose={() => setConfirmTarget(null)}
+        onConfirm={() => actions.deletePosition(confirmTarget.id, weekDates)}
+        title={confirmTarget ? `למחוק את "${confirmTarget.title}"?` : ""}
+        body="העמדה תימחק לצמיתות, כולל שיבוצים שכבר בוצעו לה השבוע הנוכחי (אם יש). הפעולה לא הפיכה."
+        confirmLabel="מחק עמדה"
+        tone="danger"
+        busy={busy}
+      />
     </div>
   );
 }
