@@ -35,7 +35,10 @@ import { missingRowsForWeek } from "../lib/positions.js";
 // subscription firing on its own write) can resolve out of order and let a
 // stale response overwrite a fresher one. createSequenceGuard is the fix,
 // scoped to this single choke point — see sequenceGuard.js's header.
-import { createSequenceGuard } from "../lib/sequenceGuard.js";
+// Phase 13 (BUG-02): refresh() and optimistic() delegate their bodies to
+// sequencedRefresh/optimisticWrite, so the race between them is tested in
+// Node (scripts/verify-publish-sync.mjs) on the exact code that runs here.
+import { createSequenceGuard, optimisticWrite, sequencedRefresh } from "../lib/sequenceGuard.js";
 
 const EMPTY = {
   team: null,
@@ -200,18 +203,18 @@ export function useGuardian() {
     // no matter which one actually resolves first. This single choke point
     // covers all ~12 call sites and the realtime subscription without
     // touching any of them.
-    const token = refreshSeqRef.current.next();
-    try {
-      const team = await api.loadTeam(teamCode);
-      if (!refreshSeqRef.current.isCurrent(token)) return;
-      if (mounted.current) {
+    await sequencedRefresh({
+      guard: refreshSeqRef.current,
+      load: () => api.loadTeam(teamCode),
+      paint: (team) => {
+        if (!mounted.current) return;
         setData(team);
         setOffline(false);
-      }
-    } catch (e) {
-      if (!refreshSeqRef.current.isCurrent(token)) return;
-      if (mounted.current) setError(e.message);
-    }
+      },
+      fail: (e) => {
+        if (mounted.current) setError(e.message);
+      },
+    });
   }, []);
 
   // צילום המטמון נכתב ממקום אחד — כל מצב "ready" שנצבע נשמר. שמירה בכל
@@ -222,21 +225,33 @@ export function useGuardian() {
 
   // חזרת הרשת מרעננת מיד. בלי זה המשתמש נשאר עם צילום ישן עד לפעולה הבאה,
   // ובאבטחה זה בדיוק הזמן שבו הסידור השתנה.
+  //
+  // אותו היגיון לחזרה לאפליקציה (Phase 13, BUG-03): טלפון בכיס משהה את
+  // ה-WebSocket, ואירועי realtime שקרו בינתיים לא נשלחים שוב. בלי הרענון
+  // הזה משתתף שפותח את "התורנויות שלי" אחרי ביטול הפצה ממשיך לראות את
+  // הסידור כמפורסם עד טעינה מחדש — ה-socket מגלה שהוא מת רק בדופק הבא.
   useEffect(() => {
     const back = () => refresh();
     window.addEventListener("online", back);
     const gone = () => setOffline(true);
     window.addEventListener("offline", gone);
+    const resumed = () => {
+      if (document.visibilityState === "visible" && navigator.onLine) refresh();
+    };
+    document.addEventListener("visibilitychange", resumed);
     return () => {
       window.removeEventListener("online", back);
       window.removeEventListener("offline", gone);
+      document.removeEventListener("visibilitychange", resumed);
     };
   }, [refresh]);
 
   // ---------- live updates ----------
   // Everyone on a team shares one channel; any write nudges the others to
-  // refetch. RLS already limits which rows reach this client, so no filter is
-  // needed here — a change you are not allowed to see never arrives.
+  // refetch. RLS limits which INSERT/UPDATE rows reach this client, but
+  // Supabase does not apply RLS to DELETE events: every delete in any team
+  // reaches every subscriber (primary key only) and triggers a refresh here.
+  // Known follow-up from Phase 13 — the refetch itself is still RLS-scoped.
   const teamCode = user?.teamCode;
   useEffect(() => {
     if (!teamCode) return;
@@ -247,7 +262,16 @@ export function useGuardian() {
     ]) {
       channel.on("postgres_changes", { event: "*", schema: "public", table }, onChange);
     }
-    channel.subscribe();
+    // Phase 13 (BUG-03): postgres_changes has no replay — an event sent while
+    // the socket was down is gone. The socket can go down (network loss, a
+    // backgrounded phone), and a publish of N rows is N messages per connected
+    // client, which risks Supabase's messages-per-second limit (not observed
+    // live). supabase-js rejoins on its own and reports SUBSCRIBED on every
+    // successful (re)join, so that is the moment to re-read what was missed —
+    // including the gap between the first loadTeam() and the first join.
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") refresh();
+    });
     return () => {
       supabase.removeChannel(channel);
     };
@@ -281,20 +305,32 @@ export function useGuardian() {
    * Paints `patch` immediately, then does the real write. If the write fails
    * the previous dataset is restored, so the screen never keeps showing a
    * change the server rejected.
+   *
+   * @param reconcile  (Phase 13, BUG-02) invalidate every refresh() already
+   *                   in flight before painting, and re-read the team after a
+   *                   successful write instead of trusting a realtime event
+   *                   to do it — otherwise a read issued before the write
+   *                   paints the old rows back over the patch. For bulk
+   *                   writes whose result other people see (publish), not
+   *                   for per-click actions, which would double every fetch.
+   *                   See optimisticWrite() in sequenceGuard.js.
    */
   const optimistic = useCallback(
-    (patch, work, options) =>
-      run(async () => {
-        const snapshot = dataRef.current;
-        setData(patch);
-        try {
-          await work();
-        } catch (e) {
-          if (mounted.current) setData(snapshot);
-          throw e;
-        }
-      }, options),
-    [run]
+    (patch, work, { reconcile = false, ...options } = {}) =>
+      run(
+        () =>
+          optimisticWrite({
+            guard: refreshSeqRef.current,
+            read: () => dataRef.current,
+            paint: setData,
+            patch,
+            work,
+            isLive: () => mounted.current,
+            reconcile: reconcile ? refresh : null,
+          }),
+        options
+      ),
+    [run, refresh]
   );
 
   /**
@@ -609,6 +645,12 @@ export function useGuardian() {
           { rethrow: true }
         ),
 
+      // reconcile (Phase 13, BUG-02/03): פרסום של N משמרות מייצר N אירועי
+      // realtime — N קריאות loadTeam במקביל, שכל אחת מהן יכולה לחזור אחרי
+      // ביטול ההפצה שבא מיד אחריו ולצבוע "מפורסם" מחדש. עם reconcile,
+      // optimistic() פוסלת את כל הקריאות שיצאו לפני הצביעה, והקריאה שאחרי
+      // הכתיבה פוסלת את אלה שיצאו באמצעה וצובעת את מה שבאמת נשמר — בלי
+      // לסמוך על אירוע realtime שאולי לא יגיע בכלל.
       publish: (shiftIds, published) =>
         optimistic(
           (d) => ({
@@ -616,7 +658,7 @@ export function useGuardian() {
             shifts: d.shifts.map((s) => (shiftIds.includes(s.id) ? { ...s, published } : s)),
           }),
           () => api.setPublished(shiftIds, published),
-          { rethrow: true }
+          { rethrow: true, reconcile: true }
         ),
 
       // overrideNote (שלב 6): מועבר רק כשהקריאה מגיעה מכפתור "שבץ בכל זאת"
