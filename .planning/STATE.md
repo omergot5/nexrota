@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: גימור להשקה
-current_phase: 12
-current_phase_name: אישורי פעולות קריטיות
-status: executing
-stopped_at: Completed 12-05-PLAN.md (RosterWizard/PositionsScreen delete-position), live-verified; Wave 2 complete, 12-06 (Wave 3, closing plan) next
-last_updated: "2026-09-25T00:30:00.000Z"
+current_phase: 13
+current_phase_name: "באג — ביטול הפצה אחרי פרסום"
+status: planning
+stopped_at: "Phase 12 closed: merged (12-01..12-06), doc contradiction resolved (CLAUDE.md x2 + PROJECT.md), CONFIRM-06 live-verified (cancel-then-reload across 2 dialog types); ready to plan Phase 13"
+last_updated: "2026-09-25T01:00:00.000Z"
 last_activity: 2026-09-25
-last_activity_desc: 12-05 (RosterWizard + PositionsScreen deletePosition, CONFIRM-05) merged and live-verified in army mode — both delete paths correctly gated, Cancel is a true no-op, SQL confirms permanent deletion; all 5 CONFIRM-05 actions from the closed review list now wired
-state_head: 2550d8a95093d241a745ebd3e8baa56389d52f12
+last_activity_desc: "12-06 (doc reconciliation + closing integration verification) merged. Root CLAUDE.md, .claude/CLAUDE.md (applied directly — gitignored, no commit), and PROJECT.md all updated to describe both UndoBar-default and pre-confirm-closed-list tracks, resolving the Iron-Principle-3 contradiction. CONFIRM-01 re-verified via code scan (no duplicate confirm logic). CONFIRM-06 live-verified: delete-week Cancel + publish-unpublish-all Cancel both confirmed byte-identical to pre-click state after a full page reload (not just visual dismissal), across two structurally different dialogs. Phase 12 (CONFIRM-01..06) fully complete; transitioned to Phase 13"
+state_head: d43bb0da418e96ce4a409a15cf8118f0a383f257
 progress:
   total_phases: 8
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 23
-  completed_plans: 22
-  percent: 75
+  completed_plans: 23
+  percent: 88
 ---
 
 # Project State
@@ -25,16 +25,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-17)
 
 **Core value:** אדם שמקבל את האפליקציה לידיו מסיים סידור שבועי מלא בלי שאף אחד יסביר לו כלום — ומה שהמערכת אומרת לו על עצמה הוא נכון.
-**Current focus:** Phase 12 — אישורי פעולות קריטיות
+**Current focus:** Phase 13 — באג ביטול הפצה אחרי פרסום
 
 ## Current Position
 
-Phase: 12 (אישורי פעולות קריטיות)
-Plan: 5 of 6 complete (Wave 2 complete: 12-03/12-04/12-05 done, 12-06 (Wave 3, closing plan) next)
-Status: Executing
-Last activity: 2026-09-25 — 12-05 (RosterWizard/PositionsScreen delete-position) merged and live-verified in army mode
+Phase: 13 (באג — ביטול הפצה אחרי פרסום)
+Plan: not yet planned
+Status: Ready to plan
+Last activity: 2026-09-25 — Phase 12 merged, doc contradiction resolved, verified (CONFIRM-01 code-scan + CONFIRM-06 live cancel-then-reload)
 
-Progress: [████████░░] 75% (v1.2)
+Progress: [█████████░] 88% (v1.2)
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Progress: [████████░░] 75% (v1.2)
 | Phase 12 P03 | 15min | 3 tasks | 1 files |
 | Phase 12 P04 | 10min | 2 tasks | 1 files |
 | Phase 12 P05 | 10min | 2 tasks | 2 files |
+| Phase 12 P06 | 35min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,8 @@ Progress: [████████░░] 75% (v1.2)
 - [Phase 12]: 12-03: clearWeek's delete call extracted into named confirmDeleteWeek helper (not inline lambda) so it doesn't trip the plan's own literal forward-scan verify-check
 - [Phase 12]: 12-04: WeekFlow's step-5 CTA publish button is a separate UI entry point from ScheduleMgmt's own "פרסם הכל" (both call actions.publish(ids,true), both now gated independently, no shared component needed since one-directional); demo-cleanup button gated on demoShiftIdsForWeek(shifts, weekDates).length > 0, same as its Phase-11 visibility gate
 - [Phase 12]: 12-05: RosterWizard's removeItem only opens ConfirmDialog for the item.position branch (real, saved positions) — item.seed (unsaved draft) stays immediate, no dialog, since nothing exists server-side yet to confirm deleting; setActiveKey(null) moved inside onConfirm so it only runs after the delete actually succeeds
+- [Phase 12]: 12-06: `.claude/CLAUDE.md` is fully gitignored (`.gitignore` line 8, no exception) — worktree executors can never commit edits to it; the orchestrating session must apply such edits directly in the main checkout. Applied here for the Undo/pre-confirm pattern description and the third write-mechanism (`run()`) note.
+- [Phase 12]: 12-06: CONFIRM-06 verified specifically via Cancel-then-full-page-reload (not just visual dismissal) across two structurally different dialogs (delete-week, publish/unpublish-all) — both confirmed byte-identical to pre-click state via direct SQL, closing the exact verification gap the phase was scoped to catch
 
 ### Pending Todos
 
@@ -119,7 +122,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- **[v1.2 Phase 12] סתירה לעקרון ברזל קיים.** `CLAUDE.md` עקרון 3 קובע "ביטול במקום אישור — בלי `confirm()`"; בעל המוצר הפך זאת במפורש לפעולות הרסניות. Phase 12 חייבת להכריע אילו פעולות עוברות לאישור-מראש ואילו נשארות ב-`UndoBar`, ולעדכן את `CLAUDE.md` + `PROJECT.md` בהתאם.
+- **[v1.2 Phase 12] ✓ הושלם ואומת (2026-09-25).** שש התוכניות (12-01..12-06) בוצעו, אומתו לייב בדפדפן (צוותי בדיקה נפרדים לכל אחת מ-12-03/04/05, קוד army למחיקת-עמדה, פורק אחרי כל בדיקה). ה-סתירה לעקרון ברזל 3 (שהיה קיים מ-Phase 8) נפתרה: `CLAUDE.md` (root), `.claude/CLAUDE.md` (מוחל ישירות — gitignored, אין commit) ו-`PROJECT.md` עודכנו לתאר שני מסלולים במקביל — UndoBar כברירת מחדל לרוב הפעולות ההרסניות, פרה-אישור לרשימה סגורה ומתועדת (טבלת-ביקורת ב-useGuardian.js). CONFIRM-06 אומת במיוחד דרך ביטול+רענון-דף-מלא (לא רק דחייה חזותית) על שני דיאלוגים שונים מבנית — תוצאה זהה-בייט למצב שלפני הלחיצה, מאומת ישירות ב-SQL.
 - **[v1.2 Phase 8] ✓ הושלם ואומת (2026-09-22).** שלושת התוכניות מוזגו, code review עלה 3 אזהרות (WR-01/02/03) שתוקנו ואומתו לייב בדפדפן, ו-`gsd-verifier` אישר 5/5 קריטריוני הצלחה. `UnifiedBoard.jsx` נשאר באותו שם, רק זז לשלב אחרי `shifts`.
 - **[v1.2 Phase 9] ✓ הושלם ואומת (2026-09-22).** שתי התוכניות מוזגו, code review עלה 1 Critical (מחרוזת "משמרות" קשיחה בדיאלוג ההדגמה שבירה את אוצר המילים במצב army) + 2 Warnings + 1 Info — כולם תוקנו ואומתו לייב בדפדפן (כולל רישום צוות-בדיקה נקי במצב army במיוחד כדי לתפוס את הבאג), ו-`gsd-verifier` אישר 5/5 קריטריוני הצלחה.
 - **[v1.2 Phase 10] ✓ הושלם ואומת (2026-09-23).** שלושת התוכניות מוזגו (10-01/10-02/10-03), code review על הדיף המלא העלה 0 Critical + 2 Warnings (הערות מיושנות ב-RosterWizard.jsx שעדיין תיארו את מסך המשאבים שנמחק כקיים, וקובץ ResourceView.jsx שנמחק מ-git אך נשאר untracked בעץ העבודה) + 1 Info — שתי האזהרות תוקנו ישירות, `npm test`/`npm run build` עברו נקי, ו-`gsd-verifier` אישר 3/3 קריטריוני הצלחה בבדיקה עצמאית מול הקוד הנוכחי.
@@ -148,12 +151,13 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-24T16:34:48.963Z
-Stopped at: Completed 12-03-PLAN.md
+Last session: 2026-09-25T01:00:00.000Z
+Stopped at: Phase 12 closed (merged + doc-reconciled + verified); ready to plan Phase 13
 Resume file: None
 
 ## Operator Next Steps
 
-- Plan Phase 12 with `/gsd-plan-phase 12`
-- Phase 12 carries a UI hint — consider `/gsd-ui-phase 12` first
-- Phase 12 must resolve the CLAUDE.md Iron Principle 3 conflict flagged above (UndoBar-only vs. product-owner-mandated confirm dialogs for destructive actions) before/while wiring CONFIRM-01..06
+- Plan Phase 13 with `/gsd-plan-phase 13`
+- Phase 13 fixes the "ביטול הפצה" (unpublish) bug (BUG-01..04) — reproduce, find root cause, fix, and add regression coverage
+- Per 12-CONTEXT.md finding §2 (Phase 12's investigation): `api.setPublished` in `api.js` is already correct (`.select()` + row-count check) — the bug lives in the UI/state flow above it, not the DB layer. Phase 12 gated the existing (buggy) unpublish call behind `ConfirmDialog` without touching or masking it, so Phase 13 should reproduce and fix through that same dialog, not around it.
+- Note from live verification during Phase 12: the unpublish bug did NOT reproduce in either of the two live attempts made while testing CONFIRM-04's dialog wiring (both day-level and all-shifts unpublish worked correctly) — the bug is evidently intermittent or conditional, not a hard failure on every attempt. Phase 13 will need a more targeted repro scenario than "click unpublish once."
