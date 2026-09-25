@@ -5,16 +5,16 @@ milestone_name: גימור להשקה
 current_phase: 12
 current_phase_name: אישורי פעולות קריטיות
 status: executing
-stopped_at: Completed 12-03-PLAN.md
-last_updated: "2026-09-24T16:34:50.715Z"
-last_activity: 2026-09-24
-last_activity_desc: Phase 11 verified passed (4/4 success criteria); code review found CR-01 (task-card metadata corruption via UnifiedBoard's inline +/x), CR-02 (non-atomic deletePosition fake-rollback), WR-01 (avatar z-index), WR-02 (imprecise toast) — all fixed and re-verified by gsd-verifier against current code; transitioned to Phase 12
-state_head: b4aa7bb3709662ca5934fbd9ad3a380f6d2cd562
+stopped_at: Completed 12-04-PLAN.md (WeekFlow CTA publish + demo-cleanup buttons), live-verified; 12-05 (Wave 2) next
+last_updated: "2026-09-25T00:00:00.000Z"
+last_activity: 2026-09-25
+last_activity_desc: 12-04 (WeekFlow CTA publish button + demo-cleanup button, CONFIRM-02/03/04) merged and live-verified — both human-check points pass (step-5 CTA publish, demo-cleanup scoped correctly to is_demo rows only)
+state_head: ced5555c9df3d0729f296ad8a9f879d445bb65ae
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 23
-  completed_plans: 20
+  completed_plans: 21
   percent: 75
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 ## Current Position
 
 Phase: 12 (אישורי פעולות קריטיות)
-Plan: 3 of 6 complete (Wave 1: 12-01 done, 12-02 next)
-Status: Ready to execute
-Last activity: 2026-09-24 — 12-01 (generic ConfirmDialog, CONFIRM-01) merged, no UI consumer yet
+Plan: 4 of 6 complete (Wave 2: 12-03/12-04 done, 12-05 next)
+Status: Executing
+Last activity: 2026-09-25 — 12-04 (WeekFlow CTA publish + demo-cleanup) merged and live-verified
 
 Progress: [████████░░] 75% (v1.2)
 
@@ -78,6 +78,7 @@ Progress: [████████░░] 75% (v1.2)
 | Phase 12 P01 | 10min | 1 tasks | 1 files |
 | Phase 12 P02 | 25min | 3 tasks | 1 files |
 | Phase 12 P03 | 15min | 3 tasks | 1 files |
+| Phase 12 P04 | 10min | 2 tasks | 1 files |
 
 ## Accumulated Context
 

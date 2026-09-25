@@ -232,7 +232,7 @@ Plans:
   3. קיימת רשימה מתועדת של כל הפעולות ההרסניות שאותרו בסקירת הקוד — כולל אלו שמעבר לארבע הידועות — ומצב החיבור של כל אחת
   4. לחיצה על "בטל" בדיאלוג משאירה את המערכת בדיוק במצב הקודם — מאומת ברענון דף אחרי ביטול, לא רק במראה המסך
 
-**Plans**: 3/6 plans executed (3 waves)
+**Plans**: 4/6 plans executed (3 waves)
 **UI hint**: yes
 
 Plans:
@@ -240,7 +240,7 @@ Plans:
 - [x] 12-01-PLAN.md — ConfirmDialog: רכיב אישור גנרי ב-ui.jsx (CONFIRM-01, גל 1)
 - [x] 12-02-PLAN.md — useGuardian.js: מנגנון כתיבה-מיידית לחמש פעולות מקודמות + טבלת-ביקורת CONFIRM-05 (CONFIRM-03/05, גל 1)
 - [x] 12-03-PLAN.md — views.jsx: פרסום/ביטול-פרסום, מחק-שבוע, מלא-שבוע, הסרת-אדם (CONFIRM-02/03/04/05, גל 2)
-- [ ] 12-04-PLAN.md — WeekFlow.jsx: CTA-פרסום + מחק-נתוני-הדגמה (CONFIRM-02/03/04, גל 2)
+- [x] 12-04-PLAN.md — WeekFlow.jsx: CTA-פרסום + מחק-נתוני-הדגמה (CONFIRM-02/03/04, גל 2)
 - [ ] 12-05-PLAN.md — RosterWizard.jsx/PositionsScreen.jsx: מחיקת עמדה (CONFIRM-05, גל 2)
 - [ ] 12-06-PLAN.md — עדכון תיעוד (CLAUDE.md×2 + PROJECT.md) + סבב אימות-אינטגרציה סוגר (CONFIRM-01/06, גל 3)
 
