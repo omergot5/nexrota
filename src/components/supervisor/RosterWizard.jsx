@@ -18,7 +18,7 @@
 // ============================================================
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { Alert, Btn, Card, IconBtn, Input, PageHeader, Segmented, Select } from "../ui.jsx";
+import { Alert, Btn, Card, ConfirmDialog, IconBtn, Input, PageHeader, Segmented, Select } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import { DAYS_HE_SHORT, fromISODate, rangeLabelHe } from "../../lib/dates.js";
 import { folderIcon, foldersFor } from "../../lib/categories.js";
@@ -154,6 +154,7 @@ export default function RosterWizard({
 
   const [draftSeeds, setDraftSeeds] = useState([]); // זרעים/עמדות-חדשות שנוספו ידנית ב"הוסף משימה", עדיין לא נשמרו
   const [activeKey, setActiveKey] = useState(null);
+  const [confirmState, setConfirmState] = useState(null); // CONFIRM-05: {title, body, confirmLabel, tone, onConfirm} | null — נפתח רק על מחיקת עמדה אמיתית
   const [form, setForm] = useState(null); // draft נוכחי בעריכה
   const [focusedKey, setFocusedKey] = useState(null); // מפתח השורה הממוקדת כרגע בפאנל התצוגה (WEEKBUILD-05), null = תצוגה כללית
   const [hideDrafts, setHideDrafts] = useState(false); // WEEKBUILD-04: true = הצג רק rows (ממומשות), הסתר pendingRows (טיוטה בעריכה)
@@ -276,17 +277,28 @@ export default function RosterWizard({
     if (next) openItem(next);
   };
 
+  // CONFIRM-05: רק עמדה אמיתית (item.position, קיימת בשרת) עוברת דרך
+  // ConfirmDialog; setActiveKey(null) עובר לתוך onConfirm ורץ רק אחרי
+  // שהמחיקה הצליחה (T-12-05-B). זרע/טיוטה (item.seed) נשאר מיידי — אין
+  // לו נתון שרת למחוק, אין כאן "פעולה הרסנית" אמיתית.
   const removeItem = (item) => {
     if (item.position) {
-      // weekDates מועבר כדי ש-deletePosition (11-01) יוכל לבטל-מימוש/למחוק
-      // קודם את שורות gs_work_items של השבוע הנוכחי המקושרות לעמדה הזו —
-      // בלי זה, מחיקת עמדה שהשבוע שלה כבר ממומש נכשלת בהפרת מפתח-זר גולמית.
-      actions.deletePosition(item.position.id, weekDates);
-    } else if (item.seed.id) {
+      setConfirmState({
+        title: `למחוק את "${item.position.title}"?`,
+        body: "העמדה תימחק לצמיתות, כולל שיבוצים שכבר בוצעו לה השבוע הנוכחי (אם יש). הפעולה לא הפיכה.",
+        confirmLabel: "מחק עמדה",
+        tone: "danger",
+        onConfirm: async () => {
+          await actions.deletePosition(item.position.id, weekDates);
+          if (item.key === resolvedActiveKey) setActiveKey(null);
+        },
+      });
+      return;
+    }
+    if (item.seed.id) {
       setDraftSeeds((d) => d.filter((s) => s.id !== item.seed.id));
     }
-    // זרע מובנה (SEED_POSITIONS) בלי id: אין מה למחוק במצב — הוא פשוט
-    // חוזר ברצועה עד שייבנה בפועל, בדיוק כמו לפני שנפתח.
+    // זרע מובנה (SEED_POSITIONS) בלי id: חוזר ברצועה עד שייבנה בפועל.
     if (item.key === resolvedActiveKey) setActiveKey(null);
   };
 
@@ -623,6 +635,17 @@ export default function RosterWizard({
           </Card>
         )}
       </div>
+
+      <ConfirmDialog
+        open={Boolean(confirmState)}
+        onClose={() => setConfirmState(null)}
+        onConfirm={confirmState?.onConfirm}
+        title={confirmState?.title}
+        body={confirmState?.body}
+        confirmLabel={confirmState?.confirmLabel}
+        tone={confirmState?.tone}
+        busy={busy}
+      />
     </div>
   );
 }
