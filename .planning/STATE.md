@@ -5,16 +5,16 @@ milestone_name: גימור להשקה
 current_phase: 12
 current_phase_name: אישורי פעולות קריטיות
 status: executing
-stopped_at: Completed 12-04-PLAN.md (WeekFlow CTA publish + demo-cleanup buttons), live-verified; 12-05 (Wave 2) next
-last_updated: "2026-09-25T00:00:00.000Z"
+stopped_at: Completed 12-05-PLAN.md (RosterWizard/PositionsScreen delete-position), live-verified; Wave 2 complete, 12-06 (Wave 3, closing plan) next
+last_updated: "2026-09-25T00:30:00.000Z"
 last_activity: 2026-09-25
-last_activity_desc: 12-04 (WeekFlow CTA publish button + demo-cleanup button, CONFIRM-02/03/04) merged and live-verified — both human-check points pass (step-5 CTA publish, demo-cleanup scoped correctly to is_demo rows only)
-state_head: ced5555c9df3d0729f296ad8a9f879d445bb65ae
+last_activity_desc: 12-05 (RosterWizard + PositionsScreen deletePosition, CONFIRM-05) merged and live-verified in army mode — both delete paths correctly gated, Cancel is a true no-op, SQL confirms permanent deletion; all 5 CONFIRM-05 actions from the closed review list now wired
+state_head: 2550d8a95093d241a745ebd3e8baa56389d52f12
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 23
-  completed_plans: 21
+  completed_plans: 22
   percent: 75
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 ## Current Position
 
 Phase: 12 (אישורי פעולות קריטיות)
-Plan: 4 of 6 complete (Wave 2: 12-03/12-04 done, 12-05 next)
+Plan: 5 of 6 complete (Wave 2 complete: 12-03/12-04/12-05 done, 12-06 (Wave 3, closing plan) next)
 Status: Executing
-Last activity: 2026-09-25 — 12-04 (WeekFlow CTA publish + demo-cleanup) merged and live-verified
+Last activity: 2026-09-25 — 12-05 (RosterWizard/PositionsScreen delete-position) merged and live-verified in army mode
 
 Progress: [████████░░] 75% (v1.2)
 
@@ -79,6 +79,7 @@ Progress: [████████░░] 75% (v1.2)
 | Phase 12 P02 | 25min | 3 tasks | 1 files |
 | Phase 12 P03 | 15min | 3 tasks | 1 files |
 | Phase 12 P04 | 10min | 2 tasks | 1 files |
+| Phase 12 P05 | 10min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,8 @@ Progress: [████████░░] 75% (v1.2)
 - [Phase 12]: 12-03: fillWeek gates confirmation only when weekShifts.length > 0 — empty week (EmptyState path) still creates immediately, no dialog
 - [Phase 12]: 12-03: ScheduleMgmt publish/unpublish gated via shared askPublish() helper across all 3 UI call sites; no changes to actions.publish/api.setPublished — known unpublish bug left for Phase 13
 - [Phase 12]: 12-03: clearWeek's delete call extracted into named confirmDeleteWeek helper (not inline lambda) so it doesn't trip the plan's own literal forward-scan verify-check
+- [Phase 12]: 12-04: WeekFlow's step-5 CTA publish button is a separate UI entry point from ScheduleMgmt's own "פרסם הכל" (both call actions.publish(ids,true), both now gated independently, no shared component needed since one-directional); demo-cleanup button gated on demoShiftIdsForWeek(shifts, weekDates).length > 0, same as its Phase-11 visibility gate
+- [Phase 12]: 12-05: RosterWizard's removeItem only opens ConfirmDialog for the item.position branch (real, saved positions) — item.seed (unsaved draft) stays immediate, no dialog, since nothing exists server-side yet to confirm deleting; setActiveKey(null) moved inside onConfirm so it only runs after the delete actually succeeds
 
 ### Pending Todos
 
