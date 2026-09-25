@@ -5,10 +5,10 @@ milestone_name: גימור להשקה
 current_phase: 13
 current_phase_name: "באג — ביטול הפצה אחרי פרסום"
 status: planning
-stopped_at: "Phase 12 closed: merged (12-01..12-06), doc contradiction resolved (CLAUDE.md x2 + PROJECT.md), CONFIRM-06 live-verified (cancel-then-reload across 2 dialog types); ready to plan Phase 13"
-last_updated: "2026-09-25T01:00:00.000Z"
+stopped_at: "Phase 12 fully closed: merged (12-01..12-06), doc contradiction resolved (CLAUDE.md x2 + PROJECT.md), CONFIRM-06 live-verified (cancel-then-reload across 2 dialog types), gsd-verifier gap (deleteDemoDataForWeek missing rethrow) found and fixed + live-verified (commit cbc514a); ready to plan Phase 13"
+last_updated: "2026-09-25T02:00:00.000Z"
 last_activity: 2026-09-25
-last_activity_desc: "12-06 (doc reconciliation + closing integration verification) merged. Root CLAUDE.md, .claude/CLAUDE.md (applied directly — gitignored, no commit), and PROJECT.md all updated to describe both UndoBar-default and pre-confirm-closed-list tracks, resolving the Iron-Principle-3 contradiction. CONFIRM-01 re-verified via code scan (no duplicate confirm logic). CONFIRM-06 live-verified: delete-week Cancel + publish-unpublish-all Cancel both confirmed byte-identical to pre-click state after a full page reload (not just visual dismissal), across two structurally different dialogs. Phase 12 (CONFIRM-01..06) fully complete; transitioned to Phase 13"
+last_activity_desc: "12-06 (doc reconciliation + closing integration verification) merged. Root CLAUDE.md, .claude/CLAUDE.md (applied directly — gitignored, no commit), and PROJECT.md all updated to describe both UndoBar-default and pre-confirm-closed-list tracks, resolving the Iron-Principle-3 contradiction. gsd-verifier's goal-backward pass then found one real residual gap — deleteDemoDataForWeek was the one ConfirmDialog-wired action missing { rethrow: true } from the WR-01 fix pass; fixed, live-verified (fresh test team, seeded demo data, confirmed delete succeeds and dialog closes correctly with no regression), 12-REVIEW.md/12-VERIFICATION.md updated to match. Phase 12 (CONFIRM-01..06) fully complete; transitioned to Phase 13"
 state_head: d43bb0da418e96ce4a409a15cf8118f0a383f257
 progress:
   total_phases: 8
