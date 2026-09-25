@@ -125,6 +125,10 @@ Since `actions.deletePosition(...)` always resolves (never rejects, per WR-01), 
 - **IN-03 fixed**: added `loading={busy}` to the day-toggle publish button in `views.jsx` (the exact call site this phase already re-touched for `askPublish` wiring), matching its sibling "פרסם הכל"/"בטל פרסום" buttons.
 - Live-verified after the fixes: registered a fresh test team, seeded demo data, confirmed (a) unpublish-all's dialog now reads "כל משמרות השבוע יחזרו למצב טיוטה — השומרים לא יראו אותן יותר כמפורסמות" (correct grammar), (b) confirming it closes the dialog and unpublishes successfully (0/14, no regression from the rethrow/close-on-success-only change), and (c) the day-toggle dialog reads "משמרות יום ראשון, 27 בספטמבר ייראו מיד אצל כל השומרים המשובצים" (correct grammar). `npm test` and `npm run build` both pass.
 
+### Post-review gap (found by `gsd-verifier`, 2026-09-25)
+
+`deleteDemoDataForWeek` (`useGuardian.js:745-758`) was the one ConfirmDialog-wired action the WR-01 fix pass above missed — it still called plain `run()` with no `{ rethrow: true }`, so its own `ConfirmDialog` (`WeekFlow.jsx`'s "מחק נתוני הדגמה לשבוע זה") would have closed silently on failure exactly like the original WR-01 bug, contradicting this document's claim that every wired action was fixed. Fixed by adding the same `{ rethrow: true }` option used by its siblings. `npm test`/`npm run build` pass. Live-verified: registered a fresh test team (`phase12ftest`), seeded 20 guards/14 shifts of demo data, opened the demo-cleanup `ConfirmDialog`, confirmed it — dialog closed correctly and the board went from 14 shifts to empty with no console errors (success path unaffected by the rethrow addition). Test team cleaned up via cascading SQL delete afterward. Committed as `cbc514a`.
+
 ---
 
 _Reviewed: 2026-09-25_
