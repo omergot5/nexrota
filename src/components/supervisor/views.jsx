@@ -11,6 +11,7 @@ import { DEMO_TEAM_NAME } from "../../lib/demoData.js";
 import {
   availabilityDeadline, byStartTime, dayName, DAYS_HE_SHORT, formatDateHe, fromISODate, isTaskEngineEligible,
   rangeLabelHe, rangeTextHe, recentItems, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
+  shiftDisplayName,
 } from "../../lib/dates.js";
 import { loadWindowMode, RECENT_DAYS, setLoadWindowMode, subscribeLoadWindow } from "../../lib/loadWindow.js";
 import { availStatus, checkAssignment, isQualified } from "../../lib/autoAssign.js";
@@ -382,7 +383,7 @@ export function SupDashboard({
                   <div className="w-1.5 h-10 rounded-full flex-shrink-0" style={{ background: s.color }} aria-hidden="true" />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-content truncate">
-                      {s.label} <span className="text-muted font-normal">· {shortDate(s.date)}</span>
+                      {shiftDisplayName(s)} <span className="text-muted font-normal">· {shortDate(s.date)}</span>
                     </p>
                     <p className="text-[11px] text-muted" data-numeric>
                       {s.startTime}–{s.endTime}
@@ -713,7 +714,7 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
                           }
                         }}
                       >
-                        <div className="font-bold text-[12px] pl-6">{s.label}</div>
+                        <div className="font-bold text-[12px] pl-6">{shiftDisplayName(s)}</div>
                         <div className="opacity-90 mt-0.5 text-[10px]" data-numeric>
                           {s.startTime}–{s.endTime}
                         </div>
@@ -859,7 +860,7 @@ export function ShiftMgmt({ shifts, guards, weekDates, actions, busy, tasks = []
                   className="flex items-center gap-2 text-xs bg-surface-sunken rounded-lg px-3 py-2"
                 >
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
-                  <span className="font-medium text-content">{s.label}</span>
+                  <span className="font-medium text-content">{shiftDisplayName(s)}</span>
                   <span className="text-muted" data-numeric>
                     {s.startTime}–{s.endTime}
                   </span>
@@ -982,7 +983,7 @@ export function AvailView({ guards, shifts, availability, weekDates, embedded = 
                   </th>
                   {dayShifts.map((s) => (
                     <th key={s.id} scope="col" className="text-center py-2 px-3 font-medium text-muted">
-                      <div className="text-xs">{s.label}</div>
+                      <div className="text-xs">{shiftDisplayName(s)}</div>
                       <div className="text-[10px] font-normal text-faint">
                         {s.startTime}–{s.endTime}
                       </div>
@@ -1209,7 +1210,7 @@ export function AssignView({
               >
                 <div>
                   <h3 className="font-bold text-lg">
-                    {shift.label}{" "}
+                    {shiftDisplayName(shift)}{" "}
                     <span className="opacity-80 text-sm font-medium" data-numeric>
                       {shift.startTime}–{shift.endTime}
                     </span>
@@ -1574,7 +1575,7 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
                             className="font-bold text-sm px-2 py-0.5 rounded-lg"
                             style={{ backgroundColor: POSITION_LABEL_BG, color: readableInk(POSITION_LABEL_BG) }}
                           >
-                            {s.label}
+                            {shiftDisplayName(s)}
                           </span>
                           <span className="text-[11px] opacity-90" data-numeric>
                             {s.startTime}–{s.endTime}
@@ -1687,7 +1688,7 @@ export function SwapMgmt({ guards, shifts, availability = {}, swapRequests, acti
                     </div>
                     {s && (
                       <p className="text-xs text-muted mt-1">
-                        {formatDateHe(s.date)} · {s.label}{" "}
+                        {formatDateHe(s.date)} · {shiftDisplayName(s)}{" "}
                         <span data-numeric>{s.startTime}–{s.endTime}</span>
                       </p>
                     )}
