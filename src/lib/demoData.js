@@ -391,7 +391,9 @@ function positionPlanToShiftRow(row, teamCode) {
     label: row.label,
     start_time: row.startTime,
     end_time: row.endTime,
-    location: "כניסה ראשית",
+    // המיקום הוא העמדה עצמה ("עמדת שמירה 1"), לא "כניסה ראשית" לכולן —
+    // אחרת חייל לא יכול לדעת לאן ללכת בלי לנחש.
+    location: String(row.label || "").split(" – ")[0] || "כניסה ראשית",
     required_guards: row.requiredGuards || 1,
     category: row.category || null,
     position_id: row.positionId,

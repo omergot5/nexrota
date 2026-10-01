@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { autoAssign, availStatus, DEFAULT_RULES, explainUnfilled } from "../lib/autoAssign.js";
-import { formatDateHe, rangeLabelHe, shortDate, withEngineTasks } from "../lib/dates.js";
+import { formatDateHe, groupShiftsByPost, rangeLabelHe, shortDate, splitShiftLabel, withEngineTasks } from "../lib/dates.js";
 import { loadShareHint, rollingLoad } from "../lib/fairness.js";
 import { DEFAULT_FAIRNESS_WINDOW_DAYS } from "../lib/fairnessWindow.js";
 import { t } from "../lib/terms.js";
@@ -632,8 +632,15 @@ export default function SmartAssign({
                     <p className="text-xs font-bold text-muted mb-2 border-b border-hairline pb-1.5">
                       {formatDateHe(date)}
                     </p>
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {dayShifts.map((shift) => {
+                    <div className="space-y-3">
+                      {groupShiftsByPost(dayShifts).map(({ post, shifts: postShifts }) => (
+                      <div key={post}>
+                      <p className="text-sm font-bold text-brand mb-1.5 flex items-center gap-1.5">
+                        <Icon name="map-pin" size={13} />
+                        {post}
+                      </p>
+                      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {postShifts.map((shift) => {
                         const records = plan.detailByShift[shift.id] || [];
                         const need = Math.max(1, shift.requiredGuards || 1);
                         const short = records.length < need;
@@ -650,19 +657,27 @@ export default function SmartAssign({
                                   aria-hidden="true"
                                 />
                                 <span className="font-bold text-sm text-content truncate">
-                                  {shift.label}
+                                  {splitShiftLabel(shift.label).part || (
+                                    <span data-numeric>{shift.startTime}–{shift.endTime}</span>
+                                  )}
                                 </span>
                               </div>
                               <Badge tone={short ? "warn" : "accent"}>
                                 {records.length}/{need}
                               </Badge>
                             </div>
-                            <p className="text-[11px] text-faint mb-3 flex items-center gap-1">
-                              <span data-numeric>
-                                {shift.startTime}–{shift.endTime}
-                              </span>
-                              <Icon name="map-pin" size={11} />
-                              {shift.location}
+                            <p className="text-xs text-muted mb-3 flex items-center gap-1">
+                              {splitShiftLabel(shift.label).part && (
+                                <span data-numeric>
+                                  {shift.startTime}–{shift.endTime}
+                                </span>
+                              )}
+                              {shift.location && shift.location !== post && (
+                                <>
+                                  <Icon name="map-pin" size={11} />
+                                  {shift.location}
+                                </>
+                              )}
                             </p>
                             <div className="space-y-1.5">
                               {records.map((rec) => {
@@ -700,6 +715,9 @@ export default function SmartAssign({
                           </Card>
                         );
                       })}
+                      </div>
+                      </div>
+                      ))}
                     </div>
                   </div>
                 );

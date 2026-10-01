@@ -413,3 +413,30 @@ export function boardItemsForDates(shifts = [], tasks = [], dates = []) {
 
   return { days, outside, undated };
 }
+
+/**
+ * "עמדת שמירה 1 – משמרת 2" → { post: "עמדת שמירה 1", part: "משמרת 2" }.
+ * תווית בלי מפריד (סיור, כוננות) היא עמדה בפני עצמה: part=null.
+ * כך כל מסך מקבץ את אותה עמדה יחד, והחייל קורא "איפה" ו"איזו משמרת" בנפרד.
+ */
+export function splitShiftLabel(label = "") {
+  const i = label.indexOf(" – ");
+  if (i < 0) return { post: label, part: null };
+  return { post: label.slice(0, i), part: label.slice(i + 3) };
+}
+
+/** מקבץ משמרות של יום לפי עמדה; עמדות לפי שם (מספרי), משמרות לפי שעת התחלה. */
+export function groupShiftsByPost(dayShifts) {
+  const groups = new Map();
+  for (const s of dayShifts) {
+    const { post } = splitShiftLabel(s.label);
+    if (!groups.has(post)) groups.set(post, []);
+    groups.get(post).push(s);
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b, "he", { numeric: true }))
+    .map(([post, shifts]) => ({
+      post,
+      shifts: shifts.sort((x, y) => x.startTime.localeCompare(y.startTime)),
+    }));
+}
