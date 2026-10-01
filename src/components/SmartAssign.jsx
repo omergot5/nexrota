@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { autoAssign, availStatus, DEFAULT_RULES, explainUnfilled } from "../lib/autoAssign.js";
-import { formatDateHe, groupShiftsByPost, rangeLabelHe, shortDate, splitShiftLabel, withEngineTasks } from "../lib/dates.js";
+import { formatDateHe, groupShiftsByPost, rangeLabelHe, shiftPartName, shortDate, splitShiftLabel, withEngineTasks } from "../lib/dates.js";
 import { loadShareHint, rollingLoad } from "../lib/fairness.js";
 import { DEFAULT_FAIRNESS_WINDOW_DAYS } from "../lib/fairnessWindow.js";
 import { t } from "../lib/terms.js";
@@ -657,7 +657,7 @@ export default function SmartAssign({
                                   aria-hidden="true"
                                 />
                                 <span className="font-bold text-sm text-content truncate">
-                                  {splitShiftLabel(shift.label).part || (
+                                  {splitShiftLabel(shift.label).part ? shiftPartName(shift) : (
                                     <span data-numeric>{shift.startTime}–{shift.endTime}</span>
                                   )}
                                 </span>

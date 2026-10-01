@@ -9,6 +9,7 @@ import {
   availabilityDeadline, boardItemsForDates, countdownHe, dayName, formatDateHe,
   rangeLabelHe, recentItems, shiftInterval, shortDate, toISODate, todayISO, weekByOffset,
   withEngineTasks,
+  shiftDisplayName,
 } from "../lib/dates.js";
 import { availStatus, checkAssignment, teamAverages } from "../lib/autoAssign.js";
 import { qualifiedGuardsForPosition } from "../lib/positions.js";
@@ -78,7 +79,7 @@ function NextDuty({ shift, mates }) {
             {shift.location}
           </span>
         )}
-        <span className="opacity-85">{shift.label}</span>
+        <span className="opacity-85">{shiftDisplayName(shift)}</span>
       </div>
 
       <p className="text-xs opacity-85 mt-3">
@@ -477,7 +478,7 @@ function MyAvailability({ user, team, shifts, tasks = [], availability, actions,
                         >
                           <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
                             <div className="min-w-0">
-                              <h3 className="font-bold text-base text-content">{s.label}</h3>
+                              <h3 className="font-bold text-base text-content">{shiftDisplayName(s)}</h3>
                               <p className="text-xs text-muted mt-0.5 flex items-center gap-1">
                                 <span data-numeric>
                                   {s.startTime}–{s.endTime}
@@ -671,7 +672,7 @@ function MySwaps({ user, team, guards, shifts, availability = {}, swapRequests, 
                       </p>
                       {s && (
                         <p className="text-xs text-muted mt-0.5">
-                          {formatDateHe(s.date)} · {s.label}{" "}
+                          {formatDateHe(s.date)} · {shiftDisplayName(s)}{" "}
                           <span data-numeric>{s.startTime}–{s.endTime}</span>
                         </p>
                       )}
@@ -738,7 +739,7 @@ function MySwaps({ user, team, guards, shifts, availability = {}, swapRequests, 
                       <p className="font-semibold text-sm text-content">בקשה ל{nameOf(r.toGuard)}</p>
                       {s && (
                         <p className="text-xs text-muted mt-0.5">
-                          {formatDateHe(s.date)} · {s.label}{" "}
+                          {formatDateHe(s.date)} · {shiftDisplayName(s)}{" "}
                           <span data-numeric>{s.startTime}–{s.endTime}</span>
                         </p>
                       )}
@@ -778,7 +779,7 @@ function MySwaps({ user, team, guards, shifts, availability = {}, swapRequests, 
               <option value="">בחר משמרת</option>
               {myShifts.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {shortDate(s.date)} — {s.label} {s.startTime}–{s.endTime}
+                  {shortDate(s.date)} — {shiftDisplayName(s)} {s.startTime}–{s.endTime}
                 </option>
               ))}
             </Select>

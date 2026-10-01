@@ -457,3 +457,48 @@ export function groupShiftsByPost(dayShifts) {
       shifts: shifts.sort((x, y) => x.startTime.localeCompare(y.startTime)),
     }));
 }
+
+/**
+ * שם חלק-היום של משמרת לפי שעת ההתחלה: "לילה" / "בוקר" / "צהריים" / "ערב".
+ * "משמרת 2" לא אומרת לחייל כלום; "בוקר 08:00–16:00" כן. נגזר מהשעות, לא
+ * מהמספר, כך שגם חלוקה ל-6 או 12 שעות נקראת נכון.
+ */
+export function shiftPartName(shift) {
+  if (!shift?.startTime) return "";
+  const h = minutesOfTime(shift.startTime) / 60;
+  if (h >= 22 || h < 5) return "לילה";
+  if (h < 11) return "בוקר";
+  if (h < 16) return "צהריים";
+  return "ערב";
+}
+
+/**
+ * שם תצוגה מלא למשמרת: "עמדת שמירה 1 · בוקר" כשיש חלק, אחרת התווית עצמה.
+ * מקור יחיד לכל מסך שמציג משמרת בשורה אחת (משתתף, יומן).
+ */
+export function shiftDisplayName(shift) {
+  const { post, part } = splitShiftLabel(shift?.label);
+  return part ? `${post} · ${shiftPartName(shift)}` : post;
+}
+
+/**
+ * מקבץ את פריטי היום לבלוקים: כל עמדה שיש לה כמה משמרות היא בלוק אחד
+ * (כותרת + המשמרות בטור, לפי שעה). פריט בודד — סיור, כוננות, משימה —
+ * נשאר כרטיס רגיל. טיימלס קודם, עמדות לפי שם (מספרי) כדי שהסדר יהיה זהה
+ * בכל יום.
+ */
+export function groupDayItems(items) {
+  const timeless = items.filter((i) => i.timeless);
+  const timed = items.filter((i) => !i.timeless);
+  const byPost = new Map();
+  for (const it of timed) {
+    const { post, part } = splitShiftLabel(it.label);
+    const key = part ? post : ` ${it.id}`; // בלי חלק — בלוק משלו
+    if (!byPost.has(key)) byPost.set(key, { post, items: [], grouped: Boolean(part) });
+    byPost.get(key).items.push(it);
+  }
+  const blocks = [...byPost.values()]
+    .map((b) => ({ ...b, items: b.items.sort((x, y) => String(x.startTime).localeCompare(String(y.startTime))) }))
+    .sort((a, b) => a.post.localeCompare(b.post, "he", { numeric: true }));
+  return [...timeless.map((it) => ({ post: it.label, items: [it], grouped: false })), ...blocks];
+}

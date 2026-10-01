@@ -8,6 +8,7 @@ import ResourceGrid from "./ResourceGrid.jsx";
 import {
   DAYS_HE, DAYS_HE_SHORT, addDays, boardItemsForDates, formatDateHe, fromISODate, monthGrid,
   monthLabelHe, rangeLabelHe, rangeTextHe, shiftHours, startOfWeek, toISODate, todayISO, weekFrom,
+  shiftDisplayName,
 } from "../../lib/dates.js";
 
 // ============================================================
@@ -315,7 +316,7 @@ function DayList({ date, items, guards, teamMode }) {
             />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-content text-sm">{s.label}</span>
+                <span className="font-bold text-content text-sm">{s.timeless ? s.label : shiftDisplayName(s)}</span>
                 {s.timeless ? (
                   <>
                     <span className="text-xs text-muted" data-numeric>

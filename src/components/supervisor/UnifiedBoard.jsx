@@ -32,7 +32,7 @@ import { useState } from "react";
 import { Badge, EmptyState, Modal, Avatar } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import {
-  DAYS_HE_SHORT, boardItemsForDates, fromISODate, isToday, rangeTextHe, shortDate,
+  DAYS_HE_SHORT, boardItemsForDates, fromISODate, groupDayItems, isToday, rangeTextHe, shiftPartName, shortDate,
 } from "../../lib/dates.js";
 import { categoryTone, TONE_VARS } from "../../design/categoryPalette.js";
 import { isQualified } from "../../lib/autoAssign.js";
@@ -149,16 +149,31 @@ function DayColumn({ day, guards, onMove, onToggleAssignment, mode }) {
         </p>
       </div>
       <div className="space-y-1.5">
-        {day.items.map((item) => (
-          <BoardCard
-            key={`${item.timeless ? "t" : "s"}-${item.id}`}
-            item={item}
-            guards={guards}
-            onMove={onMove}
-            onToggleAssignment={onToggleAssignment}
-            mode={mode}
-          />
-        ))}
+        {groupDayItems(day.items).map((block) => {
+          const cards = block.items.map((item) => (
+            <BoardCard
+              key={`${item.timeless ? "t" : "s"}-${item.id}`}
+              item={item}
+              displayLabel={block.grouped ? shiftPartName(item) : undefined}
+              guards={guards}
+              onMove={onMove}
+              onToggleAssignment={onToggleAssignment}
+              mode={mode}
+            />
+          ));
+          // עמדה עם כמה משמרות: בלוק אחד — כותרת העמדה ומתחתיה המשמרות בטור.
+          return block.grouped ? (
+            <div
+              key={`post-${block.post}`}
+              className="rounded-xl ring-1 ring-inset ring-hairline-strong p-1 space-y-1"
+            >
+              <p className="text-[11px] font-bold text-content px-1 pt-0.5 truncate">{block.post}</p>
+              {cards}
+            </div>
+          ) : (
+            cards
+          );
+        })}
         {day.items.length === 0 && <p className="text-center text-[11px] text-faint py-3">—</p>}
       </div>
     </div>
@@ -173,7 +188,7 @@ function DayColumn({ day, guards, onMove, onToggleAssignment, mode }) {
 // אחת, לא שתיים שעלולות להיסחף.
 export const DRAG_MIME = "application/x-nexrota-guard";
 
-function BoardCard({ item, guards, onMove, onToggleAssignment, mode }) {
+function BoardCard({ item, displayLabel, guards, onMove, onToggleAssignment, mode }) {
   const timeless = Boolean(item.timeless);
   // חוסר איוש הוא מושג שקיים רק לפריט מתוזמן (D-08 — שורת עמדה עתידית אין
   // לה עוד ניצול; פריט timeless אין לו requiredGuards בכלל).
@@ -242,7 +257,7 @@ function BoardCard({ item, guards, onMove, onToggleAssignment, mode }) {
       style={{ background: TONE_VARS[tone], color: "rgb(var(--cat-on))" }}
       {...dragProps}
     >
-      <p className="font-bold truncate">{item.label}</p>
+      <p className="font-bold truncate">{displayLabel || item.label}</p>
       {/* ההבדל היחיד בין כרטיס טיימלס לכרטיס מתוזמן הוא איזה יסוד מטא מופיע
         * כאן — לא צבע, לא רקע, לא צורה (D-12). */}
       {timeless ? (
