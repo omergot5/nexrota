@@ -21,7 +21,7 @@
 //    רשימה בלי מידע.
 // ============================================================
 
-import { shiftHours, addDays } from "./dates.js";
+import { shiftHours, addDays, isNightShift } from "./dates.js";
 import { shiftLoad, capacityOf } from "./autoAssign.js";
 
 const round1 = (n) => Math.round(n * 10) / 10;
@@ -65,7 +65,7 @@ function tally(guards, shifts, inWindow, taskWeights = {}) {
       rec.count += 1;
       rec.hours += hours;
       rec.load += weight;
-      if (s.type === "night") rec.nights += 1;
+      if (isNightShift(s)) rec.nights += 1;
     }
   }
   return per;

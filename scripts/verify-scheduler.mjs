@@ -1564,5 +1564,27 @@ console.log("\n=== BALANCE-GUARD-01 · מעבר האיזון לא יוצר שו�
       JSON.stringify(autoAssign({ shifts: zShifts, guards: zGuards, availability: zAvailability }).byShift));
 }
 
+
+import { isNightShift as _isNight } from "../src/lib/dates.js";
+import { shiftLoad as _shiftLoad } from "../src/lib/autoAssign.js";
+
+// ---- לילה לפי שעות: כוננות/שמירה צבאיות (type custom) הן לילה ----
+{
+  const mk = (startTime, endTime, type = "custom") => ({ date: "2026-10-05", startTime, endTime, type });
+  const cases = [
+    ["כוננות 18:00–06:00", mk("18:00", "06:00"), true],
+    ["שמירה 00:00–08:00", mk("00:00", "08:00"), true],
+    ["שמירה 16:00–00:00", mk("16:00", "00:00"), false],
+    ["שמירה 08:00–16:00", mk("08:00", "16:00"), false],
+    ["סיור 06:00–18:00", mk("06:00", "18:00"), false],
+    ["מטבח 05:30–13:30", mk("05:30", "13:30"), false],
+    ["type night תמיד לילה", mk("07:00", "19:00", "night"), true],
+    ["משימה 19:00–07:00 נשארת שטוחה (D-07)", mk("19:00", "07:00", "task"), false],
+  ];
+  for (const [label, shift, want] of cases) check(`isNightShift · ${label}`, _isNight(shift) === want);
+  check("shiftLoad · לילה custom נושא ×1.4",
+    Math.abs(_shiftLoad(mk("18:00", "06:00")) - _shiftLoad(mk("06:00", "18:00")) * 1.4) < 1e-9);
+}
+
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);

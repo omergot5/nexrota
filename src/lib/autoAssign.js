@@ -18,6 +18,7 @@
 import {
   shiftInterval,
   shiftHours,
+  isNightShift,
   formatDateHe,
   fromISODate,
   minutesOfTime,
@@ -103,7 +104,7 @@ const isWeekendShift = (shift) => {
  * (במידה ותהיה כזו) עדיין נושאת גם את משקל הלילה. שני הצירים עצמאיים.
  */
 export function shiftLoad(shift, weights = {}) {
-  const base = LOAD_WEIGHTS[shift.type] ?? LOAD_WEIGHTS.default;
+  const base = isNightShift(shift) ? LOAD_WEIGHTS.night : (LOAD_WEIGHTS[shift.type] ?? LOAD_WEIGHTS.default);
   const weekend = isWeekendShift(shift) ? LOAD_WEIGHTS.weekend : 1;
   // המכפילים לא מוכפלים זה בזה: לילה בשבת אינו פי 1.75 מיום חול. נלקח החמור
   // מביניהם, כדי שהסבב יישאר יציב.
@@ -318,7 +319,7 @@ function checkHardConstraints({ guard, shift, load, availability, rules }) {
       reason: `הגיע/ה לתקרה של ${rules.maxShiftsPerWeek} משמרות בשבוע`,
     };
   }
-  if (shift.type === "night" && load.nights >= rules.maxNightsPerWeek) {
+  if (isNightShift(shift) && load.nights >= rules.maxNightsPerWeek) {
     return {
       ok: false,
       code: "night-cap",
@@ -335,7 +336,7 @@ function checkHardConstraints({ guard, shift, load, availability, rules }) {
 // the denominator is the best score this particular shift could hand out.
 const W = { availability: 40, fairness: 35, night: 22, rest: 10, continuity: 5 };
 const maxScoreFor = (shift) =>
-  W.availability + W.fairness + W.rest + W.continuity + (shift.type === "night" ? W.night : 0);
+  W.availability + W.fairness + W.rest + W.continuity + (isNightShift(shift) ? W.night : 0);
 
 function scoreCandidate({ guard, shift, load, availability, rules, stats, check, carried }) {
   const parts = [];
@@ -402,7 +403,7 @@ function scoreCandidate({ guard, shift, load, availability, rules, stats, check,
   // 3. Night rotation — measured against the team's expected share of nights,
   //    not against the hard cap, or nights pile onto whoever is free first.
   //    Same carried-load treatment as fairness above.
-  if (shift.type === "night") {
+  if (isNightShift(shift)) {
     const nightTarget = Math.max(stats.nightTargetPerGuard * capacityOf(guard), 0.001);
     const nightFair = Math.max(0, Math.min(1, 1 - (load.nights + carriedNights) / nightTarget));
     const nightPts = points(22 * nightFair);
@@ -545,7 +546,7 @@ export function autoAssign({
     l.hours += shiftHours(shift);
     l.load += shiftLoad(shift, taskWeights);
     l.dates.add(shift.date);
-    if (shift.type === "night") l.nights += 1;
+    if (isNightShift(shift)) l.nights += 1;
     const record = { shiftId: shift.id, guardId: guard.id, score, raw, parts, locked };
     assignments.push(record);
     byShift.get(shift.id).push(record);
@@ -566,7 +567,7 @@ export function autoAssign({
 
   const totalSlots = openShifts.reduce((n, s) => n + Math.max(1, s.requiredGuards || 1), 0);
   const nightSlots = openShifts
-    .filter((s) => s.type === "night")
+    .filter((s) => isNightShift(s))
     .reduce((n, s) => n + Math.max(1, s.requiredGuards || 1), 0);
   // Who asked for something specific this week. Computed once over the whole
   // set rather than per candidate, so the opportunity-cost rule above sees
@@ -911,7 +912,7 @@ function removeFromLoad(l, shift, weights = {}) {
   l.count -= 1;
   l.hours -= shiftHours(shift);
   l.load -= shiftLoad(shift, weights);
-  if (shift.type === "night") l.nights -= 1;
+  if (isNightShift(shift)) l.nights -= 1;
   if (!l.shifts.some((s) => s.date === shift.date)) l.dates.delete(shift.date);
 }
 
@@ -922,7 +923,7 @@ function addToLoad(l, shift, weights = {}) {
   l.hours += shiftHours(shift);
   l.load += shiftLoad(shift, weights);
   l.dates.add(shift.date);
-  if (shift.type === "night") l.nights += 1;
+  if (isNightShift(shift)) l.nights += 1;
 }
 
 // ---------- result shaping ----------
@@ -1153,7 +1154,7 @@ export function teamAverages(guards, shifts, taskWeights = {}) {
       rec.count += 1;
       rec.hours += hours;
       rec.load += weight;
-      if (s.type === "night") rec.nights += 1;
+      if (isNightShift(s)) rec.nights += 1;
     }
   }
 

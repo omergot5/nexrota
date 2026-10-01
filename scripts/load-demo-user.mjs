@@ -23,6 +23,8 @@ try {
   Object.assign(out, { ok: true, mode: team.data?.mode, guards: guards.count, items: shifts.count, seeded: res });
 } catch (err) {
   out.error = String(err.message || err);
+  const { data: sd } = await supabase.auth.getSession();
+  out.session = sd.session ? { exp: sd.session.expires_at, now: Math.floor(Date.now() / 1000) } : null;
 }
 out.ms = Date.now() - t0;
 console.log(JSON.stringify(out));

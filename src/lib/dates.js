@@ -150,6 +150,23 @@ export const shiftInterval = (shift) => {
   return { start, end };
 };
 
+/**
+ * לילה לפי השעות, לא רק לפי התווית. משמרות צבאיות/מותאמות (כוננות 18:00–06:00,
+ * שמירה 00:00–08:00) נושאות סוג "custom" אבל הן לילה לכל דבר — מי שמקיים
+ * אותן נשבר לו השינה. לילה = משמרת שחופפת לחלון 00:00–05:00. משמרת שנגמרת
+ * בחצות בדיוק (16:00–00:00) ומשמרת שמתחילה 05:30 אינן לילה.
+ */
+export const isNightShift = (shift) => {
+  if (shift?.type === "night") return true;
+  // משימות נשארות שטוחות, בלי מכפיל לילה (D-07, UNIF-02).
+  if (shift?.type === "task") return false;
+  if (!shift?.startTime || !shift?.endTime) return false;
+  const s = minutesOfTime(shift.startTime);
+  let e = minutesOfTime(shift.endTime);
+  if (e <= s) e += 1440;
+  return (s < 300 && e > 0) || (e > 1440 && s < 1740);
+};
+
 export const shiftHours = (shift) => {
   const { start, end } = shiftInterval(shift);
   return (end - start) / 3600000;
