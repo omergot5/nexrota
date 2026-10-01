@@ -7,6 +7,7 @@ import {
   Modal, PageHeader, readableInk, Segmented, Select, StatCard,
 } from "../ui.jsx";
 import { Dot, Icon } from "../icons.jsx";
+import { DEMO_TEAM_NAME } from "../../lib/demoData.js";
 import {
   availabilityDeadline, byStartTime, dayName, DAYS_HE_SHORT, formatDateHe, fromISODate, isTaskEngineEligible,
   rangeLabelHe, rangeTextHe, recentItems, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
@@ -2700,6 +2701,8 @@ function ProfilePicker({ team, actions, busy, shifts = [], tasks = [] }) {
   // לטעינת הצוות, כדי שהכרטיס לא יהבהב על ברירת מחדל שגויה.
   const fallback = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
   const active = team?.mode || fallback;
+  // ההדגמה האורחת צבאית בלבד — אבטחה ומסעדנות לא מוצעות בה בכלל.
+  const profiles = team?.name === DEMO_TEAM_NAME ? PROFILES.filter((p) => p.id === "army") : PROFILES;
 
   // מעבר פרופיל לא נוגע בשום משמרת/משימה קיימת (updateTeamSettings כותבת
   // רק לעמודת mode) — קטגוריה מהפרופיל הקודם ממשיכה להתקיים כ"מותאמת
@@ -2727,7 +2730,7 @@ function ProfilePicker({ team, actions, busy, shifts = [], tasks = [] }) {
         </span>
       </p>
       <div className="grid gap-3 sm:grid-cols-3">
-        {PROFILES.map((p) => {
+        {profiles.map((p) => {
           const on = p.id === active;
           const leftover = on ? 0 : leftoverCountFor(p.id);
           return (

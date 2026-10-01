@@ -20,7 +20,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient.js";
 import * as api from "../lib/api.js";
-import { seedDemoTeam, seedArmyRoster, demoShiftIdsForWeek } from "../lib/demoData.js";
+import { seedDemoTeam, seedArmyRoster, demoShiftIdsForWeek, DEMO_TEAM_NAME } from "../lib/demoData.js";
 import { setTermProfile } from "../lib/terms.js";
 // שכבת ה-state הראשונה שנוגעת במנוע (Phase 3, QUAL-04 מסלול 4): שיבוץ ידני
 // מבצע כתיבה ישירה, ולכן חייב לשאול את אותה שאלה שהמנוע שואל לפני שהוא
@@ -492,7 +492,7 @@ export function useGuardian() {
           } else {
             // session קיים כבר יכול להחזיק צוות הדגמה מביקור קודם (אותה
             // אנונימית נשמרת ב-localStorage) — בלי הבדיקה הזאת כל לחיצה
-            // נוספת על "הפעל הדגמה" יוצרת עוד "מוקד הדגמה" חדש בבסיס
+            // נוספת על "הפעל הדגמה" יוצרת עוד "פלוגת הדגמה" חדש בבסיס
             // הנתונים, גם כשהמשתמש כבר בתוך אחד. תריסרי הצוותים היתומים
             // שכבר קיימים שם הם בדיוק התוצאה של החוסר הזה.
             const existing = await api.getMyProfile();
@@ -502,13 +502,14 @@ export function useGuardian() {
             }
           }
           const { data: rows, error: rpcErr } = await supabase.rpc("gs_create_team", {
-            p_team_name: "מוקד הדגמה",
-            p_full_name: "מנהל הדגמה",
+            p_team_name: DEMO_TEAM_NAME,
+            p_full_name: "מפקד הדגמה",
+            p_mode: "army",
           });
           if (rpcErr) throw new Error("פתיחת ההדגמה נכשלה — נסה שוב");
           const row = Array.isArray(rows) ? rows[0] : rows;
 
-          await seedDemoTeam({ teamCode: row.team_code, existingGuards: [], existingShifts: [] });
+          await seedArmyRoster({ teamCode: row.team_code, existingGuards: [], existingPositions: [], guardCount: 15 });
           await hydrateSelf();
           return row.team_code;
         },

@@ -19,6 +19,9 @@ import { buildDivisionRows, missingRowsForWeek } from "./positions.js";
 // (15-25 איש) — אז המאגר הורחב ל-20 כדי ש-`guardCount` יוכל לבקש
 // גם 14/15/20 בלי לייצר שמות גנריים ("שומר 8"). מ-8 ומעלה אין PATTERN
 // ידני — `fallbackStatus` (למטה) כבר מכסה אותם דטרמיניסטית.
+/** שם צוות ההדגמה האורחת. ההדגמה צבאית בלבד — המסך מזהה אותה לפי השם הזה. */
+export const DEMO_TEAM_NAME = "פלוגת הדגמה";
+
 const DEMO_GUARDS = [
   { name: "גיא לוי", phone: "050-1234567" },
   { name: "מיכל כהן", phone: "052-2345678" },
