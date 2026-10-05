@@ -54,7 +54,10 @@ class ErrorBoundary extends Component {
           <Btn
             variant="outline"
             onClick={() => {
-              localStorage.clear();
+              // רק צילום המצב הלא-מקוון (OFFLINE_KEY ב-useGuardian) — הוא
+              // הסיבה הסבירה לקריסה. clear() היה מוחק גם את ה-session ואת
+              // העדפות התצוגה.
+              localStorage.removeItem("gs-offline");
               window.location.reload();
             }}
           >
