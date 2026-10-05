@@ -269,13 +269,17 @@ check("supervisor inserts a position and gets a row back from .select()",
   !posErr && posRows?.length === 1, posErr?.message);
 const position = posRows?.[0];
 
-const { data: guardPosInsert, error: guardPosErr } = await guardA.from("gs_positions").insert({
+// guardA was superseded in section 8 (its profile was adopted by a newer
+// anonymous session), so it has no team any more and would pass/fail these
+// checks for the wrong reason. guardSloppy is the session that currently
+// holds the guard profile.
+const { data: guardPosInsert, error: guardPosErr } = await guardSloppy.from("gs_positions").insert({
   team_code: CODE, shape: "template", title: "עמדה פיראטית", category: "שמירות",
 }).select();
 check("guard (non-supervisor) cannot create a position",
   Boolean(guardPosErr) || (guardPosInsert?.length || 0) === 0, "insert unexpectedly allowed");
 
-const { data: guardPosRead, error: guardPosReadErr } = await guardA.from("gs_positions").select("*").eq("id", position?.id);
+const { data: guardPosRead, error: guardPosReadErr } = await guardSloppy.from("gs_positions").select("*").eq("id", position?.id);
 check("guard can read their own team's position", guardPosRead?.length === 1,
   guardPosReadErr?.message || `saw ${guardPosRead?.length}, position.id=${position?.id}`);
 
