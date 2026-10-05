@@ -31,7 +31,3 @@ export const DEFAULT_FAIRNESS_WINDOW_DAYS = 90;
 export function normalizeFairnessWindow(days) {
   return VALID_FAIRNESS_WINDOWS.includes(days) ? days : DEFAULT_FAIRNESS_WINDOW_DAYS;
 }
-
-export function fairnessWindowLabel(days) {
-  return FAIRNESS_WINDOW_OPTIONS.find((o) => o.days === days)?.label || `${days} ימים`;
-}

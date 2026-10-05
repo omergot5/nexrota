@@ -714,10 +714,3 @@ export const ConfirmDialog = ({
     </Modal>
   );
 };
-
-/** Loading placeholder that reserves the final height, so nothing shifts. */
-export const Skeleton = ({ className = "" }) => (
-  <div className={`relative overflow-hidden bg-surface-sunken rounded-lg ${className}`} aria-hidden="true">
-    <div className="absolute inset-y-0 w-1/3 bg-gradient-to-l from-transparent via-white/[0.07] to-transparent animate-sheen" />
-  </div>
-);

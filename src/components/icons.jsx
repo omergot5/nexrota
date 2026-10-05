@@ -201,8 +201,6 @@ const PATHS = {
   menu: ["M4 6h16", "M4 12h16", "M4 18h16"],
 };
 
-export const ICON_NAMES = Object.keys(PATHS);
-
 /** Renders one geometry entry: a `d` string, a rect spec, or a circle spec. */
 function Shape({ spec, i }) {
   if (typeof spec === "string") return <path key={i} d={spec} />;

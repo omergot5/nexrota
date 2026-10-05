@@ -39,16 +39,6 @@ export const DEFAULT_RULES = {
   balancePasses: 40, // local-search iterations
 };
 
-export const RULE_LABELS = {
-  minRestHours: "מנוחה מינימלית בין משמרות",
-  maxConsecutiveHours: "מקסימום שעות רצופות",
-  maxShiftsPerWeek: "מקסימום משמרות לשבוע",
-  maxNightsPerWeek: "מקסימום לילות לשבוע",
-  allowMaybe: 'לשבץ גם מי שסימן "אולי"',
-  allowUnknown: "לשבץ גם מי שלא הגיש זמינות",
-  honourPreferences: 'להעדיף את מי שסימן "מעדיף"',
-};
-
 /**
  * Availability is a ladder, not a switch. "I can work Sunday but I'd rather
  * have Tuesday" used to be unsayable: marking Sunday unavailable closes the
@@ -1091,17 +1081,6 @@ export function checkAssignment({ guard, shift, shifts = [], availability = {}, 
   }
 
   return checkHardConstraints({ guard, shift, load, availability, rules });
-}
-
-export function explainAssignment(record, guardName) {
-  if (!record) return "";
-  const top = [...(record.parts || [])]
-    .filter((p) => p.points > 0)
-    .sort((a, b) => b.points - a.points)
-    .slice(0, 2)
-    .map((p) => p.label);
-  if (!top.length) return `${guardName} שובץ/ה ידנית`;
-  return `${guardName}: ${top.join(" · ")}`;
 }
 
 export function explainUnfilled(entry) {

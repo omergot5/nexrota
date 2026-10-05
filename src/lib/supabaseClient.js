@@ -48,27 +48,3 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   },
 });
 
-export const SUPABASE_PROJECT_URL = SUPABASE_URL;
-
-/**
- * The app must stay usable when the backend is unreachable (paused project,
- * offline laptop, a demo on conference wifi). Callers use this to decide
- * whether to fall back to local-only mode instead of showing a dead screen.
- */
-let cloudReachable = null;
-
-export async function pingCloud() {
-  if (cloudReachable !== null) return cloudReachable;
-  try {
-    const { error } = await supabase.from("gs_teams").select("code").limit(1);
-    // A permission error still means the server answered — that counts as up.
-    cloudReachable = !error || error.code === "PGRST301" || error.code === "42501";
-  } catch {
-    cloudReachable = false;
-  }
-  return cloudReachable;
-}
-
-export function resetCloudPing() {
-  cloudReachable = null;
-}
