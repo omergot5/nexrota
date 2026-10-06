@@ -112,7 +112,7 @@ export default function PostWeekGrid({
                     editable={Boolean(onEditPost)}
                     onClick={() => onEditPost?.(post)}
                     aria-label={`עריכת העמדה ${post.post}`}
-                    className="group w-full flex items-center gap-2 px-3 py-2 text-right"
+                    className="group sticky right-0 w-[calc(100vw-3.5rem)] md:w-full flex items-center gap-2 px-3 py-2 text-right"
                   >
                     <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${tone.dot}`} aria-hidden="true" />
                     <Icon name={folderIcon(post.category)} size={15} className="text-muted flex-shrink-0" />
