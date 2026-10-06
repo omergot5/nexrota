@@ -62,8 +62,8 @@ check("security לא דורס שום מפתח (== BASE במלואו)", Object.ke
 // {...BASE, ...override} מייצר את הערך הנכון, לא את זה של BASE בטעות.
 const merged = (mode) => ({ ...BASE, ...(PROFILE_TERMS[mode] || {}) });
 check(
-  "army.noun.memberPlural דורס את BASE ('כפופים', לא 'שומרים')",
-  merged("army")["noun.memberPlural"] === "כפופים"
+  "army.noun.memberPlural דורס את BASE ('חיילים', לא 'שומרים')",
+  merged("army")["noun.memberPlural"] === "חיילים"
 );
 check(
   "restaurant.noun.memberPlural דורס את BASE ('עובדים', לא 'שומרים')",

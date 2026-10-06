@@ -98,10 +98,11 @@ export const PROFILE_TERMS = {
   },
 
   // צבאי. "סד\"כ" במקום "סידור", "תורנות" במקום "משמרת", ולשון פיקוד
-  // במקום לשון שירות: מפקד *מפיץ* סד"כ, הוא לא "שולח לצוות".
+  // במקום לשון שירות: מפקד *מפיץ* סד"כ, הוא לא "שולח לצוות". האדם עצמו
+  // הוא "חייל" — כך מפקדים מדברים עליו בפועל ("כפוף" נשמע כמו מסמך).
   army: {
-    "noun.member":       "כפוף",
-    "noun.memberPlural": "כפופים",
+    "noun.member":       "חייל",
+    "noun.memberPlural": "חיילים",
     "nav.shifts":       "בניית שבוע",
     "nav.availability": "מי דיווח",
     "nav.smart":        "בנה לי סד\"כ",
@@ -109,7 +110,7 @@ export const PROFILE_TERMS = {
     "nav.schedule":     "הפץ סד\"כ",
     "nav.swaps":        "בקשות חילוף",
     "nav.tasks":        "משימות",
-    "nav.team":         "הכפופים לי",
+    "nav.team":         "החיילים שלי",
     "nav.positions":    "עמדות קבע",
     "guard.nav.schedule":     "התורנויות שלי",
     "guard.nav.availability": "דיווח זמינות",
@@ -141,7 +142,7 @@ export const PROFILES = [
   {
     id: "army",
     label: "צבא",
-    hint: 'סד"כ תורנויות, לשון פיקוד, כפיפות',
+    hint: 'סד"כ תורנויות ולשון פיקוד',
     icon: "shield",
   },
 ];

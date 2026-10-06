@@ -126,7 +126,7 @@ globalThis.document = {
 
 // פיקסצ'ר במכוון לא 4×6 (COLOR-04, REQUIREMENTS): עמדה אחת בת שלוש
 // משמרות שמונה-שעתיות, עמדה שנייה בת שתי משמרות חמש-שעתיות, ויום שני עם
-// משמרת שתים-עשרה-שעתית בודדת. שש משמרות, שלושה כפופים. סדר האיברים
+// משמרת שתים-עשרה-שעתית בודדת. שש משמרות, שלושה חיילים. סדר האיברים
 // מעורבב במכוון ושונה מהסדר הכרונולוגי — אחרת הבדיקה הייתה עוברת גם בלי
 // מיון בכלל. משמרת אחת בלי משובצים (מסלול "לא מאויש"), ואחת עם שניים
 // (ריבוי שבבים).
@@ -262,7 +262,7 @@ check(
   labelContrast >= 4.5
 );
 
-// שבבי הכפופים (COLOR-03 — אי-רגרסיה): פלטת עשרת צבעי הכפופים, ללא שינוי.
+// שבבי החיילים (COLOR-03 — אי-רגרסיה): פלטת עשרת צבעי החיילים, ללא שינוי.
 const GUARD_COLORS = [
   "#4C9585", "#3E7C9B", "#7A6FA8", "#A85F7A", "#B0763C",
   "#5E8C5A", "#9A6250", "#4F7FA8", "#8A6B9E", "#2F7A6B",
@@ -270,12 +270,12 @@ const GUARD_COLORS = [
 const guardPillFills = log1.filter((e) => e.action === "fill" && GUARD_COLORS.includes(e.fillStyle));
 const totalAssignments = buildFixture().shifts.reduce((sum, s) => sum + s.assignedGuards.length, 0);
 check(
-  "שבבי הכפופים עדיין נצבעים מפלטת עשרת צבעי הכפופים, ומספרם שווה לסך השיבוצים בפיקסצ'ר (D-02/COLOR-03)",
+  "שבבי החיילים עדיין נצבעים מפלטת עשרת צבעי החיילים, ומספרם שווה לסך השיבוצים בפיקסצ'ר (D-02/COLOR-03)",
   guardPillFills.length === totalAssignments,
   `expected=${totalAssignments} got=${guardPillFills.length}`
 );
 check(
-  "לפחות שני גוונים נבדלים בין שבבי הכפופים",
+  "לפחות שני גוונים נבדלים בין שבבי החיילים",
   new Set(guardPillFills.map((e) => e.fillStyle)).size >= 2
 );
 

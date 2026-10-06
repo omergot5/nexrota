@@ -297,7 +297,7 @@ async function ensureArmyPositions(teamCode, existingPositions) {
 }
 
 /**
- * הדגמה מלאה למצב army: `guardCount` כפופים (7/14/15/20) + חמש המשימות
+ * הדגמה מלאה למצב army: `guardCount` חיילים + חמש המשימות
  * הקבועות (כולל שתי עמדות 24/7 מחולקות) + זמינות דטרמיניסטית לכל
  * המשמרות שמומשו מהן לשבוע הבא. Safe to re-run — כל שלב מוסיף רק מה
  * שחסר, באותו אופן בדיוק כמו seedDemoTeam.
@@ -342,7 +342,7 @@ export async function seedArmyRoster({ teamCode, existingGuards = [], existingPo
 
   const shifts = [...realizedShifts, ...shiftRows.map(shiftFromRow)];
 
-  // ---- זמינות: כל כפוף/ה מול כל משמרת שקיימת בשבוע, יחס דטרמיניסטי
+  // ---- זמינות: כל חייל/ת מול כל משמרת שקיימת בשבוע, יחס דטרמיניסטי
   // זהה ל-fallbackStatus הכללי (fallbackStatus(gi, di, kind))— כאן אין
   // "day"/"night" בינארי כמו בהדגמה הכללית, אז הדירוג נגזר מאינדקס
   // המשמרת בתוך היום במקום, עדיין בלי Math.random. ----

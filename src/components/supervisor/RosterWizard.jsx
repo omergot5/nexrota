@@ -454,7 +454,7 @@ export default function RosterWizard({
       <div className="flex gap-2 items-start p-3.5 rounded-2xl bg-brand/8 ring-1 ring-inset ring-brand/20 text-[12.5px] text-muted leading-relaxed">
         <Icon name="lock" size={16} className="text-brand mt-0.5 flex-shrink-0" />
         <span>
-          <strong className="text-content">הכול חוסם הכול.</strong> ברגע שכפוף/ה משובץ/ת למשימה אחת, הוא/היא לא
+          <strong className="text-content">הכול חוסם הכול.</strong> ברגע שחייל/ת משובץ/ת למשימה אחת, הוא/היא לא
           יכול/ה להופיע באף משימה אחרת שחופפת אליה בזמן — בלי קשר לקטגוריה. זה כבר קורה במנוע לבד, לא צריך להגדיר
           את זה כאן.
         </span>
@@ -605,11 +605,11 @@ export default function RosterWizard({
             )}
 
             <div>
-              <p className="text-[12px] font-bold text-muted mb-1.5">כמות כפופים נדרשת בו-זמנית</p>
+              <p className="text-[12px] font-bold text-muted mb-1.5">כמות {t("noun.memberPlural")} נדרשת בו-זמנית</p>
               <div className="flex items-center gap-2.5">
                 <button
                   type="button"
-                  aria-label="הפחת כמות כפופים נדרשת"
+                  aria-label={`הפחת כמות ${t("noun.memberPlural")} נדרשת`}
                   onClick={() => setForm((f) => ({ ...f, requiredGuards: Math.max(1, (Number(f.requiredGuards) || 1) - 1) }))}
                   className="w-9 h-9 rounded-lg ring-1 ring-inset ring-hairline bg-surface-sunken font-extrabold cursor-pointer"
                 >
@@ -620,7 +620,7 @@ export default function RosterWizard({
                 </span>
                 <button
                   type="button"
-                  aria-label="הוסף כמות כפופים נדרשת"
+                  aria-label={`הוסף כמות ${t("noun.memberPlural")} נדרשת`}
                   onClick={() => setForm((f) => ({ ...f, requiredGuards: Math.min(6, (Number(f.requiredGuards) || 1) + 1) }))}
                   className="w-9 h-9 rounded-lg ring-1 ring-inset ring-hairline bg-surface-sunken font-extrabold cursor-pointer"
                 >
