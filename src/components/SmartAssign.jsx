@@ -36,6 +36,7 @@ const KIND_ICON = {
   balance: "shuffle",
   locked: "pin",
   turn: "clock",
+  rotation: "swap",
 };
 
 function RulesPanel({ rules, setRules, restHours, longShiftCategories = [], open, onClose }) {

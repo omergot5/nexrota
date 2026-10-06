@@ -36,7 +36,7 @@ export const DEFAULT_RULES = {
   allowMaybe: true, // may assign guards who answered "אולי"
   allowUnknown: true, // may assign guards who never submitted availability
   honourPreferences: true, // weigh "מעדיף" above a plain "זמין"
-  balancePasses: 40, // local-search iterations
+  balancePasses: 400, // local-search moves (each one strictly lowers the spread, so it always ends)
   // קטגוריות שבהן משמרת *אחת* רשאית לעבור את maxConsecutiveHours (ר' teamRules).
   longShiftCategories: [],
 };
@@ -483,6 +483,21 @@ function scoreCandidate({ guard, shift, load, availability, rules, stats, check,
     parts.push({ label: "כבר משובץ/ת ביום הזה", points: -12, kind: "spread" });
   }
 
+  // 5b. סבב בתוך קטגוריה: מטבח (או כל תורנות אחרת) עובר הלאה ולא חוזר לאותו
+  //     אדם באותו שבוע כל עוד יש מי שעוד לא עשה אותה. בלי זה, על מבנה הצבא
+  //     9 חיילים עשו את כל 12 תורנויות המטבח, ואחד מהם שלוש פעמים. רך ולא
+  //     קשיח — קטגוריה גדולה (כוננות, 98 מקומות) חייבת לחזור לאנשים.
+  const sameCategory = shift.category ? load.shifts.filter((s) => s.category === shift.category).length : 0;
+  if (sameCategory > 0) {
+    const penalty = 6 * sameCategory;
+    score -= penalty;
+    parts.push({
+      label: `כבר ${sameCategory === 1 ? "פעם אחת" : `${sameCategory} פעמים`} ב${shift.category} השבוע — הסבב עובר הלאה`,
+      points: -penalty,
+      kind: "rotation",
+    });
+  }
+
   // 6. A little continuity — same shift type across the week is easier to live with.
   const sameType = load.shifts.filter((s) => s.type === shift.type).length;
   if (sameType > 0 && sameType < 3) {
@@ -556,7 +571,7 @@ export function autoAssign({
   const addAssignment = (shift, guard, score, parts, locked = false, raw = null) => {
     const iv = shiftInterval(shift);
     const l = load.get(guard.id);
-    l.shifts.push({ ...iv, shiftId: shift.id, type: shift.type, date: shift.date });
+    l.shifts.push({ ...iv, shiftId: shift.id, type: shift.type, date: shift.date, category: shift.category || null });
     l.count += 1;
     l.hours += shiftHours(shift);
     l.load += shiftLoad(shift, taskWeights);
@@ -642,7 +657,7 @@ export function autoAssign({
   // --- greedy fill ---
   const unfilled = [];
 
-  for (const shift of ordered) {
+  const fillShift = (shift) => {
     const need = Math.max(1, shift.requiredGuards || 1);
     const blockers = [];
 
@@ -710,7 +725,17 @@ export function autoAssign({
       // in the pool even after they'd already been assigned once, so they
       // took a second shift while two OTHER guards got zero — three people
       // short of a fair share instead of the two the arithmetic requires.
-      const turnsOf = (c) => load.get(c.guardId).count / capacityOf(c.guard);
+      //
+      // פעם קודמת באותה קטגוריה השבוע נספרת כחצי תור (הסבב, 5b ב-
+      // scoreCandidate). בלי זה התור עצמו מחזיר את המטבח לאותו אדם: תורנות
+      // של 14 שעות היא "משמרת אחת" בספירה, אז מי שעשה מטבח נראה הכי פנוי
+      // בתור — ועל מבנה הצבא אחד קיבל אותו שלוש פעמים. מי שלא שובץ/ה כלל
+      // נשאר/ת תמיד במדרגה הנמוכה ביותר, כך שההבטחה למעלה לא נפגעת.
+      const turnsOf = (c) => {
+        const l = load.get(c.guardId);
+        const repeats = shift.category ? l.shifts.filter((s) => s.category === shift.category).length : 0;
+        return (l.count + repeats * 0.5) / capacityOf(c.guard);
+      };
       candidates.sort((a, b) => {
         const ta = turnsOf(a);
         const tb = turnsOf(b);
@@ -757,16 +782,20 @@ export function autoAssign({
     }
 
     const filled = byShift.get(shift.id).length;
-    if (filled < need) {
-      unfilled.push({
-        shiftId: shift.id,
-        shift,
-        needed: need,
-        filled,
-        missing: need - filled,
-        blockers: dedupeBlockers(blockers),
-      });
-    }
+    if (filled >= need) return null;
+    return {
+      shiftId: shift.id,
+      shift,
+      needed: need,
+      filled,
+      missing: need - filled,
+      blockers: dedupeBlockers(blockers),
+    };
+  };
+
+  for (const shift of ordered) {
+    const entry = fillShift(shift);
+    if (entry) unfilled.push(entry);
   }
 
   // --- local-search balancing ---
@@ -774,6 +803,86 @@ export function autoAssign({
     openShifts, activeGuards, availability, rules, stats, load, assignments, byShift, weights: taskWeights,
     carriedLoad,
   });
+  // --- second chance for what stayed open ---
+  // האיזון מזיז משמרות בין אנשים, ולכן מי שהיה חסום למשמרת פתוחה (מנוחה,
+  // חפיפה, תקרה) לפעמים כבר לא חסום אחריו. מילוי חוזר באותם כללים בדיוק —
+  // אותם אילוצים קשיחים, אותו סדר תורות — רק על מה שנשאר פתוח. הכיסוי
+  // קודם להוגנות: בלי השלב הזה מעבר האיזון החזק עלה במקום אחד במבנה הצבא.
+  const stillOpen = [];
+  for (const entry of unfilled) {
+    const again = fillShift(entry.shift);
+    if (again) stillOpen.push(again);
+  }
+  // תיקון בצעד אחד: מקום שעדיין פתוח, ואדם שחסום אליו רק בגלל משמרת אחת
+  // שלו/ה (חפיפה, מנוחה, רצף, תקרה) — אם המשמרת ההיא יכולה לעבור למישהו
+  // אחר באופן חוקי, שני המהלכים מתבצעים יחד. אף אילוץ קשיח לא מוקל: כל
+  // מהלך עובר את אותה checkHardConstraints. זמינות וכשירות לא ניתנות לתיקון
+  // כזה, ולכן לא נבדקות כאן בכלל.
+  const REPAIRABLE = new Set(["overlap", "rest", "consecutive", "weekly-cap", "night-cap"]);
+  const shiftById = new Map(openShifts.map((s) => [s.id, s]));
+  const repairOne = (shift) => {
+    for (const guard of activeGuards) {
+      const gLoad = load.get(guard.id);
+      const blocked = checkHardConstraints({ guard, shift, load: gLoad, availability, rules });
+      if (blocked.ok || !REPAIRABLE.has(blocked.code)) continue;
+      const own = assignments
+        .filter((a) => a.guardId === guard.id && !a.locked)
+        .sort((a, b) => String(a.shiftId).localeCompare(String(b.shiftId)));
+      for (const record of own) {
+        const other = shiftById.get(record.shiftId);
+        if (!other || other.id === shift.id) continue;
+        removeFromLoad(gLoad, other, taskWeights);
+        const now = checkHardConstraints({ guard, shift, load: gLoad, availability, rules });
+        if (now.ok) {
+          for (const to of activeGuards) {
+            if (to.id === guard.id) continue;
+            const toLoad = load.get(to.id);
+            const ok = checkHardConstraints({ guard: to, shift: other, load: toLoad, availability, rules });
+            if (!ok.ok) continue;
+            const moved = scoreCandidate({ guard: to, shift: other, load: toLoad, availability, rules, stats, check: ok, carried: carriedLoad[to.id] });
+            addToLoad(toLoad, other, taskWeights);
+            record.guardId = to.id;
+            record.score = moved.score;
+            record.raw = moved.raw;
+            record.parts = [...moved.parts, { label: `הועבר/ה מ${guard.name} כדי לאייש מקום שנשאר פתוח`, points: 0, kind: "balance" }];
+            const took = scoreCandidate({ guard, shift, load: gLoad, availability, rules, stats, check: now, carried: carriedLoad[guard.id] });
+            addAssignment(shift, guard, took.score, took.parts, false, took.raw);
+            log.push({
+              step: "assign",
+              title: `${shift.label} · ${formatDateHe(shift.date)}`,
+              detail: `${guard.name} — אחרי ש${other.label} עבר/ה ל${to.name}`,
+              shiftId: shift.id,
+              guardId: guard.id,
+            });
+            return true;
+          }
+        }
+        addToLoad(gLoad, other, taskWeights);
+      }
+    }
+    return false;
+  };
+  for (let i = stillOpen.length - 1; i >= 0; i--) {
+    const entry = stillOpen[i];
+    while (entry.missing > 0 && repairOne(entry.shift)) {
+      entry.filled += 1;
+      entry.missing -= 1;
+    }
+    if (entry.missing === 0) stillOpen.splice(i, 1);
+  }
+
+  // מי שקיבל/ה עכשיו את המקום שנפתח יכול/ה לצאת עמוס/ה מכולם — עוד מעבר
+  // איזון אחד מיישר את זה, בלי לגעת בכיסוי (איזון רק מזיז, לעולם לא מרוקן).
+  // נמדד במקומות ולא במשמרות: מילוי של אחד משני מקומות חסרים באותה משמרת
+  // משאיר אותה ברשימה, ובכל זאת מישהו קיבל עכשיו עוד נטל.
+  const missingOf = (list) => list.reduce((n, u) => n + u.missing, 0);
+  if (missingOf(stillOpen) < missingOf(unfilled)) {
+    const more = balanceWorkload({
+      openShifts, activeGuards, availability, rules, stats, load, assignments, byShift, weights: taskWeights,
+      carriedLoad,
+    });
+    balanceMoves.push(...more);
+  }
   if (balanceMoves.length) {
     log.push({
       step: "balance",
@@ -783,7 +892,9 @@ export function autoAssign({
     });
   }
 
-  return buildResult({ rules, openShifts, activeGuards, assignments, byShift, load, unfilled, log, stats, balanceMoves });
+  return buildResult({
+    rules, openShifts, activeGuards, assignments, byShift, load, unfilled: stillOpen, log, stats, balanceMoves,
+  });
 }
 
 // ---------- balancing ----------
@@ -827,94 +938,203 @@ function balanceWorkload({
   const debtOf = (g) =>
     load.get(g.id).load + (carriedLoad[g.id]?.load || 0) - stats.loadTargetPerGuard * capacityOf(g);
 
+  // משמרת שעוברת בין שני אנשים — הניקוד, הנימוק והחשבון של המקבל/ת.
+  const reassign = (record, to, shift, check, from) => {
+    const toLoad = load.get(to.id);
+    const { score, raw, parts } = scoreCandidate({
+      guard: to, shift, load: toLoad, availability, rules, stats, check, carried: carriedLoad[to.id],
+    });
+    addToLoad(toLoad, shift, weights);
+    record.guardId = to.id;
+    record.score = score;
+    record.raw = raw;
+    record.parts = [...parts, { label: `הועבר/ה מ${from.name} לאיזון עומסים`, points: 0, kind: "balance" }];
+    return { shiftId: shift.id, from: from.name, to: to.name, label: `${shift.label} · ${formatDateHe(shift.date)}` };
+  };
+
+  // האיזון לא מרכז קטגוריה: משמרת עוברת רק למי שמחזיק/ה ממנה פחות ממי
+  // שנותן/ת אותה. אחרת מעבר שמשפר נטל היה מחזיר את המטבח למי שכבר עשה
+  // אותו, ומבטל את הסבב שהמילוי בנה (5b ב-scoreCandidate).
+  const categoryCount = (guardLoad, category) =>
+    category ? guardLoad.shifts.filter((s) => s.category === category).length : 0;
+  // עד החלק ההוגן של אדם בקטגוריה מותר תמיד — אחרת סיור (63 מקומות ל-45
+  // חיילים) היה יכול לעבור רק למי שלא עשה סיור בכלל, וכמעט כולם עשו, כך
+  // שחייל אחד נשאר תקוע עם נטל 78 בזמן שאחרים ב-51 (נתפס על ההדגמה החיה).
+  // מעל החלק ההוגן — רק למי שמחזיק/ה פחות מהנותן/ת. במטבח (12 ל-45) החלק
+  // ההוגן הוא 1, כלומר בדיוק הסבב.
+  const categoryShare = new Map();
+  for (const s of openShifts) {
+    if (!s.category) continue;
+    categoryShare.set(s.category, (categoryShare.get(s.category) || 0) + Math.max(1, s.requiredGuards || 1));
+  }
+  const fairShareOf = (category) => Math.ceil((categoryShare.get(category) || 0) / Math.max(activeGuards.length, 1));
+  const keepsRotation = (fromLoad, toLoad, shift) => {
+    if (!shift.category) return true;
+    const to = categoryCount(toLoad, shift.category);
+    return to + 1 <= fairShareOf(shift.category) || to < categoryCount(fromLoad, shift.category);
+  };
+
+  const unlockedOf = (guard) =>
+    assignments
+      .filter((a) => a.guardId === guard.id && !a.locked)
+      // give away the least-justified first; shiftId keeps the order total
+      .sort((a, b) => a.score - b.score || String(a.shiftId).localeCompare(String(b.shiftId)));
+
+  // העברה: משמרת אחת של הכבד/ה עוברת לקל/ה.
+  const tryMove = (heavy, light, gapLoad) => {
+    const heavyLoad = load.get(heavy.id);
+    // Never create a new zero-shift guard while rebalancing *load*: the
+    // load-heaviest guard is sometimes a guard who only holds one heavy
+    // night shift, and taking it away would recreate the exact bug the
+    // turn-tiering fix in the fill exists to prevent (one guard ends the
+    // week with shifts, another with none).
+    if (heavyLoad.count <= 1) return null;
+    for (const record of unlockedOf(heavy)) {
+      const shift = shiftById.get(record.shiftId);
+      if (!shift) continue;
+      // Refuse a move that doesn't strictly shrink the pairwise gap: the
+      // post-move gap is `|gapLoad - 2w|`, which beats `gapLoad` only for
+      // `0 < w < gapLoad`. At `w === gapLoad` the shift just flip-flops
+      // between the two (caught live: a 16.8-load Friday night did exactly
+      // that for every pass).
+      const w = shiftLoad(shift, weights);
+      if (w >= gapLoad) continue;
+      if (!keepsRotation(heavyLoad, load.get(light.id), shift)) continue;
+      const check = checkHardConstraints({ guard: light, shift, load: load.get(light.id), availability, rules });
+      if (!check.ok) continue;
+      removeFromLoad(heavyLoad, shift, weights);
+      return [reassign(record, light, shift, check, heavy)];
+    }
+    return null;
+  };
+
+  // החלפה: הכבד/ה נותן/ת משמרת ארוכה ומקבל/ת בחזרה משמרת קצרה של הקל/ה.
+  // זה המהלך שהעברה לבדה לא מגיעה אליו: כשהקל/ה כבר בתקרת המשמרות
+  // (שש עמדות של 6 שעות = 36 שעות), אי אפשר לתת לו/ה עוד משמרת — אבל
+  // אפשר להחליף לו/ה עמדה של 6 בכוננות של 12. אותו תנאי בדיוק כמו העברה:
+  // ההפרש בין שתי המשמרות חייב להיות בין 0 לפער, אחרת אין שיפור אמיתי.
+  const trySwap = (heavy, light, gapLoad) => {
+    const heavyLoad = load.get(heavy.id);
+    const lightLoad = load.get(light.id);
+    const lightRecords = unlockedOf(light);
+    for (const give of unlockedOf(heavy)) {
+      const giveShift = shiftById.get(give.shiftId);
+      if (!giveShift) continue;
+      const wGive = shiftLoad(giveShift, weights);
+      for (const take of lightRecords) {
+        const takeShift = shiftById.get(take.shiftId);
+        if (!takeShift || takeShift.id === giveShift.id) continue;
+        const delta = wGive - shiftLoad(takeShift, weights);
+        if (delta <= 0 || delta >= gapLoad) continue;
+        if (!keepsRotation(heavyLoad, lightLoad, giveShift) || !keepsRotation(lightLoad, heavyLoad, takeShift)) continue;
+
+        // Both leave first: each person's rest and overlap checks must see
+        // the week *without* the shift they are about to hand over.
+        removeFromLoad(heavyLoad, giveShift, weights);
+        removeFromLoad(lightLoad, takeShift, weights);
+        const toLight = checkHardConstraints({ guard: light, shift: giveShift, load: lightLoad, availability, rules });
+        const toHeavy = toLight.ok
+          ? checkHardConstraints({ guard: heavy, shift: takeShift, load: heavyLoad, availability, rules })
+          : toLight;
+        if (toLight.ok && toHeavy.ok) {
+          return [reassign(give, light, giveShift, toLight, heavy), reassign(take, heavy, takeShift, toHeavy, light)];
+        }
+        addToLoad(heavyLoad, giveShift, weights);
+        addToLoad(lightLoad, takeShift, weights);
+      }
+    }
+    return null;
+  };
+
+  // כל מעבר מחפש את הזוג הכבד-קל הרחוק ביותר שיש ביניהם מהלך חוקי — לא רק
+  // את הכבד/ה ביותר מול הקל/ה ביותר. הגרסה הקודמת עצרה ברגע שהזוג הקיצוני
+  // הזה נתקע (הקל/ה ביותר לא יכול/ה לקחת אף משמרת של הכבד/ה ביותר בגלל
+  // מנוחה או זמינות), ולכן על מבנה הצבא היא ביצעה 2 מהלכים בשבוע שלם
+  // והשאירה פער של 22 שעות. כל מהלך מקטין ממש את סכום ריבועי החובות, ולכן
+  // הלולאה תמיד מסתיימת — לא יכולה לחזור למצב שכבר היה.
   for (let pass = 0; pass < rules.balancePasses; pass++) {
     const sorted = [...activeGuards].sort((a, b) => {
       const d = debtOf(a) - debtOf(b);
       return d !== 0 ? d : String(a.id).localeCompare(String(b.id));
     });
-    const lightest = sorted[0];
-    const heaviest = sorted[sorted.length - 1];
-    if (!lightest || !heaviest) break;
 
-    const gapLoad = debtOf(heaviest) - debtOf(lightest);
-    if (gapLoad < gapThreshold) break; // already flat enough, in load units
-
-    // Try to hand one of the heaviest guard's shifts to the lightest one.
-    const movable = assignments
-      .filter((a) => a.guardId === heaviest.id && !a.locked)
-      .sort((a, b) => a.score - b.score); // give away the least-justified first
-
-    let moved = false;
-    for (const candidate of movable) {
-      const shift = shiftById.get(candidate.shiftId);
-      if (!shift) continue;
-
-      // Simulate removing it from the heavy guard first — the light guard may
-      // otherwise fail a rest check against a shift that is about to move.
-      const heavyLoad = load.get(heaviest.id);
-      const lightLoad = load.get(lightest.id);
-
-      const check = checkHardConstraints({ guard: lightest, shift, load: lightLoad, availability, rules });
-      if (!check.ok) continue;
-      if (availStatus(availability, lightest.id, shift.id) === "unavailable") continue;
-
-      // Never create a new zero-shift guard while rebalancing *load*: this
-      // pass sorts purely by weighted load, a different axis from the
-      // greedy fill's turn count — a single heavy night shift can outweigh
-      // several light day shifts, so the load-heaviest guard is sometimes
-      // also a guard who only holds that one shift. Taking it away here
-      // would recreate the exact bug the turn-tiering fix exists to
-      // prevent (one guard ends the week with shifts, another with none),
-      // just via the balance pass instead of the fill order. This is
-      // deliberately narrow — it only blocks the specific 1-shift-to-0
-      // case, not ordinary load-smoothing between guards who both keep at
-      // least one shift either way (FAIR-01 below depends on those moves
-      // still happening).
-      if (heavyLoad.count === 1) continue;
-
-      // Refuse a move that doesn't strictly shrink the pairwise gap. The
-      // post-move gap is `|gapLoad - 2w|`, which beats the pre-move
-      // `gapLoad` only for `0 < w < gapLoad` — at `w === gapLoad` the trade
-      // is a wash (new gap equals the old one, just flipped in sign), and
-      // above it the guards swap places by a margin at least as large as
-      // before. Caught live on the demo roster: a single Friday-night shift
-      // (weekend × night = 12h × 1.4 = 16.8 load) sat at *exactly* the gap
-      // between its two guards, so it flip-flopped between them for all
-      // `balancePasses`, never once improving anything. `>=`, not `>` — the
-      // equal case is the one that was silently passing before.
-      const w = shiftLoad(shift, weights);
-      if (w >= gapLoad) continue;
-
-      // Apply the move.
-      removeFromLoad(heavyLoad, shift, weights);
-      const { score, raw, parts } = scoreCandidate({
-        guard: lightest, shift, load: lightLoad, availability, rules, stats, check,
-        carried: carriedLoad[lightest.id],
-      });
-      addToLoad(lightLoad, shift, weights);
-
-      candidate.guardId = lightest.id;
-      candidate.score = score;
-      candidate.raw = raw;
-      candidate.parts = [
-        ...parts,
-        { label: `הועבר/ה מ${heaviest.name} לאיזון עומסים`, points: 0, kind: "balance" },
-      ];
-      const list = byShift.get(shift.id);
-      const idx = list.findIndex((r) => r === candidate);
-      if (idx === -1) list.push(candidate);
-
-      moves.push({
-        shiftId: shift.id,
-        from: heaviest.name,
-        to: lightest.name,
-        label: `${shift.label} · ${formatDateHe(shift.date)}`,
-      });
-      moved = true;
-      break;
+    let applied = null;
+    search: for (let h = sorted.length - 1; h > 0; h--) {
+      for (let l = 0; l < h; l++) {
+        const gapLoad = debtOf(sorted[h]) - debtOf(sorted[l]);
+        if (gapLoad < gapThreshold) {
+          if (l === 0) break search; // already flat enough, in load units
+          break; // lighter candidates only get heavier from here
+        }
+        applied = tryMove(sorted[h], sorted[l], gapLoad) || trySwap(sorted[h], sorted[l], gapLoad);
+        if (applied) break search;
+      }
     }
 
-    if (!moved) break; // no legal improvement left
+    if (!applied) break; // no legal improvement left
+    moves.push(...applied);
+  }
+
+  // סבב אחרון: מי שמחזיק/ה בקטגוריה יותר מהחלק ההוגן שלו/ה מעביר/ה משמרת
+  // ממנה למי שמתחת לחלק ההוגן — גם כשהנטל כבר מאוזן ולכן המעבר שלמעלה לא
+  // רואה סיבה לזוז. התנאי: המהלך לא מרחיב את הפער הכולל — המקבל/ת לא עובר/ת
+  // את העמוס/ה ביותר כרגע, והנותן/ת לא יורד/ת מתחת לפנוי/ה ביותר — כך שהסבב
+  // לעולם לא קונה גיוון במחיר הוגנות. (נתפס על מבנה הצבא: חייל עשה מטבח
+  // שלוש פעמים כשהיה חייל חוקי שלא עשה אותו בכלל.)
+  const debtBounds = () => {
+    const all = activeGuards.map(debtOf);
+    return { top: Math.max(...all), bottom: Math.min(...all) };
+  };
+  for (const giver of [...activeGuards].sort((a, b) => String(a.id).localeCompare(String(b.id)))) {
+    const giverLoad = load.get(giver.id);
+    for (const record of unlockedOf(giver)) {
+      const shift = shiftById.get(record.shiftId);
+      if (!shift?.category || categoryCount(giverLoad, shift.category) <= fairShareOf(shift.category)) continue;
+      const w = shiftLoad(shift, weights);
+      const { top, bottom } = debtBounds();
+      const within = (d) => d <= top + 1e-9 && d >= bottom - 1e-9;
+      const receivers = [...activeGuards]
+        .filter((g) => g.id !== giver.id && categoryCount(load.get(g.id), shift.category) + 1 <= fairShareOf(shift.category))
+        .sort((a, b) => debtOf(a) - debtOf(b) || String(a.id).localeCompare(String(b.id)));
+
+      let done = false;
+      for (const receiver of receivers) {
+        const rLoad = load.get(receiver.id);
+        // העברה פשוטה, כשהנטל מאפשר אותה.
+        if (giverLoad.count > 1 && within(debtOf(giver) - w) && within(debtOf(receiver) + w)) {
+          const check = checkHardConstraints({ guard: receiver, shift, load: rLoad, availability, rules });
+          if (check.ok) {
+            removeFromLoad(giverLoad, shift, weights);
+            moves.push(reassign(record, receiver, shift, check, giver));
+            done = true;
+            break;
+          }
+        }
+        // אחרת החלפה: הנותן/ת מקבל/ת בחזרה משמרת של המקבל/ת מקטגוריה אחרת,
+        // באורך דומה — המטבח זז, הנטל של שניהם כמעט לא.
+        for (const take of unlockedOf(receiver)) {
+          const back = shiftById.get(take.shiftId);
+          if (!back || back.category === shift.category) continue;
+          if (!keepsRotation(rLoad, giverLoad, back)) continue;
+          const delta = w - shiftLoad(back, weights);
+          if (!within(debtOf(giver) - delta) || !within(debtOf(receiver) + delta)) continue;
+          removeFromLoad(giverLoad, shift, weights);
+          removeFromLoad(rLoad, back, weights);
+          const toReceiver = checkHardConstraints({ guard: receiver, shift, load: rLoad, availability, rules });
+          const toGiver = toReceiver.ok
+            ? checkHardConstraints({ guard: giver, shift: back, load: giverLoad, availability, rules })
+            : toReceiver;
+          if (toReceiver.ok && toGiver.ok) {
+            moves.push(reassign(record, receiver, shift, toReceiver, giver), reassign(take, giver, back, toGiver, receiver));
+            done = true;
+            break;
+          }
+          addToLoad(giverLoad, shift, weights);
+          addToLoad(rLoad, back, weights);
+        }
+        if (done) break;
+      }
+    }
   }
 
   return moves;
@@ -933,7 +1153,7 @@ function removeFromLoad(l, shift, weights = {}) {
 
 function addToLoad(l, shift, weights = {}) {
   const iv = shiftInterval(shift);
-  l.shifts.push({ ...iv, shiftId: shift.id, type: shift.type, date: shift.date });
+  l.shifts.push({ ...iv, shiftId: shift.id, type: shift.type, date: shift.date, category: shift.category || null });
   l.count += 1;
   l.hours += shiftHours(shift);
   l.load += shiftLoad(shift, weights);
