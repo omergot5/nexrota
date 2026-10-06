@@ -316,7 +316,6 @@ function ShiftCell({ shift, block, post, tone, cell, firstName, guards, onEditSh
               className="inline-flex items-center gap-0.5 text-[10px] font-black px-1 rounded bg-bg text-warn"
               title="בסיור ובכוננות חייב להיות בכל משמרת סמל, מפקץ או מפקד כיתה"
             >
-              <Icon name="alert" size={9} />
               ללא {COMMAND_MARK}
             </span>
           )}
