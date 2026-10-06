@@ -100,7 +100,11 @@ const fallbackStatus = demoAvailabilityCode;
  * לקיים. עכשיו היא נכונה מעצם המבנה, ומשותפת לשני מסלולי ההדגמה
  * (seedDemoTeam הכללי ו-seedArmyRoster) כדי ששניהם לא יכפילו שומרים.
  */
-async function ensureDemoGuards(teamCode, existingGuards, guardCount) {
+/** תפקידי ההדגמה בצבא: סמל, מפקץ ו-4 מפקדי כיתה — לפי הסדר ברשימת החיילים. */
+const ARMY_DEMO_ROLES = ["sergeant", "platoon", "squad", "squad", "squad", "squad"];
+const ARMY_COMMAND_CATEGORIES = ["סיור", "כוננות"];
+
+async function ensureDemoGuards(teamCode, existingGuards, guardCount, { withRoles = false } = {}) {
   const pool = DEMO_GUARDS.slice(0, Math.min(Math.max(guardCount, 1), DEMO_GUARDS.length));
 
   const { data: rosterData, error: rosterError } = await supabase
@@ -130,13 +134,25 @@ async function ensureDemoGuards(teamCode, existingGuards, guardCount) {
     guardRows = data || [];
   }
 
-  return {
-    allGuards: [
-      ...knownGuards.map((g) => ({ id: g.id, full_name: g.name })),
-      ...guardRows.map((r) => ({ id: r.id, full_name: r.full_name })),
-    ],
-    guardsAdded: guardRows.length,
-  };
+  const allGuards = [
+    ...knownGuards.map((g) => ({ id: g.id, full_name: g.name })),
+    ...guardRows.map((r) => ({ id: r.id, full_name: r.full_name })),
+  ];
+
+  // בצבא: ששת הראשונים הם בעלי התפקיד (סמל, מפקץ, ארבעה מפקדי כיתה), ומוגבלים לסיור ולכוננות —
+  // בדרך כלל הם לא עושים שמירה או מטבח. כתיבה חוזרת בטוחה: אותו ערך על אותה שורה.
+  if (withRoles) {
+    const byName = new Map(allGuards.map((g) => [g.full_name.trim(), g.id]));
+    await Promise.all(
+      ARMY_DEMO_ROLES.map((role, i) => {
+        const id = byName.get(DEMO_GUARDS[i]?.name);
+        if (!id) return null;
+        return supabase.from("gs_profiles").update({ duty_role: role, qualified_categories: ARMY_COMMAND_CATEGORIES }).eq("id", id);
+      })
+    );
+  }
+
+  return { allGuards, guardsAdded: guardRows.length };
 }
 
 /**
@@ -297,7 +313,7 @@ export async function seedArmyRoster({
   const sundayISO = dates[0];
 
   const [{ allGuards, guardsAdded }, { allPositions, positionsAdded, changedIds }] = await Promise.all([
-    ensureDemoGuards(teamCode, existingGuards, guardCount),
+    ensureDemoGuards(teamCode, existingGuards, guardCount, { withRoles: true }),
     ensureArmyPositions(teamCode, existingPositions, { reconcile, soldiers: guardCount }),
   ]);
 

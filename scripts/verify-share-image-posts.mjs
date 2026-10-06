@@ -61,8 +61,8 @@ const first = (label) => shifts.find((s) => s.label.startsWith(label) && s.date 
 const sh1 = first("עמדת שמירה 1 – משמרת 1");
 sh1.assignedGuards = ["g1"];
 first("עמדת שמירה 1 – משמרת 2").assignedGuards = ["g2"];
-first("סיור – משמרת 1").assignedGuards = ["g1", "g3"]; // סיור צריך 3 → מקום אחד פנוי
-first("עמדת שמירה 2 – משמרת 1").assignedGuards = ["g4"];
+first("כוננות – משמרת 1").assignedGuards = ["g1", "g3"]; // כוננות צריכה 6 → ארבעה מקומות פנויים
+first("סיור – משמרת 1").assignedGuards = ["g4"];
 // יום עם שעות שונות מהתבנית
 const odd = shifts.find((s) => s.label.startsWith("עמדת שמירה 1 – משמרת 1") && s.date === week[2]);
 odd.startTime = "08:00";

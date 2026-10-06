@@ -73,38 +73,38 @@ const slotsOf = (positions) => positions.reduce((n, p) => n + p.requiredGuards *
 const std = armyDemoPositions(30);
 const post = byPost(std);
 check(
-  "רגיל: שתי עמדות שמירה, 4 משמרות של 6 שעות, חייל אחד בכל אחת",
-  ["עמדת שמירה 1", "עמדת שמירה 2"].every((n) => post(n).length === 4 && post(n).every((p) => p.requiredGuards === 1))
+  "רגיל: עמדת שמירה אחת, 4 משמרות של 6 שעות, חייל אחד בכל אחת",
+  post("עמדת שמירה 2").length === 0 && post("עמדת שמירה 1").length === 4 && post("עמדת שמירה 1").every((p) => p.requiredGuards === 1)
 );
 check(
-  "רגיל: סיור — 3 משמרות של 8 שעות, 2 חיילים בכל אחת",
-  post("סיור").length === 3 && post("סיור").every((p) => p.requiredGuards === 2)
+  "רגיל: סיור — 3 משמרות של 8 שעות, חייל אחד בכל אחת (בעל תפקיד)",
+  post("סיור").length === 3 && post("סיור").every((p) => p.requiredGuards === 1)
 );
 check(
-  "רגיל: כוננות — 2 משמרות של 12 שעות, 3 חיילים במקביל",
-  post("כוננות").length === 2 && post("כוננות").every((p) => p.requiredGuards === 3)
+  "רגיל: כוננות — 2 משמרות של 12 שעות, 6 חיילים במקביל",
+  post("כוננות").length === 2 && post("כוננות").every((p) => p.requiredGuards === 6)
 );
 const kitchen = post("תורנות מטבח");
 check(
-  "רגיל: מטבח 06:30–20:30, 2 חיילים, א'–ו'",
+  "רגיל: מטבח 06:30–20:30, חייל אחד, א'–ו'",
   kitchen.length === 1 && kitchen[0].startTime === "06:30" && kitchen[0].endTime === "20:30" &&
-    kitchen[0].requiredGuards === 2 && kitchen[0].weekdays.join() === "0,1,2,3,4,5"
+    kitchen[0].requiredGuards === 1 && kitchen[0].weekdays.join() === "0,1,2,3,4,5"
 );
 check(
   "רגיל: כל עמדה מחולקת מתחילה בבוקר (06:00)",
-  ["עמדת שמירה 1", "עמדת שמירה 2", "סיור", "כוננות"].every((n) => post(n)[0].startTime === "06:00")
+  ["עמדת שמירה 1", "סיור", "כוננות"].every((n) => post(n)[0].startTime === "06:00")
 );
-check("רגיל: 152 מקומות בשבוע", slotsOf(std) === 152, `got ${slotsOf(std)}`);
+check("רגיל: 139 מקומות בשבוע", slotsOf(std) === 139, `got ${slotsOf(std)}`);
 
 const small = armyDemoPositions(20);
 const sPost = byPost(small);
 check(
-  "קטן: עמדת שמירה אחת, סיור של חייל, כוננות של 3, מטבח של אחד",
+  "קטן: עמדת שמירה אחת, סיור של חייל, כוננות של 4, מטבח של אחד",
   sPost("עמדת שמירה 2").length === 0 && sPost("עמדת שמירה 1").length === 4 &&
-    sPost("סיור").every((p) => p.requiredGuards === 1) && sPost("כוננות").every((p) => p.requiredGuards === 3) &&
+    sPost("סיור").every((p) => p.requiredGuards === 1) && sPost("כוננות").every((p) => p.requiredGuards === 4) &&
     sPost("תורנות מטבח")[0].requiredGuards === 1
 );
-check("קטן: 97 מקומות בשבוע", slotsOf(small) === 97, `got ${slotsOf(small)}`);
+check("קטן: 111 מקומות בשבוע", slotsOf(small) === 111, `got ${slotsOf(small)}`);
 
 // ============================================================
 console.log("\nכיסוי — המבנה מתאייש במלואו עם הצוות שמיועד לו\n");
@@ -165,7 +165,7 @@ const isKitchen = (u) => String(u.shift?.label || u.label || "").includes("מט�
 const strict = staff(stdShifts, ARMY_DEMO_SOLDIERS, { minRestHours: 10, longShiftCategories: [] });
 check(
   "בלי ההיתר ל'משמרות ארוכות' המנוע לא עוקף את כלל ה-12: רק המטבח נשאר פתוח",
-  missingOf(strict.result, (u) => !isKitchen(u)) === 0 && missingOf(strict.result, isKitchen) === 12,
+  missingOf(strict.result, (u) => !isKitchen(u)) === 0 && missingOf(strict.result, isKitchen) === 6,
   `${missingOf(strict.result, isKitchen)} חסרים במטבח`
 );
 
@@ -202,10 +202,10 @@ const big = std.map((p, i) => ({
 }));
 const shrink = planArmyDemoPositions(big, { reconcile: true });
 check(
-  "הדגמה ישנה (סיור ×3, כוננות ×7) מתעדכנת לכמויות הרגילות (×2, ×3)",
+  "הדגמה ישנה (סיור ×3, כוננות ×7) מתעדכנת לכמויות הרגילות (×1, ×6)",
   shrink.update.length === 5 &&
-    shrink.update.filter((u) => u.patch.category === "סיור").every((u) => u.patch.requiredGuards === 2) &&
-    shrink.update.filter((u) => u.patch.category === "כוננות").every((u) => u.patch.requiredGuards === 3),
+    shrink.update.filter((u) => u.patch.category === "סיור").every((u) => u.patch.requiredGuards === 1) &&
+    shrink.update.filter((u) => u.patch.category === "כוננות").every((u) => u.patch.requiredGuards === 6),
   `${shrink.update.length} עדכונים`
 );
 const toSmall = planArmyDemoPositions(
@@ -213,9 +213,10 @@ const toSmall = planArmyDemoPositions(
   { reconcile: true, soldiers: 20 }
 );
 check(
-  "מעבר ל-20: עמדת שמירה 2 כבית (4 משמרות), ושאר העמדות לא נוספות מחדש",
-  toSmall.deactivate.length === 4 && toSmall.insert.length === 0,
-  `deactivate=${toSmall.deactivate.length} insert=${toSmall.insert.length}`
+  "מעבר ל-20: הכוננות קטנה מ-6 ל-4 (2 עדכונים), בלי כיבוי ובלי הוספה",
+  toSmall.update.length === 2 && toSmall.update.every((u) => u.patch.category === "כוננות" && u.patch.requiredGuards === 4) &&
+    toSmall.deactivate.length === 0 && toSmall.insert.length === 0,
+  `update=${toSmall.update.length} deactivate=${toSmall.deactivate.length} insert=${toSmall.insert.length}`
 );
 
 console.log(failures === 0 ? "\nPASS\n" : `\n${failures} FAILURE(S)\n`);

@@ -25,6 +25,7 @@ import WorkItemForm from "./WorkItemForm.jsx";
 import PostPublishView from "./PostPublishView.jsx";
 import ShareWeekBtn from "./ShareWeekBtn.jsx";
 import { buildPostWeek, opDayOf } from "../../lib/postWeek.js";
+import { DUTY_ROLES, dutyRoleLabel, isCommander } from "../../lib/dutyRoles.js";
 import { focusDay, weekStatus } from "../../lib/weekStatus.js";
 import { FocusDayCard, WeekStatusCard } from "./DashboardCards.jsx";
 
@@ -2704,6 +2705,35 @@ function ProfilePicker({ team, actions, busy, shifts = [], tasks = [] }) {
   );
 }
 
+/**
+ * "מי בעל תפקיד": בסיור ובכוננות חייב להיות בכל משמרת סמל, מפקץ או מפקד כיתה.
+ * המנוע אוכף את זה רק אחרי שיש בצוות בעלי תפקיד — לכן ההסבר כאן הוא הצעד הראשון
+ * של מי שמקים צוות חדש: לסמן אותם ברשימה.
+ */
+function CommandHint({ guards }) {
+  const holders = guards.filter(isCommander);
+  const countOf = (id) => guards.filter((g) => g.dutyRole === id).length;
+  return (
+    <div className="mb-4 p-3 rounded-xl bg-info/10 ring-1 ring-inset ring-info/25 text-sm" role="note">
+      <p className="font-bold text-content flex items-center gap-2">
+        <Icon name="shield" size={16} className="text-info" />
+        בעלי תפקיד
+      </p>
+      {holders.length === 0 ? (
+        <p className="text-muted mt-1">
+          בסיור ובכוננות חייב להיות בכל משמרת בעל תפקיד: סמל, מפקץ או מפקד כיתה. סמן אותם ברשימה למטה (שדה "תפקיד"). עד שתסמן, השיבוץ
+          לא מחייב את זה. בעלי תפקיד מוגבלים אוטומטית לסיור ולכוננות, כמו שרגיל — אפשר להרחיב בכשירות.
+        </p>
+      ) : (
+        <p className="text-muted mt-1" data-numeric>
+          {holders.length} בעלי תפקיד: {DUTY_ROLES.map((r) => `${countOf(r.id)} ${r.label}`).join(" · ")}. אם בשיבוץ נשארות משמרות בלי
+          בעל תפקיד, צריך עוד בעלי תפקיד — לכל אחד יש תקרה של 6 תורנויות בשבוע.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function TeamView({
   user, team, guards, actions, busy, onSeedDemo, shifts = [], tasks = [], compatibility = [],
 }) {
@@ -2912,6 +2942,7 @@ export function TeamView({
             </div>
           )}
         </div>
+        {team?.mode === "army" && guards.length > 0 && <CommandHint guards={guards} />}
         {guards.length === 0 ? (
           <p className="text-muted text-sm text-center py-8">
             אין {t("noun.memberPlural")} עדיין — שתף את קוד הצוות או הוסף ידנית
@@ -2970,10 +3001,32 @@ export function TeamView({
                           חצי משרה
                         </Badge>
                       )}
+                      {g.dutyRole && (
+                        <Badge tone="info" icon="shield">
+                          {dutyRoleLabel(g.dutyRole)}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
+                  {team?.mode === "army" && (
+                    <div className="w-32 ml-1">
+                      <Select
+                        value={g.dutyRole || ""}
+                        onChange={(e) => actions.setGuardDutyRole(g.id, e.target.value || null)}
+                        aria-label={`תפקיד של ${g.name}`}
+                        className="!h-9 !text-xs"
+                      >
+                        <option value="">ללא תפקיד</option>
+                        {DUTY_ROLES.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  )}
                   {/* עורך הכשירות, אדם אחד בכל פעם (D-04). */}
                   <IconBtn
                     icon="sliders"

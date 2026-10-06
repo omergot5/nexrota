@@ -120,6 +120,8 @@ export const profileFromRow = (row) => ({
   // (autoAssign.js capacityOf), לא אילוץ קשיח. עמודה חסרה נופלת ל-false,
   // בדיוק כמו ברירת המחדל של העמודה עצמה.
   halfTime: row.half_time === true,
+  // 'sergeant' | 'platoon' | 'squad' | null — 0032_guard_duty_role.sql
+  dutyRole: ["sergeant", "platoon", "squad"].includes(row.duty_role) ? row.duty_role : null,
   // משבצת צבע שמורה (0031_guard_color_slot.sql); null = עוד לא נקבעה והצבע מחושב.
   colorSlot: Number.isInteger(row.color_slot) ? row.color_slot : null,
 });
@@ -926,6 +928,17 @@ export async function setGuardHalfTime(profileId, halfTime) {
   if (!data?.length) {
     throw new Error("אין לך הרשאה לשנות את היקף המשרה של האדם הזה — התחבר מחדש ונסה שוב");
   }
+}
+
+/** שומר את התפקיד של אדם בפלוגה (0032_guard_duty_role.sql); null = חייל רגיל. */
+export async function setGuardDutyRole(profileId, role) {
+  const { data, error } = await supabase
+    .from("gs_profiles")
+    .update({ duty_role: ["sergeant", "platoon", "squad"].includes(role) ? role : null })
+    .eq("id", profileId)
+    .select("id");
+  if (error) throw new Error(error.message);
+  if (!data?.length) throw new Error("אין לך הרשאה לשנות את התפקיד של האדם הזה — התחבר מחדש ונסה שוב");
 }
 
 /** שומר את משבצת הצבע של אדם (0031_guard_color_slot.sql). */

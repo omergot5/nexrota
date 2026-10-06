@@ -477,6 +477,16 @@ export default function SmartAssign({
             </Alert>
           )}
 
+          {plan.commandGaps?.length > 0 && (
+            <Alert tone="warn">
+              {plan.commandGaps.length === 1
+                ? "משמרת אחת בסיור או בכוננות נשארה בלי בעל תפקיד"
+                : `${plan.commandGaps.length} משמרות בסיור או בכוננות נשארו בלי בעל תפקיד`}
+              : אין סמל, מפקץ או מפקד כיתה פנוי וחוקי להן (זמינות, מנוחה או תקרת 6 תורנויות). כדי לכסות אותן צריך עוד בעלי תפקיד, או לשבץ אחד
+              ידנית עם נימוק.
+            </Alert>
+          )}
+
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Kpi
               label={`כיסוי ${t("unit.shifts")}`}

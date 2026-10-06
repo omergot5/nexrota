@@ -24,6 +24,8 @@ import { seedDemoTeam, seedArmyRoster, demoShiftIdsForWeek, DEMO_TEAM_NAME } fro
 import { ARMY_DEMO_SOLDIERS } from "../lib/armyDemo.js";
 import { setTermProfile } from "../lib/terms.js";
 import { assignGuardColors, slotsForGuards } from "../lib/guardColors.js";
+import { isCommander } from "../lib/dutyRoles.js";
+import { teamRules } from "../lib/autoAssign.js";
 // שכבת ה-state הראשונה שנוגעת במנוע (Phase 3, QUAL-04 מסלול 4): שיבוץ ידני
 // מבצע כתיבה ישירה, ולכן חייב לשאול את אותה שאלה שהמנוע שואל לפני שהוא
 // כותב — בדיוק כמו ששני מסכי ההחלפה כבר עושים לפני אישור.
@@ -951,6 +953,22 @@ export function useGuardian() {
           }),
           () => api.setGuardWeekendPreference(id, preference)
         ),
+
+      // תפקיד בפלוגה. בעל תפקיד לא עושה בדרך כלל שמירה או מטבח, אז כשמסמנים תפקיד ועוד אין
+      // הגבלת כשירות — מגבילים אותו לקטגוריות הפיקוד (סיור, כוננות). המפקד יכול להרחיב אחר כך.
+      setGuardDutyRole: (id, role) => {
+        const guard = dataRef.current.guards.find((g) => g.id === id);
+        const restrict = isCommander({ dutyRole: role }) && guard && guard.qualifiedCategories == null;
+        const categories = restrict ? [...(teamRules(dataRef.current.team).commandCategories || [])] : null;
+        const apply = (g) => (g.id === id ? { ...g, dutyRole: role, ...(categories?.length ? { qualifiedCategories: categories } : {}) } : g);
+        return optimistic(
+          (d) => ({ ...d, guards: d.guards.map(apply), members: d.members.map(apply) }),
+          async () => {
+            await api.setGuardDutyRole(id, role);
+            if (categories?.length) await api.setGuardQualifications(id, categories);
+          }
+        );
+      },
 
       setGuardHalfTime: (id, halfTime) =>
         optimistic(

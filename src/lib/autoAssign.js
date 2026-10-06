@@ -15,6 +15,7 @@
 //      guards to flatten the workload without breaking any hard constraint.
 // ============================================================
 
+import { isCommander } from "./dutyRoles.js";
 import {
   shiftInterval,
   shiftHours,
@@ -39,6 +40,9 @@ export const DEFAULT_RULES = {
   balancePasses: 400, // local-search moves (each one strictly lowers the spread, so it always ends)
   // קטגוריות שבהן משמרת *אחת* רשאית לעבור את maxConsecutiveHours (ר' teamRules).
   longShiftCategories: [],
+  // קטגוריות שבכל משמרת שלהן חייב להיות לפחות בעל תפקיד אחד (סמל / מפקץ / מפקד כיתה).
+  // נאכף רק אם בצוות יש בעלי תפקיד בכלל.
+  commandCategories: [],
 };
 
 /**
@@ -48,6 +52,9 @@ export const DEFAULT_RULES = {
  */
 export const LONG_SHIFT_DEFAULTS = { army: ["תורנות מטבח", "כוננות"] };
 
+/** בצבא: בסיור ובכוננות חייב בעל תפקיד בכל משמרת. */
+export const COMMAND_DEFAULTS = { army: ["סיור", "כוננות"] };
+
 /**
  * הכללים הקבועים של צוות — המקור היחיד לכל מסך שבודק שיבוץ (השיבוץ החכם,
  * שיבוץ ידני, אישור החלפה אצל המשתתף), כדי שכולם יסכימו על אותה תשובה.
@@ -56,6 +63,7 @@ export function teamRules(team) {
   return {
     ...(team?.restHours ? { minRestHours: team.restHours } : {}),
     longShiftCategories: team?.longShiftCategories ?? LONG_SHIFT_DEFAULTS[team?.mode] ?? [],
+    commandCategories: team?.commandCategories ?? COMMAND_DEFAULTS[team?.mode] ?? [],
   };
 }
 
@@ -657,15 +665,22 @@ export function autoAssign({
   // --- greedy fill ---
   const unfilled = [];
 
-  const fillShift = (shift) => {
-    const need = Math.max(1, shift.requiredGuards || 1);
+  // --- בעלי תפקיד: בכל משמרת בקטגוריה שדורשת פיקוד חייב להיות אחד ---
+  const guardById = new Map(activeGuards.map((g) => [g.id, g]));
+  const commandersExist = activeGuards.some(isCommander);
+  const needsCommand = (shift) => commandersExist && (rules.commandCategories || []).includes(shift.category);
+  const hasCommander = (shift) => byShift.get(shift.id).some((r) => isCommander(guardById.get(r.guardId)));
+
+  const fillShift = (shift, { commandFirst = false } = {}) => {
+    const need = commandFirst ? 1 : Math.max(1, shift.requiredGuards || 1);
     const blockers = [];
 
-    while (byShift.get(shift.id).length < need) {
+    while (commandFirst ? !hasCommander(shift) : byShift.get(shift.id).length < need) {
       const candidates = [];
       const roundBlockers = [];
 
       for (const guard of activeGuards) {
+        if (commandFirst && !isCommander(guard)) continue;
         const l = load.get(guard.id);
         const check = checkHardConstraints({ guard, shift, load: l, availability, rules });
         if (!check.ok) {
@@ -736,7 +751,15 @@ export function autoAssign({
         const repeats = shift.category ? l.shifts.filter((s) => s.category === shift.category).length : 0;
         return (l.count + repeats * 0.5) / capacityOf(c.guard);
       };
+      // במשמרת שכבר יש בה בעל תפקיד, שאר המקומות עוברים קודם לחיילים רגילים — כדי
+      // שבעלי התפקיד, שמעטים, יישארו פנויים למשמרות שעוד חסר בהן אחד.
+      const spareCommanders = !commandFirst && needsCommand(shift) && hasCommander(shift);
       candidates.sort((a, b) => {
+        if (spareCommanders) {
+          const ca = isCommander(a.guard) ? 1 : 0;
+          const cb = isCommander(b.guard) ? 1 : 0;
+          if (ca !== cb) return ca - cb;
+        }
         const ta = turnsOf(a);
         const tb = turnsOf(b);
         if (ta !== tb) return ta - tb;
@@ -769,7 +792,11 @@ export function autoAssign({
               },
             ]
           : winner.parts;
-      addAssignment(shift, winner.guard, winner.score, winnerParts, false, winner.raw);
+      const placed = addAssignment(shift, winner.guard, winner.score, winnerParts, false, winner.raw);
+      if (commandFirst) {
+        placed.command = true; // נעוץ: האיזון והתיקון לא מזיזים אותו, אחרת המשמרת נשארת בלי בעל תפקיד
+        placed.parts = [...placed.parts, { label: `בעל תפקיד — בכל משמרת ${shift.category} חייב להיות אחד`, points: 0, kind: "command" }];
+      }
 
       log.push({
         step: "assign",
@@ -781,6 +808,7 @@ export function autoAssign({
       });
     }
 
+    if (commandFirst) return null;
     const filled = byShift.get(shift.id).length;
     if (filled >= need) return null;
     return {
@@ -793,6 +821,10 @@ export function autoAssign({
     };
   };
 
+  // קודם בעל תפקיד לכל משמרת שדורשת אחד (מי שנעול ידנית כבר נחשב), ואחר כך שאר המקומות.
+  for (const shift of ordered) {
+    if (needsCommand(shift) && !hasCommander(shift)) fillShift(shift, { commandFirst: true });
+  }
   for (const shift of ordered) {
     const entry = fillShift(shift);
     if (entry) unfilled.push(entry);
@@ -826,7 +858,7 @@ export function autoAssign({
       const blocked = checkHardConstraints({ guard, shift, load: gLoad, availability, rules });
       if (blocked.ok || !REPAIRABLE.has(blocked.code)) continue;
       const own = assignments
-        .filter((a) => a.guardId === guard.id && !a.locked)
+        .filter((a) => a.guardId === guard.id && !a.locked && !a.command)
         .sort((a, b) => String(a.shiftId).localeCompare(String(b.shiftId)));
       for (const record of own) {
         const other = shiftById.get(record.shiftId);
@@ -892,9 +924,12 @@ export function autoAssign({
     });
   }
 
-  return buildResult({
+  const result = buildResult({
     rules, openShifts, activeGuards, assignments, byShift, load, unfilled: stillOpen, log, stats, balanceMoves,
   });
+  // משמרות שדורשות בעל תפקיד ונשארו בלעדיו: אין בעל תפקיד פנוי וחוקי (זמינות, מנוחה, תקרה).
+  result.commandGaps = openShifts.filter((s) => needsCommand(s) && !hasCommander(s)).map((s) => ({ shiftId: s.id, label: s.label, date: s.date }));
+  return result;
 }
 
 // ---------- balancing ----------
@@ -976,7 +1011,7 @@ function balanceWorkload({
 
   const unlockedOf = (guard) =>
     assignments
-      .filter((a) => a.guardId === guard.id && !a.locked)
+      .filter((a) => a.guardId === guard.id && !a.locked && !a.command)
       // give away the least-justified first; shiftId keeps the order total
       .sort((a, b) => a.score - b.score || String(a.shiftId).localeCompare(String(b.shiftId)));
 
