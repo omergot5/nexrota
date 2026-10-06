@@ -120,6 +120,8 @@ export const profileFromRow = (row) => ({
   // (autoAssign.js capacityOf), לא אילוץ קשיח. עמודה חסרה נופלת ל-false,
   // בדיוק כמו ברירת המחדל של העמודה עצמה.
   halfTime: row.half_time === true,
+  // משבצת צבע שמורה (0031_guard_color_slot.sql); null = עוד לא נקבעה והצבע מחושב.
+  colorSlot: Number.isInteger(row.color_slot) ? row.color_slot : null,
 });
 
 export const availKey = (guardId, shiftId) => `${guardId}-${shiftId}`;
@@ -924,6 +926,17 @@ export async function setGuardHalfTime(profileId, halfTime) {
   if (!data?.length) {
     throw new Error("אין לך הרשאה לשנות את היקף המשרה של האדם הזה — התחבר מחדש ונסה שוב");
   }
+}
+
+/** שומר את משבצת הצבע של אדם (0031_guard_color_slot.sql). */
+export async function setGuardColorSlot(profileId, slot) {
+  const { data, error } = await supabase
+    .from("gs_profiles")
+    .update({ color_slot: Number.isInteger(slot) ? slot : null })
+    .eq("id", profileId)
+    .select("id");
+  if (error) throw new Error(error.message);
+  if (!data?.length) throw new Error("אין לך הרשאה לשנות את הצבע של האדם הזה — התחבר מחדש ונסה שוב");
 }
 
 export async function removeGuard(profileId) {

@@ -4,7 +4,7 @@
 // מה נשמר כאן: חייל מזהה את עצמו לפי צבע, ולכן עד 36 אנשים אף צבע לא חוזר, עד 12
 // כולם בגוון אחר, וכל צבע נושא דיו קריא. ושהצירוף של אדם לא מערבב את כולם.
 
-import { GUARD_COLOR_COUNT, GUARD_PALETTE, colorsForGuards } from "../src/lib/guardColors.js";
+import { GUARD_COLOR_COUNT, GUARD_PALETTE, colorsForGuards, slotsForGuards } from "../src/lib/guardColors.js";
 
 let failures = 0;
 const check = (label, cond, extra = "") => {
@@ -62,6 +62,23 @@ console.log("\nדטרמיניזם ויציבות\n");
   const after = colorsForGuards(team(30));
   const changed = [...before].filter(([id, c]) => after.get(id) !== c).length;
   check("צירוף חייל לצוות של 29 משנה מעט אחרים", changed <= 10, `${changed} מתוך 29 השתנו`);
+}
+
+console.log("\nצבע שמור לא זז\n");
+{
+  const base = team(29);
+  const slots = slotsForGuards(base);
+  const saved = base.map((g) => ({ ...g, colorSlot: slots.get(String(g.id)) }));
+  const withNew = colorsForGuards([...saved, { id: uuidLike(999) }]);
+  const was = colorsForGuards(saved);
+  const moved = saved.filter((g) => withNew.get(String(g.id)) !== was.get(String(g.id))).length;
+  check("צירוף חייל לצוות עם צבעים שמורים — אף אחד לא משנה צבע", moved === 0, moved + " השתנו");
+  check("החדש מקבל צבע שעוד לא בשימוש", new Set(withNew.values()).size === 30);
+  const removed = colorsForGuards(saved.slice(5));
+  check("הסרת אנשים לא משנה את הצבע של האחרים", saved.slice(5).every((g) => removed.get(String(g.id)) === was.get(String(g.id))));
+  const clash = colorsForGuards([{ id: "a", colorSlot: 3 }, { id: "b", colorSlot: 3 }]);
+  check("שני אנשים עם אותה משבצת שמורה — לא נשארים באותו צבע", clash.get("a") !== clash.get("b"));
+  check("משבצת לא תקינה נתעלמת ממנה", colorsForGuards([{ id: "x", colorSlot: 99 }]).size === 1);
 }
 
 console.log(failures === 0 ? "\nPASS\n" : `\n${failures} FAILURE(S)\n`);

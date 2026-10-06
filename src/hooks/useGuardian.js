@@ -23,7 +23,7 @@ import * as api from "../lib/api.js";
 import { seedDemoTeam, seedArmyRoster, demoShiftIdsForWeek, DEMO_TEAM_NAME } from "../lib/demoData.js";
 import { ARMY_DEMO_SOLDIERS } from "../lib/armyDemo.js";
 import { setTermProfile } from "../lib/terms.js";
-import { assignGuardColors } from "../lib/guardColors.js";
+import { assignGuardColors, slotsForGuards } from "../lib/guardColors.js";
 // שכבת ה-state הראשונה שנוגעת במנוע (Phase 3, QUAL-04 מסלול 4): שיבוץ ידני
 // מבצע כתיבה ישירה, ולכן חייב לשאול את אותה שאלה שהמנוע שואל לפני שהוא
 // כותב — בדיוק כמו ששני מסכי ההחלפה כבר עושים לפני אישור.
@@ -111,6 +111,19 @@ export function useGuardian() {
   // כשהרשימה משתנה. נקרא בגוף הרינדור ולא ב-effect: אחרת הרינדור הראשון היה
   // מצויר עם הצבעים הישנים והיה מבהב.
   assignGuardColors(data.guards);
+
+  // שומרים את הצבע של מי שעוד אין לו, פעם אחת, כדי שלא ישתנה כשהצוות משתנה. רק מפקד
+  // (RLS), ורק בצוות אמיתי: נתוני ההדגמה נמחקים ממילא ולכן נשארים מחושבים בלבד.
+  const colorsTried = useRef(new Set());
+  useEffect(() => {
+    if (!user?.isSupervisor || !data.team || data.team.name === DEMO_TEAM_NAME) return;
+    const missing = data.guards.filter((g) => g.colorSlot == null && !colorsTried.current.has(g.id));
+    if (!missing.length) return;
+    const slots = slotsForGuards(data.guards);
+    missing.forEach((g) => colorsTried.current.add(g.id));
+    setData((d) => ({ ...d, guards: d.guards.map((g) => (slots.has(String(g.id)) && g.colorSlot == null ? { ...g, colorSlot: slots.get(String(g.id)) } : g)) }));
+    Promise.allSettled(missing.map((g) => api.setGuardColorSlot(g.id, slots.get(String(g.id)))));
+  }, [user?.isSupervisor, data.team, data.guards]);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   // "הנתונים על המסך הם צילום ישן". מוצג, ולא מוסתר: משתמש שרואה סידור בלי

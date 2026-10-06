@@ -75,22 +75,48 @@ const argMin = (counts, start) => {
 };
 
 /**
- * @param {{id: string}[]} guards
- * @returns {Map<string, string>} מזהה ⟵ צבע (hex)
+ * משבצת (0..35) לכל אדם. מי ששמור לו צבע (colorSlot) שומר אותו תמיד — גם אם צירפו או
+ * הסירו אנשים; השאר מקבלים משבצות פנויות לפי האלגוריתם. כך הצבע של חייל קיים
+ * ברגע שנשמר, ולא משתנה כשהצוות משתנה.
+ * @param {{id: string, colorSlot?: number|null}[]} guards
+ * @returns {Map<string, number>} מזהה ⟵ משבצת
  */
-export function colorsForGuards(guards = []) {
-  const ids = [...new Set(guards.map((g) => String(g.id)))].sort();
+export function slotsForGuards(guards = []) {
   const hueUse = new Array(HUES.length).fill(0);
   const toneUse = HUES.map(() => new Array(TONES.length).fill(0));
+  const taken = new Set();
   const out = new Map();
-  for (const id of ids) {
+  const take = (id, tone, hue) => {
+    hueUse[hue]++;
+    toneUse[hue][tone]++;
+    taken.add(tone * HUES.length + hue);
+    out.set(id, tone * HUES.length + hue);
+  };
+  const unique = [...new Map(guards.map((g) => [String(g.id), g])).values()].sort((x, y) => String(x.id).localeCompare(String(y.id)));
+  // קודם מי ששמור לו צבע — הם לא זזים.
+  const rest = [];
+  for (const g of unique) {
+    const slot = g.colorSlot;
+    const valid = Number.isInteger(slot) && slot >= 0 && slot < GUARD_COLOR_COUNT && !taken.has(slot);
+    if (valid) take(String(g.id), Math.floor(slot / HUES.length), slot % HUES.length);
+    else rest.push(g);
+  }
+  for (const g of rest) {
+    const id = String(g.id);
     const h = hashOf(id);
     const hue = argMin(hueUse, h % HUES.length);
     const tone = argMin(toneUse[hue], Math.floor(h / HUES.length) % TONES.length);
-    hueUse[hue]++;
-    toneUse[hue][tone]++;
-    out.set(id, GUARD_PALETTE[tone][hue]);
+    take(id, tone, hue);
   }
+  return out;
+}
+
+/**
+ * @returns {Map<string, string>} מזהה ⟵ צבע (hex)
+ */
+export function colorsForGuards(guards = []) {
+  const out = new Map();
+  for (const [id, slot] of slotsForGuards(guards)) out.set(id, GUARD_PALETTE[Math.floor(slot / HUES.length)][slot % HUES.length]);
   return out;
 }
 
