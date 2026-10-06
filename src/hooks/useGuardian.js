@@ -26,7 +26,7 @@ import { setTermProfile } from "../lib/terms.js";
 // שכבת ה-state הראשונה שנוגעת במנוע (Phase 3, QUAL-04 מסלול 4): שיבוץ ידני
 // מבצע כתיבה ישירה, ולכן חייב לשאול את אותה שאלה שהמנוע שואל לפני שהוא
 // כותב — בדיוק כמו ששני מסכי ההחלפה כבר עושים לפני אישור.
-import { checkQualification } from "../lib/autoAssign.js";
+import { refusalText, vetAssignment } from "../lib/assignVet.js";
 // Phase 4: המרת "עמדה קבועה פעילה" ל"מה חסר לשבוע הזה" היא גזירה טהורה —
 // אותו עיקרון ש-checkQualification כבר נוהג בו כאן: שכבת ה-state קוראת
 // למנוע, לא מדמה אותו.
@@ -716,19 +716,18 @@ export function useGuardian() {
         const guard = dataRef.current.guards.find((g) => g.id === guardId);
         const assigned = Boolean(shift?.assignedGuards.includes(guardId));
 
-        // חסימת כשירות בלבד (P-01) — ולא יותר מזה. המסלול הזה לא אכף שום
-        // אילוץ קשיח לפני היום: לא מנוחה, לא רצף שעות, לא תקרה שבועית ואפילו
-        // לא זמינות. זה פער אמיתי ורחב יותר, והוא נשאר פתוח בכוונה — סגירתו
-        // הייתה מתחילה לחסום שיבוצים שאחמ"ש תמיד יכל לעשות ביד (למשל לכסות
-        // חור ב-3 לפנות בוקר שמפר מנוחה כי אין מי שיחליף), וזו שיחת מוצר
-        // בפני עצמה, לא תופעת לוואי של עבודת הכשירות. רק כיוון השיבוץ נבדק:
-        // הסרה אף פעם לא נחסמת, כי מנהל שצמצם כשירות חייב להיות מסוגל להוריד
-        // מהמשמרות שהאדם כבר לא כשיר להן.
+        // הוספה עוברת את אותה בדיקה שהמנוע עושה: כשירות, חפיפה, מנוחה, רצף, זמינות
+        // ותקרה (assignVet.js) — עקרון ברזל 2. פעם הבדיקה כאן הייתה כשירות בלבד,
+        // וכל מסך שרצה לאכוף את השאר נאלץ לבדוק בעצמו לפני הקריאה; מסך חדש ששכח
+        // עקף את החוק בשקט. "שבץ בכל זאת" (overrideNote) עוקף הכול חוץ מכשירות,
+        // ונרשם עם הנימוק. הסרה אף פעם לא נחסמת: מנהל שצמצם כשירות חייב להיות
+        // מסוגל להוריד מהמשמרות שהאדם כבר לא כשיר להן.
         if (!assigned) {
-          const check = checkQualification({ guard, shift });
-          if (!check.ok) {
+          const { shifts, availability, tasks, team } = dataRef.current;
+          const verdict = vetAssignment({ guard, shift, shifts, availability, tasks, team, overrideNote });
+          if (!verdict.ok) {
             return run(async () => {
-              throw new Error(check.reason);
+              throw new Error(refusalText(guard, verdict));
             });
           }
         }
@@ -757,9 +756,8 @@ export function useGuardian() {
       // גרירת שומר ממשמרת אחת לאחרת (BOARD-05) — אותה פעולה בדיוק ש-
       // toggleAssignment כבר עושה, פעמיים, מצוירת כ-patch אחד כדי שהמסך לא
       // יהבהב "הוסר" ואז "נוסף" בשני רגעים נפרדים. אותה בדיקה בדיוק כמו
-      // toggleAssignment בכיוון ההוספה — חסימת כשירות בלבד, לא אילוץ קשיח
-      // מלא — כי זו עדיין אותה פעולה ידנית, רק בעטיפה אחרת (גרירה במקום
-      // קליק), לא ערוץ חדש עם כללים משלו.
+      // toggleAssignment בכיוון ההוספה, כי זו עדיין אותה פעולה ידנית, רק
+      // בעטיפה אחרת (גרירה במקום קליק) — לא ערוץ חדש עם כללים משלו.
       moveAssignment: (fromShiftId, toShiftId, guardId) => {
         if (fromShiftId === toShiftId) return;
         const toShift = dataRef.current.shifts.find((s) => s.id === toShiftId);
@@ -767,10 +765,15 @@ export function useGuardian() {
         if (!toShift || !guard) return;
         if (toShift.assignedGuards.includes(guardId)) return; // כבר שם — אין מה להעביר
 
-        const check = checkQualification({ guard, shift: toShift });
-        if (!check.ok) {
+        // אותה בדיקה מלאה כמו בהוספה (assignVet.js), עם יציאה מהמשמרת שממנה
+        // גוררים לפני הבדיקה — גרירה למשמרת צמודה היא לא התנגשות של האדם בעצמו.
+        const { shifts, availability, tasks, team } = dataRef.current;
+        const verdict = vetAssignment({
+          guard, shift: toShift, shifts, availability, tasks, team, movingFromShiftId: fromShiftId,
+        });
+        if (!verdict.ok) {
           return run(async () => {
-            throw new Error(check.reason);
+            throw new Error(refusalText(guard, verdict));
           });
         }
 
