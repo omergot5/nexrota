@@ -12,7 +12,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import {
-  Badge, Btn, Card, ConfirmDialog, EmptyState, Field, IconBtn, Input, Modal, PageHeader, Segmented, Select,
+  Badge, Btn, Card, ConfirmDialog, CountField, EmptyState, Field, IconBtn, Input, Modal, PageHeader, Segmented, Select,
 } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import TimeField from "../TimeField.jsx";
@@ -239,11 +239,10 @@ export default function PositionsScreen({
             )}
 
             <Field label="מספר נדרש" hint="כמה אנשים צריך בעמדה בו-זמנית">
-              <Input
-                type="number"
-                min={1}
+              <CountField
+                label="אנשים נדרשים"
                 value={form.requiredGuards}
-                onChange={(e) => setForm((f) => ({ ...f, requiredGuards: e.target.value }))}
+                onChange={(v) => setForm((f) => ({ ...f, requiredGuards: v }))}
               />
             </Field>
 

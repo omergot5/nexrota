@@ -555,6 +555,47 @@ export const Textarea = ({ className = "", rows = 3, ...rest }) => (
 );
 
 /**
+ * כמות (כמה אנשים במשמרת): −/+ לצעד אחד, ושדה שאפשר פשוט להקליד בו כל
+ * מספר. תוך כדי הקלדה מותר רגע ריק (מחקו "1" כדי לכתוב "12"); הערך נחתך
+ * לטווח רק ביציאה מהשדה, כדי לא להילחם במשתמש באמצע מספר.
+ *
+ * @param {number|""} value
+ * @param {(v: number|"") => void} onChange
+ * @param {string} label שם הכמות לקורא-מסך ("חיילים נדרשים")
+ */
+export const CountField = ({ value, onChange, label, min = 1, max = 999 }) => {
+  const n = Number(value) || min;
+  const clamp = (v) => Math.min(max, Math.max(min, Math.round(Number(v) || min)));
+  const stepBtn =
+    "w-11 h-11 flex-shrink-0 rounded-xl ring-1 ring-inset ring-hairline bg-surface-sunken text-lg font-extrabold " +
+    "cursor-pointer hover:ring-hairline-strong disabled:opacity-40 disabled:cursor-not-allowed transition-colors";
+  return (
+    <div className="flex items-center gap-2" role="group" aria-label={label}>
+      <button type="button" aria-label={`פחות ${label}`} disabled={n <= min} onClick={() => onChange(clamp(n - 1))} className={stepBtn}>
+        –
+      </button>
+      <input
+        type="number"
+        inputMode="numeric"
+        min={min}
+        max={max}
+        value={value}
+        aria-label={label}
+        onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
+        onBlur={() => onChange(clamp(value))}
+        onFocus={(e) => e.target.select()}
+        data-numeric
+        className={`${CONTROL.replace("w-full ", "")} w-20 text-center text-lg font-extrabold px-1
+          [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+      />
+      <button type="button" aria-label={`עוד ${label}`} disabled={n >= max} onClick={() => onChange(clamp(n + 1))} className={stepBtn}>
+        +
+      </button>
+    </div>
+  );
+};
+
+/**
  * Segmented control. Better than a <select> for 2–4 mutually exclusive
  * options because the alternatives stay visible, and better than radios
  * because it fits a toolbar.

@@ -18,7 +18,7 @@
 // ============================================================
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { Alert, Btn, Card, ConfirmDialog, IconBtn, Input, PageHeader, Segmented, Select } from "../ui.jsx";
+import { Alert, Btn, Card, ConfirmDialog, CountField, IconBtn, Input, PageHeader, Segmented, Select } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import TimeField from "../TimeField.jsx";
 import { DAYS_HE_SHORT, fromISODate, rangeLabelHe } from "../../lib/dates.js";
@@ -621,27 +621,11 @@ export default function RosterWizard({
 
             <div>
               <p className="text-[12px] font-bold text-muted mb-1.5">כמות {t("noun.memberPlural")} נדרשת בו-זמנית</p>
-              <div className="flex items-center gap-2.5">
-                <button
-                  type="button"
-                  aria-label={`הפחת כמות ${t("noun.memberPlural")} נדרשת`}
-                  onClick={() => setForm((f) => ({ ...f, requiredGuards: Math.max(1, (Number(f.requiredGuards) || 1) - 1) }))}
-                  className="w-9 h-9 rounded-lg ring-1 ring-inset ring-hairline bg-surface-sunken font-extrabold cursor-pointer"
-                >
-                  –
-                </button>
-                <span className="w-8 text-center text-lg font-extrabold" data-numeric role="status" aria-live="polite">
-                  {form.requiredGuards}
-                </span>
-                <button
-                  type="button"
-                  aria-label={`הוסף כמות ${t("noun.memberPlural")} נדרשת`}
-                  onClick={() => setForm((f) => ({ ...f, requiredGuards: Math.min(6, (Number(f.requiredGuards) || 1) + 1) }))}
-                  className="w-9 h-9 rounded-lg ring-1 ring-inset ring-hairline bg-surface-sunken font-extrabold cursor-pointer"
-                >
-                  +
-                </button>
-              </div>
+              <CountField
+                label={`${t("noun.memberPlural")} נדרשים`}
+                value={form.requiredGuards}
+                onChange={(v) => setForm((f) => ({ ...f, requiredGuards: v }))}
+              />
             </div>
 
             <Btn className="w-full" loading={busy} disabled={invalid} onClick={saveAndNext} icon="left">

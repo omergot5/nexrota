@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { SHIFT_TONES } from "../../design/shiftPalette.js";
-import { Alert, Avatar, Btn, Field, Input, Select, Textarea } from "../ui.jsx";
+import { Alert, Avatar, Btn, CountField, Field, Input, Select, Textarea } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import TimeField from "../TimeField.jsx";
 import { formatDateHe, isSingleDayTask, shiftHours } from "../../lib/dates.js";
@@ -191,8 +191,10 @@ export default function WorkItemForm({
   const save = async () => {
     if (!canSave) return;
     if (kind === "shift") {
-      if (editing) await actions.updateShift(editing.id, form);
-      else await actions.addShifts([form]);
+      // CountField מתיר רגע ריק באמצע הקלדה — לשרת יוצא תמיד מספר שלם ≥ 1.
+      const shift = { ...form, requiredGuards: Math.max(1, Math.round(Number(form.requiredGuards) || 1)) };
+      if (editing) await actions.updateShift(editing.id, shift);
+      else await actions.addShifts([shift]);
     } else {
       const clean =
         form.startDate && form.dueDate && form.startDate > form.dueDate
@@ -308,12 +310,10 @@ export default function WorkItemForm({
               <Input value={form.location} onChange={field("location")} />
             </Field>
             <Field label={`${t("noun.memberPlural")} נדרשים`}>
-              <Input
-                type="number"
-                min="1"
-                max="10"
+              <CountField
+                label={`${t("noun.memberPlural")} נדרשים`}
                 value={form.requiredGuards}
-                onChange={(e) => setForm((f) => ({ ...f, requiredGuards: Number(e.target.value) }))}
+                onChange={(v) => setForm((f) => ({ ...f, requiredGuards: v }))}
               />
             </Field>
           </div>
