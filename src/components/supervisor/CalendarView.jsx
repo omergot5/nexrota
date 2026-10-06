@@ -9,6 +9,7 @@ import PostWeekGrid from "./PostWeekGrid.jsx";
 import DayShiftEditor from "./DayShiftEditor.jsx";
 import ShareWeekBtn from "./ShareWeekBtn.jsx";
 import { teamRules } from "../../lib/autoAssign.js";
+import { dutyRoleLabel, markedName } from "../../lib/dutyRoles.js";
 import { initialCursor } from "../../lib/calendarCursor.js";
 import { buildPostWeek, countMissing, opDayOf, orderShiftsByPost } from "../../lib/postWeek.js";
 import {
@@ -501,13 +502,15 @@ function DayByPost({ date, shifts, items, guards, teamMode, onEdit }) {
                         const name = nameOf(gid);
                         if (!name) return null;
                         const c = guardColor(gid);
+                        const who = guards.find((x) => x.id === gid);
                         return (
                           <span
                             key={gid}
                             className="px-2 py-0.5 rounded-md text-[12px] font-bold"
                             style={{ background: c, color: readableInk(c) }}
+                            title={who?.dutyRole ? dutyRoleLabel(who.dutyRole) : undefined}
                           >
-                            {name}
+                            {markedName(who, name)}
                           </span>
                         );
                       })}

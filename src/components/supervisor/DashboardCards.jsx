@@ -1,5 +1,6 @@
 import { Btn, Card, Meter, guardColor, readableInk } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
+import { dutyRoleLabel, markedName } from "../../lib/dutyRoles.js";
 import { formatDateHe, rangeLabelHe, shiftPartName, splitShiftLabel } from "../../lib/dates.js";
 
 // ============================================================
@@ -158,14 +159,16 @@ export function FocusDayCard({ focus, guards, onNavigate }) {
                         const name = nameOf(id);
                         if (!name) return null;
                         const c = guardColor(id);
+                        const who = guards.find((g) => g.id === id);
                         // הצבע הוא של האדם — אותו צבע בכל מסך ובתמונה שנשלחת. השם תמיד כתוב עליו.
                         return (
                           <span
                             key={id}
                             className="px-2 py-0.5 rounded-md text-[12px] font-bold"
                             style={{ background: c, color: readableInk(c) }}
+                            title={who?.dutyRole ? dutyRoleLabel(who.dutyRole) : undefined}
                           >
-                            {name}
+                            {markedName(who, name)}
                           </span>
                         );
                       })}

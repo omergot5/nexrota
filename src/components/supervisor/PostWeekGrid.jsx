@@ -21,7 +21,8 @@ import { useState, useSyncExternalStore } from "react";
 import { Icon } from "../icons.jsx";
 import { DAYS_HE, DAYS_HE_SHORT, fromISODate, isToday } from "../../lib/dates.js";
 import { folderIcon } from "../../lib/categories.js";
-import { isQualified } from "../../lib/autoAssign.js";
+import { COMMAND_DEFAULTS, isQualified } from "../../lib/autoAssign.js";
+import { COMMAND_MARK, dutyRoleLabel, isCommander } from "../../lib/dutyRoles.js";
 import { DRAG_MIME } from "./dragMime.js";
 import { subscribeTerms, t, termProfile } from "../../lib/terms.js";
 import { categoryTone, TONE_CLASSES } from "../../design/categoryPalette.js";
@@ -241,13 +242,17 @@ function ShiftCell({ shift, block, post, tone, cell, firstName, guards, onEditSh
   const timesDiffer = shift.startTime !== block.startTime || shift.endTime !== block.endTime;
   const countDiffers = need !== block.requiredGuards;
   const partial = names.length > 0 && names.length < need;
+  // בסיור ובכוננות חייב בעל תפקיד. מסומן רק כשכבר שובץ מישהו (כמו החוסר) ורק אם בצוות יש בעלי תפקיד בכלל.
+  const commandRequired = (COMMAND_DEFAULTS[termProfile()] || []).includes(shift.category) && guards.some(isCommander);
+  const lacksCommand =
+    showMissing && commandRequired && ids.length > 0 && !ids.some((id) => isCommander(guards.find((x) => x.id === id)));
   // חוסר נראה רק אחרי ששובץ מישהו בשבוע (showMissing) — לפני כן כל התאים ריקים
   // וסימון כולם כחסרים הוא רעש. אייקון, מספר ומסגרת, לא צבע בלבד.
   const missing = Math.max(0, need - names.length);
   const flagged = showMissing && missing > 0;
   const label = `${post.post} ${block.part}, ${block.afterMidnight ? `ליל ${dayLong(cell.date)}` : `יום ${dayLong(cell.date)}`}: ${
     names.length ? names.join(", ") : "עוד לא שובץ"
-  }${flagged ? (missing === 1 ? ", חסר מקום אחד" : `, חסרים ${missing}`) : ""}${editable ? " — לחצו לעריכת היום הזה" : ""}`;
+  }${flagged ? (missing === 1 ? ", חסר מקום אחד" : `, חסרים ${missing}`) : ""}${lacksCommand ? ", בלי בעל תפקיד" : ""}${editable ? " — לחצו לעריכת היום הזה" : ""}`;
 
   const open = () => onEditShift?.(shift);
   const dropProps = onMove
@@ -297,7 +302,7 @@ function ShiftCell({ shift, block, post, tone, cell, firstName, guards, onEditSh
         ${tone.bg} ${tone.border} ${flagged ? "ring-1 ring-inset ring-warn" : ""} ${dragOver ? "ring-2 ring-inset ring-content" : ""}
         transition-shadow`}
     >
-      {(timesDiffer || countDiffers || partial || flagged) && (
+      {(timesDiffer || countDiffers || partial || flagged || lacksCommand) && (
         <span className="flex items-center justify-between gap-1">
           {timesDiffer ? (
             <span className="text-[10px] font-extrabold text-warn" dir="ltr" data-numeric>
@@ -305,6 +310,15 @@ function ShiftCell({ shift, block, post, tone, cell, firstName, guards, onEditSh
             </span>
           ) : (
             <span />
+          )}
+          {lacksCommand && (
+            <span
+              className="inline-flex items-center gap-0.5 text-[10px] font-black px-1 rounded bg-bg text-warn"
+              title="בסיור ובכוננות חייב להיות בכל משמרת סמל, מפקץ או מפקד כיתה"
+            >
+              <Icon name="alert" size={9} />
+              ללא {COMMAND_MARK}
+            </span>
           )}
           {(countDiffers || partial || flagged) && (
             <span
@@ -333,6 +347,11 @@ function ShiftCell({ shift, block, post, tone, cell, firstName, guards, onEditSh
                 className={onMove ? "cursor-grab active:cursor-grabbing" : undefined}
               >
                 {blocked && <Icon name="lock" size={9} className="inline ml-0.5 -mt-0.5" />}
+                {g && isCommander(g) && (
+                  <span className="text-warn" title={dutyRoleLabel(g.dutyRole)} aria-label={dutyRoleLabel(g.dutyRole)}>
+                    {COMMAND_MARK}
+                  </span>
+                )}
                 {firstName(id)}
               </span>
             );

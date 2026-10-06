@@ -57,6 +57,7 @@ const C = {
 const POSITION_LABEL_BG = "#0A0A0A";
 
 import { colorLookup } from "./guardColors.js";
+import { markedName } from "./dutyRoles.js";
 
 const F = (size, weight = 400) => `${weight} ${size}px Rubik, Arial, sans-serif`;
 
@@ -390,7 +391,10 @@ function layoutPosts(ctx, posts, nameOf) {
  */
 export function renderPostWeekCanvas({ posts, dates, guards, teamName }) {
   const measure = document.createElement("canvas").getContext("2d");
-  const nameOf = (id) => guards.find((g) => g.id === id)?.name || "לא ידוע";
+  const nameOf = (id) => {
+    const g = guards.find((x) => x.id === id);
+    return g ? markedName(g, g.name) : "לא ידוע";
+  };
   const guardColor = colorLookup(guards);
   const colW = (W - GRID_PAD * 2 - LABEL_W) / Math.max(dates.length, 1);
   const { sections, total } = layoutPosts(measure, posts, nameOf);
