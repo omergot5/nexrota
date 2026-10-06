@@ -92,7 +92,7 @@ function Wheel({ options, value, onChange, label }) {
     <div className="relative w-16 h-[200px]">
       {/* פס הבחירה — השורה שבמרכז היא הערך */}
       <div
-        className="absolute inset-x-0 top-[80px] h-10 rounded-xl bg-brand/12 ring-1 ring-inset ring-brand/35 pointer-events-none"
+        className="absolute inset-x-0 top-[80px] h-10 rounded-xl bg-brand/10 ring-1 ring-inset ring-brand/30 pointer-events-none"
         aria-hidden="true"
       />
       <div

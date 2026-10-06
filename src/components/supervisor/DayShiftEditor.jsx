@@ -11,17 +11,30 @@
 import { useEffect, useState } from "react";
 import { Alert, Btn, CountField, Field, Modal } from "../ui.jsx";
 import TimeField from "../TimeField.jsx";
-import { formatDateHe, shiftDisplayName, shiftHours } from "../../lib/dates.js";
+import { addDays, dayName, formatDateHe, shiftDisplayName, shiftHours, shortDate } from "../../lib/dates.js";
 import { DEFAULT_RULES } from "../../lib/autoAssign.js";
+import { isAfterMidnight } from "../../lib/postWeek.js";
 import { t } from "../../lib/terms.js";
 
 const round1 = (n) => Math.round(n * 10) / 10;
 
 /**
+ * "יום ראשון, 11 באוקטובר" — ולמשמרת שמתחילה אחרי חצות, הלילה שהיא שייכת
+ * אליו: "ליל ראשון–שני (12/10, 00:00)". אחרת מי שלחץ על תא הלילה בעמודת
+ * ראשון היה רואה פה "יום שני" ומתבלבל איזה לילה הוא עורך.
+ */
+function whenLabel(shift) {
+  if (!isAfterMidnight(shift.startTime)) return formatDateHe(shift.date);
+  const eve = addDays(shift.date, -1);
+  return `ליל ${dayName(eve)}–${dayName(shift.date)} (${shortDate(shift.date)}, ${shift.startTime})`;
+}
+
+/**
  * @param {object|null} shift המשמרת שנלחצה; null = סגור
  * @param {(shift: object) => Promise} onSave מקבל את המשמרת המלאה עם השינויים
+ * @param {(shift: object) => void} [onCancelDay] ביטול התורנות ביום הזה בלבד
  */
-export default function DayShiftEditor({ shift, onClose, onSave, busy }) {
+export default function DayShiftEditor({ shift, onClose, onSave, onCancelDay, busy }) {
   const [form, setForm] = useState(null);
 
   // טופס חדש לכל משמרת שנפתחת — לא שאריות מהמשמרת הקודמת.
@@ -53,14 +66,27 @@ export default function DayShiftEditor({ shift, onClose, onSave, busy }) {
       open
       onClose={onClose}
       title={shiftDisplayName(shift)}
-      subtitle={`${formatDateHe(shift.date)} · השינוי חל רק על היום הזה`}
+      subtitle={`${whenLabel(shift)} · השינוי חל רק על היום הזה`}
       footer={
         <>
           <Btn className="flex-1" onClick={save} loading={busy} disabled={!changed || !form.startTime || !form.endTime}>
             שמור ליום הזה
           </Btn>
+          {onCancelDay && (
+            // מחיקת פריט בודד — UndoBar של 8 שניות, לא אישור מראש (עקרון ברזל 3).
+            <Btn
+              variant="ghost"
+              icon="trash"
+              onClick={() => {
+                onCancelDay(shift);
+                onClose();
+              }}
+            >
+              בטל ביום הזה
+            </Btn>
+          )}
           <Btn variant="secondary" onClick={onClose}>
-            ביטול
+            סגור
           </Btn>
         </>
       }

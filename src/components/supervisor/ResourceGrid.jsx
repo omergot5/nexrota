@@ -28,11 +28,6 @@ export default function ResourceGrid({
   guards = [],
   firstColLabel = "עמדה / קטגוריה",
   onRowClick,
-  // לחיצה על פריט בודד (תורנות של יום אחד) — אופציונלי. בלעדיו הגריד
-  // לקריאה בלבד, בדיוק כמו ביומן. canClickItem מסנן פריטים שאין מה לערוך
-  // בהם (משימה בלי שעות).
-  onItemClick,
-  canClickItem = () => true,
 }) {
   // תחום הפעילות מוחל מ-subscribeTerms/termProfile, לא מפרופ (D-07) —
   // אותה קריאה בדיוק שהייתה קיימת במסך "מבט משאבים" הישן (הוסר ב-Phase 10), כדי שהצבע-לפי-קטגוריה
@@ -165,29 +160,16 @@ export default function ResourceGrid({
                             </span>
                           );
 
-                          const clickable = typeof onItemClick === "function" && canClickItem(item);
-                          const ItemTag = clickable ? "button" : "div";
                           return (
-                            <ItemTag
+                            <div
                               key={item.id}
-                              title={clickable ? `${item.label} — לחצו לעריכת היום הזה` : item.label}
-                              {...(clickable
-                                ? {
-                                    type: "button",
-                                    onClick: () => onItemClick(item),
-                                    "aria-label": `עריכת ${item.label}, ${shortDate(day.date)}`,
-                                  }
-                                : {})}
-                              className={`block w-full text-right rounded-lg border-r-[3px] px-1.5 py-1 ${tone.bg} ${tone.border} ${
+                              title={item.label}
+                              className={`rounded-lg border-r-[3px] px-1.5 py-1 ${tone.bg} ${tone.border} ${
                                 // פריט חוצה-חצות (continuesBefore, resourceView.js) מתחיל
                                 // ב-00:00 באופן מלאכותי — פינה עליונה מרובעת מסמנת "זה
                                 // ממשיך מאתמול", אותו סימון בדיוק שהיה ב-WeekTimeGrid
                                 // (עכשיו נמחק) דרך borderTopLeftRadius/borderTopRightRadius.
                                 item.continuesBefore ? "rounded-t-none" : ""
-                              } ${
-                                clickable
-                                  ? "cursor-pointer hover:ring-1 hover:ring-inset hover:ring-brand/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 transition-shadow"
-                                  : ""
                               }`}
                             >
                               {item.startTime ? (
@@ -212,7 +194,7 @@ export default function ResourceGrid({
                               >
                                 {unfilled ? "לא משובץ" : names.join(", ")}
                               </div>
-                            </ItemTag>
+                            </div>
                           );
                         })}
                       </div>

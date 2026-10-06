@@ -640,6 +640,33 @@ export async function deleteShift(shiftId) {
  * לולאה על deleteShift הייתה שולחת שבע־עשרה בקשות למחיקת שבוע, וכל אחת
  * מהן יכולה להיכשל בנפרד — כלומר שבוע שנמחק חצי. `in` הוא אטומי.
  */
+// עמודות שמותר לעדכן בבת אחת בכמה משמרות (סנכרון תבנית של עמדה —
+// planTemplateSync ב-postWeek.js). שדה שלא ברשימה הוא באג, לא עמודה חדשה.
+const SHIFT_FIELD_COLUMNS = {
+  label: "title",
+  startTime: "start_time",
+  endTime: "end_time",
+  requiredGuards: "required_guards",
+  category: "category",
+  location: "location",
+};
+
+export async function updateShiftFields(shiftIds, fields) {
+  if (!shiftIds.length) return;
+  const row = {};
+  for (const [key, value] of Object.entries(fields)) {
+    const column = SHIFT_FIELD_COLUMNS[key];
+    if (!column) throw new Error(`שדה משמרת לא מוכר: ${key}`);
+    row[column] = value;
+  }
+  const { data, error } = await supabase
+    .from("gs_work_items").update(row).in("id", shiftIds).eq("kind", "shift").select("id");
+  if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("אין לך הרשאה לעדכן את התורנויות האלה — התחבר מחדש ונסה שוב");
+  }
+}
+
 export async function deleteShifts(shiftIds) {
   if (!shiftIds.length) return;
   const { data, error } = await supabase
@@ -1093,6 +1120,27 @@ export async function updatePosition(id, patch) {
   }
 }
 
+/**
+ * הסרת עמדה מבניית השבוע: המשמרות שלה מהשבוע המוצג והלאה נמחקות (יחד עם
+ * השיבוצים שלהן — הקורא אישר את זה ב-ConfirmDialog), והעמדה עצמה נמחקת.
+ * אם יש לה משמרות בשבועות שכבר עברו, המפתח הזר (בלי cascade) חוסם את
+ * המחיקה — ואז היא רק מכובה, כדי שההיסטוריה תמשיך להצביע על עמדה קיימת.
+ */
+export async function retirePosition(id, fromDate) {
+  if (fromDate) {
+    const { error } = await supabase
+      .from("gs_work_items").delete().eq("position_id", id).gte("start_date", fromDate);
+    if (error) throw new Error(error.message);
+  }
+  const { data, error } = await supabase.from("gs_positions").delete().eq("id", id).select("id");
+  if (!error && data?.length) return;
+  const { data: off, error: offError } = await supabase
+    .from("gs_positions").update({ active: false }).eq("id", id).select("id");
+  if (offError || !off?.length) {
+    throw new Error(error?.message || offError?.message || "אין לך הרשאה להסיר את העמדה הזאת — התחבר מחדש ונסה שוב");
+  }
+}
+
 export async function deletePosition(id) {
   const { data, error } = await supabase.from("gs_positions").delete().eq("id", id).select("id");
   if (error) throw new Error(error.message);
@@ -1132,7 +1180,11 @@ export async function materializeTemplateShifts(rows, teamCode) {
   const { data, error } = await supabase
     .from("gs_work_items")
     .upsert(
-      rows.map((r) => shiftRowToWorkItem(shiftToRow(r, teamCode))),
+      // המיקום הוא העמדה עצמה ("סיור", "עמדת שמירה 1") ולא "כניסה ראשית"
+      // של shiftToRow — אחרת חייל בסיור רואה שהוא אמור להיות בכניסה.
+      rows.map((r) =>
+        shiftRowToWorkItem(shiftToRow({ ...r, location: r.location || String(r.label || "").split(" – ")[0] }, teamCode))
+      ),
       { onConflict: "position_id,start_date", ignoreDuplicates: true }
     )
     .select(SHIFT_SELECT);

@@ -466,6 +466,13 @@ export function groupShiftsByPost(dayShifts) {
 export function shiftPartName(shift) {
   if (!shift?.startTime) return "";
   const h = minutesOfTime(shift.startTime) / 60;
+  // משמרת של 10 שעות ומעלה היא חצי יממה: "יום" או "לילה". "ערב" ל-18:00–06:00
+  // או "צהריים" ל-12:00–00:00 מטעים — זו הכוננות של כל הלילה.
+  if (shift.endTime) {
+    let length = minutesOfTime(shift.endTime) - minutesOfTime(shift.startTime);
+    if (length <= 0) length += 1440;
+    if (length >= 600) return h >= 5 && h < 14 ? "יום" : "לילה";
+  }
   if (h >= 22 || h < 5) return "לילה";
   if (h < 11) return "בוקר";
   if (h < 16) return "צהריים";

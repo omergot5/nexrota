@@ -31,6 +31,7 @@ import { checkQualification } from "../lib/autoAssign.js";
 // אותו עיקרון ש-checkQualification כבר נוהג בו כאן: שכבת ה-state קוראת
 // למנוע, לא מדמה אותו.
 import { missingRowsForWeek } from "../lib/positions.js";
+import { planTemplateSync } from "../lib/postWeek.js";
 // Phase 11 (INLINE-04): refresh() has no sequencing today — two overlapping
 // loadTeam() calls (any two quick actions, or an action racing the realtime
 // subscription firing on its own write) can resolve out of order and let a
@@ -217,6 +218,30 @@ export function useGuardian() {
       },
     });
   }, []);
+
+  // השלמת המשמרות החסרות של שבוע מכל עמדה פעילה. משותף ל-ensurePositionsForWeek
+  // ולשמירת עמדה (savePost), שקוראת לזה אחרי שהתבניות השתנו. בלי משהו
+  // להשלים — חוזר מיד, בלי כתיבה ובלי רענון (המסך קורא לזה בכל מעבר שבוע).
+  // `snapshot` — נתונים טריים מהשרת, כשהקורא בדיוק כתב: dataRef מתעדכן רק
+  // ב-effect אחרי הרינדור, כך שמיד אחרי כתיבה הוא עוד לא מכיר עמדה שנוצרה.
+  const materializeWeek = useCallback(
+    async (sundayISO, snapshot = dataRef.current) => {
+      const { positions, shifts, tasks } = snapshot;
+      const team = dataRef.current.team || snapshot.team;
+      const activeTemplates = (positions || []).filter((p) => p.active && p.shape === "template");
+      const templateRows = activeTemplates.flatMap((p) => missingRowsForWeek(p, sundayISO, shifts));
+
+      const activeWeekly = (positions || []).filter((p) => p.active && p.shape === "weekly");
+      const weeklyRows = activeWeekly.flatMap((p) => missingRowsForWeek(p, sundayISO, tasks));
+
+      if (!templateRows.length && !weeklyRows.length) return { created: 0 };
+      if (templateRows.length) await api.materializeTemplateShifts(templateRows, team?.code);
+      if (weeklyRows.length) await api.materializeWeeklyPositionTasks(weeklyRows, team?.code);
+      await refresh();
+      return { created: templateRows.length + weeklyRows.length };
+    },
+    [refresh]
+  );
 
   // צילום המטמון נכתב ממקום אחד — כל מצב "ready" שנצבע נשמר. שמירה בכל
   // פעולה בנפרד הייתה נשכחת בפעולה הבאה שמישהו יוסיף.
@@ -1039,23 +1064,41 @@ export function useGuardian() {
        * {created: 0} בלי שום כתיבה ובלי refresh() — כי המסך שקורא לזה יכול
        * לקרוא בכל שינוי שבוע, ו-refresh() ללא תנאי מכאן היה לולאה.
        */
-      ensurePositionsForWeek: (sundayISO) =>
-        run(async () => {
-          const { positions, shifts, tasks, team } = dataRef.current;
-          const activeTemplates = (positions || []).filter((p) => p.active && p.shape === "template");
-          const templateRows = activeTemplates.flatMap((p) => missingRowsForWeek(p, sundayISO, shifts));
+      ensurePositionsForWeek: (sundayISO) => run(() => materializeWeek(sundayISO)),
 
-          const activeWeekly = (positions || []).filter((p) => p.active && p.shape === "weekly");
-          const weeklyRows = activeWeekly.flatMap((p) => missingRowsForWeek(p, sundayISO, tasks));
-
-          if (!templateRows.length && !weeklyRows.length) return { created: 0 };
-          if (templateRows.length) await api.materializeTemplateShifts(templateRows, team?.code);
-          if (weeklyRows.length) await api.materializeWeeklyPositionTasks(weeklyRows, team?.code);
-          await refresh();
-          return { created: templateRows.length + weeklyRows.length };
-        }),
+      /**
+       * שמירת עמדה מהעורך של בניית השבוע (PostEditor) — כל המשמרות שלה בבת
+       * אחת: יצירה, עדכון תבנית ומחיקה, ורענון אחד בסוף במקום רענון לכל
+       * משמרת. עדכון תבנית מסנכרן גם את המשמרות שכבר נוצרו ממנה מהשבוע
+       * המוצג והלאה (planTemplateSync, postWeek.js) — אחרת המפקד מעלה סיור
+       * ל-3 והשבוע ממשיך להציג 1.
+       *
+       * remove היא מחיקת עמדה — ברשימת הפרה-אישור (עקרון ברזל 3): הקורא פותח
+       * ConfirmDialog לפני שהוא שולח אותה. עמדה שיש לה היסטוריה בשבועות
+       * קודמים לא נמחקת אלא מכובה (retirePosition), כדי שהעבר יישאר נכון.
+       */
+      savePost: ({ create = [], update = [], remove = [], weekDates = [] }) =>
+        run(
+          async () => {
+            const { team, shifts } = dataRef.current;
+            const fromDate = weekDates[0];
+            for (const position of create) await api.createPosition(position, team?.code);
+            for (const { id, before, after } of update) {
+              await api.updatePosition(id, { ...after, teamCode: team?.code });
+              const sync = planTemplateSync({ shifts, positionId: id, before, after, fromDate });
+              for (const { ids, fields } of sync.update) await api.updateShiftFields(ids, fields);
+              if (sync.remove.length) await api.deleteShifts(sync.remove);
+            }
+            for (const id of remove) await api.retirePosition(id, fromDate);
+            // השלמת המשמרות של השבוע מול מה שבאמת בשרת עכשיו (עמדה שנוצרה
+            // הרגע עוד לא ב-dataRef), ורענון אחד שמצייר הכול.
+            const created = fromDate ? (await materializeWeek(fromDate, await api.loadTeam(team?.code))).created : 0;
+            if (!created) await refresh();
+          },
+          { rethrow: true }
+        ),
     }),
-    [run, optimistic, deferred, refresh]
+    [run, optimistic, deferred, refresh, materializeWeek]
   );
 
   const clearError = useCallback(() => setError(null), []);
