@@ -21,7 +21,9 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Alert, Btn, Card, ConfirmDialog, CountField, IconBtn, Input, PageHeader, Segmented, Select } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import TimeField from "../TimeField.jsx";
-import { DAYS_HE_SHORT, fromISODate, rangeLabelHe } from "../../lib/dates.js";
+import DayShiftEditor from "./DayShiftEditor.jsx";
+import { DAYS_HE_SHORT, fromISODate, rangeLabelHe, shiftHours } from "../../lib/dates.js";
+import { DEFAULT_RULES } from "../../lib/autoAssign.js";
 import { folderIcon, foldersFor } from "../../lib/categories.js";
 import { buildDivisionRows } from "../../lib/positions.js";
 import { buildResourceRows } from "../../lib/resourceView.js";
@@ -158,6 +160,7 @@ export default function RosterWizard({
   const [confirmState, setConfirmState] = useState(null); // CONFIRM-05: {title, body, confirmLabel, tone, onConfirm} | null — נפתח רק על מחיקת עמדה אמיתית
   const [form, setForm] = useState(null); // draft נוכחי בעריכה
   const [focusedKey, setFocusedKey] = useState(null); // מפתח השורה הממוקדת כרגע בפאנל התצוגה (WEEKBUILD-05), null = תצוגה כללית
+  const [dayEditId, setDayEditId] = useState(null); // תורנות של יום אחד שנפתחה לעריכה מהגריד, null = סגור
   const [hideDrafts, setHideDrafts] = useState(false); // WEEKBUILD-04: true = הצג רק rows (ממומשות), הסתר pendingRows (טיוטה בעריכה)
 
   // מפתח כל פריט נגזר מזהות יציבה — לעולם לא מהאינדקס שלו במערך: זרעי
@@ -399,6 +402,24 @@ export default function RosterWizard({
   // (focusedRow) לא לחיץ דרך שורת-רפאים מלכתחילה (WEEKBUILD-04/05).
   const visibleRows = hideDrafts ? rows : allRows;
 
+  // לחיצה על תורנות בגריד פותחת עריכה של היום הזה בלבד. רק משמרות אמיתיות
+  // (לא משימה, לא שורת-רפאים) — נגזר מ-shifts בכל רינדור, כדי שהעורך יציג
+  // את הנתונים הטריים אחרי שמירה.
+  const shiftIds = useMemo(() => new Set(shifts.map((s) => s.id)), [shifts]);
+  const dayEditShift = dayEditId ? shifts.find((s) => s.id === dayEditId) || null : null;
+  const gridItemProps = {
+    onItemClick: (item) => setDayEditId(item.id),
+    canClickItem: (item) => shiftIds.has(item.id),
+  };
+
+  // תורנות ארוכה מהרצף המותר לעולם לא תאויש בשיבוץ האוטומטי — עדיף לדעת
+  // את זה כאן, כשמגדירים אותה, ולא לגלות "0/2" אחרי הרצת המנוע.
+  const templateHours =
+    form?.shape === "template" && form.startTime && form.endTime
+      ? shiftHours({ date: weekDates[0] || "2026-01-04", startTime: form.startTime, endTime: form.endTime })
+      : 0;
+  const tooLong = templateHours > DEFAULT_RULES.maxConsecutiveHours;
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -488,7 +509,7 @@ export default function RosterWizard({
           </div>
           {focusedRow ? (
             <div className="-mx-4 -mb-4">
-              <ResourceGrid rows={[focusedRow]} dates={weekDates} guards={guards} />
+              <ResourceGrid rows={[focusedRow]} dates={weekDates} guards={guards} {...gridItemProps} />
             </div>
           ) : visibleRows.length === 0 ? (
             <p className="text-[12px] text-faint leading-relaxed">
@@ -501,6 +522,7 @@ export default function RosterWizard({
                 dates={weekDates}
                 guards={guards}
                 onRowClick={(row) => setFocusedKey(row.key ?? row.category)}
+                {...gridItemProps}
               />
             </div>
           )}
@@ -609,6 +631,11 @@ export default function RosterWizard({
                     />
                   </div>
                 </div>
+                {tooLong && (
+                  <Alert tone="warn">
+                    {`${Math.round(templateHours * 10) / 10} שעות ברצף — יותר מ-${DEFAULT_RULES.maxConsecutiveHours}. השיבוץ האוטומטי לא ישבץ לתורנות הזו אף אחד, אלא אם מעלים את "מקסימום שעות רצופות" בכללים.`}
+                  </Alert>
+                )}
                 {form.startTime && form.endTime && form.weekdays.length > 0 && team?.restHours && (
                   <Alert tone={restWarning ? "warn" : "accent"}>
                     {restWarning
@@ -643,6 +670,13 @@ export default function RosterWizard({
         body={confirmState?.body}
         confirmLabel={confirmState?.confirmLabel}
         tone={confirmState?.tone}
+        busy={busy}
+      />
+
+      <DayShiftEditor
+        shift={dayEditShift}
+        onClose={() => setDayEditId(null)}
+        onSave={(next) => actions.updateShift(next.id, next)}
         busy={busy}
       />
     </div>
