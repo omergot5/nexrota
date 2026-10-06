@@ -24,7 +24,9 @@ import { categoryOptions, folderIcon, foldersFor, UNFILED } from "../../lib/cate
 import WorkItemForm from "./WorkItemForm.jsx";
 import PostPublishView from "./PostPublishView.jsx";
 import ShareWeekBtn from "./ShareWeekBtn.jsx";
-import { buildPostWeek } from "../../lib/postWeek.js";
+import { buildPostWeek, opDayOf } from "../../lib/postWeek.js";
+import { focusDay, weekStatus } from "../../lib/weekStatus.js";
+import { FocusDayCard, WeekStatusCard } from "./DashboardCards.jsx";
 
 /**
  * Whole-week patterns. Two 12-hour shifts is the common security roster, but
@@ -136,10 +138,13 @@ function SeedDemoDialog({ open, onClose, onConfirm, busy }) {
 
 export function SupDashboard({
   guards, shifts, swapRequests, tasks, team, weekDates = [], compatibility = [], onNavigate, onSeedDemo, busy, actions,
+  availability = {},
 }) {
   const [demoDialogOpen, setDemoDialogOpen] = useState(false);
   const today = todayISO();
-  const todayShifts = shifts.filter((s) => s.date === today);
+  const army = team?.mode === "army";
+  // בצבא "היום" הוא היום המבצעי: 00:00–05:00 הוא עוד הלילה של אתמול.
+  const todayShifts = shifts.filter((s) => (army ? opDayOf(s) : s.date) === today);
   const pendingSwaps = swapRequests.filter((r) => r.status === "pending").length;
   const openTasksList = tasks.filter((t) => t.status !== "done");
   const openTasks = openTasksList.length;
@@ -188,28 +193,25 @@ export function SupDashboard({
     [guards, mergedForLoad, loadWindow, team]
   );
   const maxLoad = Math.max(1, ...loadRows.map((r) => r.load));
+  // הכי עמוסים למעלה, ורק הראשונים: רשימה של שלושים שורות לא ממוינת לא עונה על
+  // "מי עמוס" — ו"הצג הכול" שומר את כולם בהישג יד.
+  const [showAllLoad, setShowAllLoad] = useState(false);
+  const sortedLoad = useMemo(() => [...loadRows].sort((a, b) => b.load - a.load), [loadRows]);
+  const LOAD_PREVIEW = 6;
+  const shownLoad = showAllLoad ? sortedLoad : sortedLoad.slice(0, LOAD_PREVIEW);
+  const loadSpread = sortedLoad.length > 1 ? sortedLoad[0].load - sortedLoad[sortedLoad.length - 1].load : 0;
 
-  // ---- מה חסר להשלים השבוע — משמרות ומשימות יחד, לא שני מספרים בשני
-  // מסכים נפרדים. הכניסה הראשית לאפליקציה (D-04) שואלת "מה חסר?", לא
-  // "מה יש בשבוע הזה" — זו בדיוק השאלה שהמשתמש ביקש שהמסך הזה יענה
-  // עליה ראשון.
-  const weekShifts = useMemo(() => shifts.filter((s) => weekDates.includes(s.date)), [shifts, weekDates]);
-  const weekSlots = useMemo(() => {
-    let need = 0;
-    let filled = 0;
-    for (const s of weekShifts) {
-      const req = Math.max(1, s.requiredGuards || 1);
-      need += req;
-      filled += Math.min(req, (s.assignedGuards || []).length);
-    }
-    return { need, filled };
-  }, [weekShifts]);
+  // משימות פתוחות השבוע — נספרות בכרטיס "השבוע הזה" לצד המשמרות.
   const weekOpenTasks = useMemo(
     () => tasks.filter((tk) => tk.status !== "done" && weekDates.includes(tk.dueDate || tk.startDate)),
     [tasks, weekDates]
   );
-  const weekAllDone =
-    weekShifts.length > 0 && weekSlots.filled >= weekSlots.need && weekOpenTasks.length === 0;
+  const status = useMemo(
+    () => weekStatus({ shifts, guards, availability, weekDates, operationalDay: army }),
+    [shifts, guards, availability, weekDates, army]
+  );
+  const focus = useMemo(() => (army ? focusDay({ shifts, today }) : null), [army, shifts, today]);
+  const showWeekCard = status.shiftCount > 0;
 
   // ---- התנגשויות פתוחות: אותו מנגנון (conflicts.js) שכבר מזהיר בטופס
   // המשימה כשעורכים משימה בודדת — כאן נסרק על כל השיבוצים הפעילים כדי
@@ -289,41 +291,15 @@ export function SupDashboard({
         </Card>
       )}
 
-      {/* "מה חסר להשלים השבוע" — משמרות ומשימות יחד, לא שני מסכים נפרדים.
-        * שקטה כשהכול מלא (D-05), אבל מוצגת גם לצוות ותיק כי היא לא שלב
-        * בהקמה — היא השאלה שחוזרת כל שבוע. */}
-      {!isNew && (weekShifts.length > 0 || weekOpenTasks.length > 0) && (
-        <Card className={weekAllDone ? "" : "!ring-warn/30"}>
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h2 className="font-bold text-content flex items-center gap-2">
-              <Icon
-                name={weekAllDone ? "check-circle" : "alert"}
-                size={18}
-                className={weekAllDone ? "text-accent" : "text-warn"}
-              />
-              מה חסר להשלים השבוע
-            </h2>
-            <Btn variant="outline" size="sm" icon="left" onClick={() => onNavigate("week")}>
-              לבניית השבוע
-            </Btn>
-          </div>
-          {weekAllDone ? (
-            <p className="text-accent text-sm font-semibold mt-2">הכול מאויש, ואין משימות פתוחות השבוע.</p>
-          ) : (
-            <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-2 text-sm">
-              {weekSlots.need > 0 && (
-                <span className={weekSlots.filled < weekSlots.need ? "text-warn font-semibold" : "text-muted"} data-numeric>
-                  {weekSlots.filled}/{weekSlots.need} מקומות מאוישים במשמרות
-                </span>
-              )}
-              {weekOpenTasks.length > 0 && (
-                <span className="text-warn font-semibold" data-numeric>
-                  {weekOpenTasks.length} משימות פתוחות השבוע
-                </span>
-              )}
-            </div>
-          )}
-        </Card>
+      {/* "השבוע הזה": דיווח, שיבוץ, פרסום וצעד אחד מומלץ — השאלה שחוזרת כל שבוע. */}
+      {showWeekCard && (
+        <WeekStatusCard
+          status={status}
+          weekDates={weekDates}
+          openTasks={weekOpenTasks.length}
+          onNavigate={onNavigate}
+          soldiers={t("noun.memberPlural")}
+        />
       )}
 
       {/* התנגשויות פתוחות — לא מוצג בכלל כשהמטריצה ריקה (D-05): רוב
@@ -368,7 +344,7 @@ export function SupDashboard({
         <StatCard
           title="משימות פתוחות"
           value={openTasks}
-          subtitle={openTasks > 0 ? `${openTasksCounted} נספרות במנוע · ${openTasksFrozen} קפואות` : undefined}
+          subtitle={openTasksFrozen > 0 ? `${openTasksFrozen} בלי שעות — לא נספרות בעומס` : openTasks > 0 ? "כולן נספרות בעומס" : undefined}
           icon="pencil"
           tone="info"
           onClick={() => onNavigate("tasks")}
@@ -376,6 +352,7 @@ export function SupDashboard({
       </div>
 
       <div className="grid lg:grid-cols-2 gap-5">
+        {army ? <FocusDayCard focus={focus} guards={guards} onNavigate={onNavigate} /> : (
         <Card>
           <h2 className="font-bold text-content mb-4 flex items-center gap-2">
             <Icon name="calendar" size={17} className="text-muted" />
@@ -407,6 +384,7 @@ export function SupDashboard({
             </div>
           )}
         </Card>
+        )}
 
         <Card>
           <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
@@ -428,7 +406,7 @@ export function SupDashboard({
             <p className="text-muted text-sm text-center py-8">אין {t("noun.memberPlural")} עדיין</p>
           ) : (
             <div className="space-y-3">
-              {loadRows.map((row) => (
+              {shownLoad.map((row) => (
                 <div key={row.guardId}>
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2 min-w-0">
@@ -449,7 +427,24 @@ export function SupDashboard({
               ))}
             </div>
           )}
-          <div className="mt-4 flex justify-end">
+          {sortedLoad[0]?.load === 0 && (
+            <p className="text-xs text-muted mt-4">
+              עוד לא הסתיים שבוע בחלון הזה, ולכן אין עומס להשוות. הוא יופיע אחרי השבוע הראשון.
+            </p>
+          )}
+          {loadSpread > 0 && (
+            <p className="text-xs text-muted mt-4" data-numeric>
+              פער בין הכי עמוס לפנוי ביותר: {loadSpread} {t("unit.load")}
+            </p>
+          )}
+          <div className="mt-3 flex items-center justify-between gap-3">
+            {sortedLoad.length > LOAD_PREVIEW ? (
+              <Btn variant="ghost" size="sm" onClick={() => setShowAllLoad((v) => !v)}>
+                {showAllLoad ? "הצג פחות" : `הצג את כולם (${sortedLoad.length})`}
+              </Btn>
+            ) : (
+              <span />
+            )}
             <Btn variant="ghost" size="sm" icon="left" onClick={() => onNavigate("analytics")}>
               לדוח המלא
             </Btn>
