@@ -5,10 +5,11 @@ import { LogoMark } from "./Logo.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 import { SupDashboard, SwapMgmt, TaskMgmt, TeamView } from "./supervisor/views.jsx";
 import PositionsScreen from "./supervisor/PositionsScreen.jsx";
-import WeekFlow, { STEP_OF } from "./supervisor/WeekFlow.jsx";
+import WeekFlow from "./supervisor/WeekFlow.jsx";
 import CalendarView from "./supervisor/CalendarView.jsx";
 import { rangeLabelHe, weekByOffset } from "../lib/dates.js";
 import { subscribeTerms, t, termProfile } from "../lib/terms.js";
+import { isWeekTarget, stepIndex } from "../lib/weekSteps.js";
 
 // Charts pull in recharts (~400KB). Nobody sees them on first load, so they
 // are split out and fetched only when the reports tab is opened.
@@ -147,8 +148,8 @@ export default function SupervisorApp({ state }) {
    * קריאה קיימת לא נשברה כשחמישה מסכים הפכו לאחד.
    */
   const go = (id) => {
-    if (id in STEP_OF) {
-      setWeekStep(STEP_OF[id]);
+    if (isWeekTarget(id)) {
+      setWeekStep(stepIndex(id, team?.mode));
       setView("week");
     } else {
       setView(id);

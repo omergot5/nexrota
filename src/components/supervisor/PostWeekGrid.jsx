@@ -9,13 +9,20 @@
 // רק כשכבר יש שיבוץ, והשעות/הכמות מופיעות בתא רק כשהיום הזה שונה מהתבנית —
 // כלומר, כשיש משהו שהמפקד צריך לשים לב אליו.
 //
+// השבוע הזה הוא גם הלוח (במקום "תמונת מצב שבועית" שהייתה מסך נפרד): כשמוסרים
+// onMove אפשר לגרור שם של אדם מתורנות לתורנות, ומקום שחסר מסומן בתא עצמו
+// (אייקון + מספר, לא צבע בלבד). בלי onMove הגריד נשאר לקריאה בלבד — כך אפשר
+// להשתמש בו גם בפרסום ובמסך של המשתתף בלי לדעת על עריכה.
+//
 // הנתונים מגיעים מוכנים מ-buildPostWeek (postWeek.js); כאן רק ציור.
 // ============================================================
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Icon } from "../icons.jsx";
 import { DAYS_HE, DAYS_HE_SHORT, fromISODate, isToday } from "../../lib/dates.js";
 import { folderIcon } from "../../lib/categories.js";
+import { isQualified } from "../../lib/autoAssign.js";
+import { DRAG_MIME } from "./UnifiedBoard.jsx";
 import { subscribeTerms, t, termProfile } from "../../lib/terms.js";
 import { categoryTone, TONE_CLASSES } from "../../design/categoryPalette.js";
 
@@ -51,7 +58,9 @@ function postMeta(post) {
   return parts.join(" · ");
 }
 
-export default function PostWeekGrid({ posts = [], dates = [], guards = [], onEditPost, onEditShift }) {
+export default function PostWeekGrid({
+  posts = [], dates = [], guards = [], onEditPost, onEditShift, onMove, showMissing = false,
+}) {
   const mode = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
   const firstName = (id) => (guards.find((g) => g.id === id)?.name || "?").split(" ")[0];
 
@@ -145,7 +154,10 @@ export default function PostWeekGrid({ posts = [], dates = [], guards = [], onEd
                           post={post}
                           tone={tone}
                           firstName={firstName}
+                          guards={guards}
                           onEditShift={onEditShift}
+                          onMove={onMove}
+                          showMissing={showMissing}
                         />
                       </td>
                     ))
@@ -160,7 +172,7 @@ export default function PostWeekGrid({ posts = [], dates = [], guards = [], onEd
   );
 }
 
-function Cell({ cell, block, post, tone, firstName, onEditShift }) {
+function Cell({ cell, block, post, tone, firstName, guards, onEditShift, onMove, showMissing }) {
   if (cell.state === "off" || cell.state === "empty") {
     return (
       <span className="block text-center text-[12px] text-faint" aria-label={cell.state === "off" ? "לא פעילה ביום הזה" : "אין תורנות ביום הזה"}>
@@ -181,51 +193,126 @@ function Cell({ cell, block, post, tone, firstName, onEditShift }) {
 
   return (
     <div className="space-y-1">
-      {cell.shifts.map((shift) => {
-        const names = (shift.assignedGuards || []).map(firstName);
-        const need = shift.requiredGuards || 1;
-        const timesDiffer = shift.startTime !== block.startTime || shift.endTime !== block.endTime;
-        const countDiffers = need !== block.requiredGuards;
-        const partial = names.length > 0 && names.length < need;
-        const label = `${post.post} ${block.part}, ${block.afterMidnight ? `ליל ${dayLong(cell.date)}` : `יום ${dayLong(cell.date)}`}: ${
-          names.length ? names.join(", ") : "עוד לא שובץ"
-        } — לחצו לעריכת היום הזה`;
-        return (
-          <button
-            key={shift.id}
-            type="button"
-            onClick={() => onEditShift?.(shift)}
-            aria-label={label}
-            title={label}
-            className={`block w-full min-h-[2rem] text-right rounded-md border-r-[3px] px-1.5 py-1 cursor-pointer
-              ${tone.bg} ${tone.border}
-              hover:ring-1 hover:ring-inset hover:ring-brand/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 transition-shadow`}
-          >
-            {(timesDiffer || countDiffers || partial) && (
-              <span className="flex items-center justify-between gap-1">
-                {timesDiffer ? (
-                  <span className="text-[10px] font-extrabold text-warn" dir="ltr" data-numeric>
-                    {shift.startTime}–{shift.endTime}
-                  </span>
-                ) : (
-                  <span />
-                )}
-                {(countDiffers || partial) && (
-                  <span
-                    className={`text-[10px] font-black px-1 rounded bg-bg ${partial ? "text-warn" : "text-content"}`}
-                    data-numeric
-                  >
-                    {partial ? `${names.length}/${need}` : `×${need}`}
-                  </span>
-                )}
+      {cell.shifts.map((shift) => (
+        <ShiftCell
+          key={shift.id}
+          shift={shift}
+          block={block}
+          post={post}
+          tone={tone}
+          cell={cell}
+          firstName={firstName}
+          guards={guards}
+          onEditShift={onEditShift}
+          onMove={onMove}
+          showMissing={showMissing}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ShiftCell({ shift, block, post, tone, cell, firstName, guards, onEditShift, onMove, showMissing }) {
+  const [dragOver, setDragOver] = useState(false);
+  const ids = shift.assignedGuards || [];
+  const names = ids.map(firstName);
+  const need = shift.requiredGuards || 1;
+  const timesDiffer = shift.startTime !== block.startTime || shift.endTime !== block.endTime;
+  const countDiffers = need !== block.requiredGuards;
+  const partial = names.length > 0 && names.length < need;
+  // חוסר נראה רק אחרי ששובץ מישהו בשבוע (showMissing) — לפני כן כל התאים ריקים
+  // וסימון כולם כחסרים הוא רעש. אייקון, מספר ומסגרת, לא צבע בלבד.
+  const missing = Math.max(0, need - names.length);
+  const flagged = showMissing && missing > 0;
+  const label = `${post.post} ${block.part}, ${block.afterMidnight ? `ליל ${dayLong(cell.date)}` : `יום ${dayLong(cell.date)}`}: ${
+    names.length ? names.join(", ") : "עוד לא שובץ"
+  }${flagged ? (missing === 1 ? ", חסר מקום אחד" : `, חסרים ${missing}`) : ""} — לחצו לעריכת היום הזה`;
+
+  const open = () => onEditShift?.(shift);
+  const dropProps = onMove
+    ? {
+        onDragOver: (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+        },
+        onDragEnter: (e) => {
+          if (e.dataTransfer.types.includes(DRAG_MIME)) setDragOver(true);
+        },
+        onDragLeave: () => setDragOver(false),
+        onDrop: (e) => {
+          e.preventDefault();
+          setDragOver(false);
+          const raw = e.dataTransfer.getData(DRAG_MIME);
+          if (!raw) return;
+          const [guardId, fromShiftId] = raw.split("::");
+          if (fromShiftId === shift.id) return;
+          onMove(fromShiftId, shift.id, guardId);
+        },
+      }
+    : {};
+
+  // div ולא button: שם בתוך כפתור לא נגרר בכל הדפדפנים (Firefox), ושם הוא
+  // בדיוק מה שנגרר. המקלדת מקבלת את אותו תפקיד דרך role + Enter/רווח.
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={open}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          open();
+        }
+      }}
+      aria-label={label}
+      title={label}
+      {...dropProps}
+      className={`block w-full min-h-[2rem] text-right rounded-md border-r-[3px] px-1.5 py-1 cursor-pointer
+        ${tone.bg} ${tone.border} ${flagged ? "ring-1 ring-inset ring-warn" : ""} ${dragOver ? "ring-2 ring-inset ring-content" : ""}
+        hover:ring-1 hover:ring-inset hover:ring-brand/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 transition-shadow`}
+    >
+      {(timesDiffer || countDiffers || partial || flagged) && (
+        <span className="flex items-center justify-between gap-1">
+          {timesDiffer ? (
+            <span className="text-[10px] font-extrabold text-warn" dir="ltr" data-numeric>
+              {shift.startTime}–{shift.endTime}
+            </span>
+          ) : (
+            <span />
+          )}
+          {(countDiffers || partial || flagged) && (
+            <span
+              className={`inline-flex items-center gap-0.5 text-[10px] font-black px-1 rounded bg-bg ${
+                partial || flagged ? "text-warn" : "text-content"
+              }`}
+              data-numeric
+            >
+              {(partial || flagged) && <Icon name="alert" size={9} />}
+              {partial || flagged ? `${names.length}/${need}` : `×${need}`}
+            </span>
+          )}
+        </span>
+      )}
+      {ids.length > 0 && (
+        <span className="flex flex-wrap gap-x-1 text-[11px] font-semibold text-content leading-tight">
+          {ids.map((id) => {
+            const g = guards.find((x) => x.id === id);
+            const blocked = g ? !isQualified(g, shift.category) : false;
+            return (
+              <span
+                key={id}
+                draggable={Boolean(onMove)}
+                onDragStart={onMove ? (e) => e.dataTransfer.setData(DRAG_MIME, `${id}::${shift.id}`) : undefined}
+                title={blocked ? `לא מוגדר/ת כשיר/ה לקטגוריית "${shift.category}"` : undefined}
+                className={onMove ? "cursor-grab active:cursor-grabbing" : undefined}
+              >
+                {blocked && <Icon name="lock" size={9} className="inline ml-0.5 -mt-0.5" />}
+                {firstName(id)}
               </span>
-            )}
-            {names.length > 0 && (
-              <span className="block text-[11px] font-semibold text-content leading-tight truncate">{names.join(", ")}</span>
-            )}
-          </button>
-        );
-      })}
+            );
+          })}
+        </span>
+      )}
     </div>
   );
 }

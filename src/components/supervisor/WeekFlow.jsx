@@ -30,27 +30,16 @@ import { availStatus } from "../../lib/autoAssign.js";
 import { boardItemsForDates } from "../../lib/dates.js";
 import { demoShiftIdsForWeek } from "../../lib/demoData.js";
 import { t } from "../../lib/terms.js";
+import { clampStep, stepIdsFor, stepIndex } from "../../lib/weekSteps.js";
 
 /**
- * מזהי הניווט הישנים ממשיכים לעבוד — כל אחד נופל לשלב שלו.
- *
- * שלב 0 הוא "בניית שבוע" (הצעד הפעיל שבו בונים משמרות/סד"כ, לא שלב
- * לקריאה בלבד). שלב 1 הוא הלוח המאוחד — שממשיך להיקרא "השבוע במבט אחד"/
- * "תמונת מצב שבועית" בדיוק כמו קודם. המיקום החדש (מיד אחרי בניית שבוע,
- * לא לפניה) הוא החלטת WEEKBUILD-02 מ-2026-09-22 (Phase 8), שמחליפה את
- * מיקום "הלוח קודם" שנקבע ב-Phase 5 (D-04) — בלי לבטל את הרעיון שהלוח
- * נגיש מוקדם ובלי חיפוש: הוא עדיין השלב השני מתוך חמישה, לא קבור בסוף.
+ * אילו שלבים יש לכל תחום, ולאן נופל כל מזהה ניווט ישן — ב-weekSteps.js (טהור,
+ * נבדק ב-Node). בצבא הלוח התמזג לתוך "בניית שבוע": הגריד לפי עמדות כבר מציג
+ * שמות ומאפשר להוסיף, להסיר ולגרור אותם, אז שני מסכים לאותו שבוע היו כפילות.
+ * בתחומים האחרים הלוח נשאר שלב 2, בדיוק כפי שנקבע ב-WEEKBUILD-02 (Phase 8,
+ * 2026-09-22): מיד אחרי בניית שבוע, לא לפניה ולא קבור בסוף.
  */
-export const STEP_OF = {
-  shifts: 0,
-  board: 1,
-  availability: 2,
-  smart: 3,
-  assignment: 3,
-  assign: 3,
-  schedule: 4,
-  publish: 4,
-};
+const ALL_STEPS = ["shifts", "board", "availability", "smart", "schedule"];
 
 export default function WeekFlow({
   step, setStep, guards, shifts, availability, weekDates, actions, busy, onNavigate, tasks = [], team,
@@ -59,6 +48,12 @@ export default function WeekFlow({
   // ברירת המחדל היא השיבוץ האוטומטי. הידני יושב לצידו בתוך אותו שלב — הוא
   // תיקון של התוצאה, לא מסך מתחרה.
   const [assignMode, setAssignMode] = useState("auto");
+
+  // שלבי המסך תלויים בתחום (weekSteps.js): בצבא ארבעה, בשאר חמישה. שלב שהאינדקס
+  // שלו חורג — למשל אחרי החלפת תחום — נחתך לאחרון הקיים, ולא קורס.
+  const stepIds = stepIdsFor(team?.mode);
+  const current = clampStep(step, team?.mode);
+  const goTo = (id) => setStep(stepIndex(id, team?.mode));
 
   // מצב-אישור משותף לשני הכפתורים ההרסניים של המסך הזה: ה-CTA לפרסום
   // (נקודת-הכניסה הרביעית לפרסום, CONFIRM-02/04) ו"מחק נתוני הדגמה לשבוע
@@ -94,6 +89,7 @@ export default function WeekFlow({
 
   const published = weekShifts.filter((s) => s.published).length;
   const hasShifts = weekShifts.length > 0;
+  const army = team?.mode === "army";
 
   // כמה פריטים הלוח המאוחד מציג לשבוע הזה — משמרות ומשימות יחד, ממוזגות
   // דרך המסלול היחיד (boardItemsForDates), כדי שהמספר על פס השלבים
@@ -107,7 +103,7 @@ export default function WeekFlow({
   // כפתור "מחק נתוני הדגמה" מוצג בכלל. שער-נראות טהור, בלי כתיבה.
   const demoIds = useMemo(() => demoShiftIdsForWeek(shifts, weekDates), [shifts, weekDates]);
 
-  const meta = [
+  const allMeta = [
     {
       id: "shifts",
       label: t("nav.shifts"),
@@ -139,13 +135,14 @@ export default function WeekFlow({
       done: hasShifts && published === weekShifts.length,
     },
   ];
+  const meta = stepIds.map((id) => allMeta.find((m) => m.id === id));
 
   // `embedded` אומר לרכיב שכותרת המסך כבר נאמרה — פס השלבים הוא הכותרת.
   const common = {
     guards, shifts, availability, weekDates, actions, busy, onNavigate, tasks, team, embedded: true,
   };
 
-  const body = [
+  const allBodies = [
     // צבא בלבד (Phase 6): האשף המונחה מחליף את בניית-השבוע הגנרית, בנוי מעל
     // gs_positions — כל שאר התחומים (אבטחה/מסעדנות) ממשיכים לקבל את
     // ShiftMgmt המקורי בלי שום שינוי, בדיוק כפי שנקבע ("אשף ההדגמה מתעסק
@@ -236,50 +233,54 @@ export default function WeekFlow({
       )}
     </div>,
     <ScheduleMgmt key="publish" {...common} />,
-  ][step];
+  ];
+  const body = allBodies[ALL_STEPS.indexOf(stepIds[current])];
 
   // הפעולה הראשית של כל שלב. בכל השלבים חוץ מהאחרון היא "סיימתי כאן,
   // קדימה"; רק בשלב האחרון היא פעולה אמיתית על הנתונים — וזה מכוון, כי
   // פרסום הוא הרגע היחיד בזרימה שהצוות מרגיש.
-  const action = [
-    {
-      // ניווט בלבד, לא כתיבת נתון — מוביל לשלב הלוח, שגם הוא לקריאה בלבד
-      // (D-03, D-08). בלי disabled: לצפות בלוח זה תמיד תקין, גם בלי
-      // משמרות עדיין — בדיוק כמו שה-CTA הישן שהוביל ללוח מעולם לא נחסם.
-      children: `המשך ל${t("nav.board")}`,
-      icon: "left",
-      onClick: () => setStep(1),
-      hint: hasShifts ? `${weekShifts.length} ${t("unit.shifts")} בשבוע הזה` : undefined,
-    },
-    {
-      // האילוץ העסקי "אי אפשר לאסוף זמינות בלי משמרות" עבר לכאן במדויק
-      // (WEEKBUILD-02): זה עכשיו המעבר שמוביל לזמינות, אחרי שהלוח התיישב
-      // בין בניית שבוע לזמינות.
-      children: `תמונת המצב ברורה — ${t("nav.availability")}?`,
-      icon: "left",
-      onClick: () => setStep(2),
-      disabled: !hasShifts,
-      hint: hasShifts
-        ? `${weekShifts.length} ${t("unit.shifts")} בשבוע הזה`
-        // "משמרת אחת" נשאר קשיח בכוונה: unit.shifts הוא רק צורת הרבים
-        // ("משמרות"/"תורנויות"), והטיה לצורת יחיד נכונה לשני הפרופילים
-        // (ובעברית התקנית של כל אחד מהם) היא עבודת אוצר מילים שדורשת
-        // מפתח t() נפרד, לא ניחוש דקדוקי כאן — ראה אבן דרך ב'.
-        //
-        // boardCount > 0 בלי hasShifts: הלוח מלא רק במשימות (בלי משמרות
-        // כלל). זמינות נאספת רק מול משמרות, אז החסימה נשארת — אבל ההודעה
-        // חייבת להודות במה שהמנהל רואה מולו על הלוח, לא לסתור אותו (WR-01,
-        // code review Phase 8).
-        : boardCount > 0
-          ? "המשימות שהוגדרו לא דורשות איסוף זמינות — צריך לפחות משמרת אחת כדי להמשיך"
-          : "צריך לפחות משמרת אחת כדי להמשיך",
-    },
+  const toBoard = {
+    // ניווט בלבד, לא כתיבת נתון — מוביל לשלב הלוח, שגם הוא לקריאה בלבד
+    // (D-03, D-08). בלי disabled: לצפות בלוח זה תמיד תקין, גם בלי
+    // משמרות עדיין — בדיוק כמו שה-CTA הישן שהוביל ללוח מעולם לא נחסם.
+    children: `המשך ל${t("nav.board")}`,
+    icon: "left",
+    onClick: () => goTo("board"),
+    hint: hasShifts ? `${weekShifts.length} ${t("unit.shifts")} בשבוע הזה` : undefined,
+  };
+  const toAvailability = {
+    // האילוץ העסקי "אי אפשר לאסוף זמינות בלי משמרות" עבר לכאן במדויק
+    // (WEEKBUILD-02): זה עכשיו המעבר שמוביל לזמינות, אחרי שהלוח התיישב
+    // בין בניית שבוע לזמינות.
+    children: `תמונת המצב ברורה — ${t("nav.availability")}?`,
+    icon: "left",
+    onClick: () => goTo("availability"),
+    disabled: !hasShifts,
+    hint: hasShifts
+      ? `${weekShifts.length} ${t("unit.shifts")} בשבוע הזה`
+      // "משמרת אחת" נשאר קשיח בכוונה: unit.shifts הוא רק צורת הרבים
+      // ("משמרות"/"תורנויות"), והטיה לצורת יחיד נכונה לשני הפרופילים
+      // (ובעברית התקנית של כל אחד מהם) היא עבודת אוצר מילים שדורשת
+      // מפתח t() נפרד, לא ניחוש דקדוקי כאן — ראה אבן דרך ב'.
+      //
+      // boardCount > 0 בלי hasShifts: הלוח מלא רק במשימות (בלי משמרות
+      // כלל). זמינות נאספת רק מול משמרות, אז החסימה נשארת — אבל ההודעה
+      // חייבת להודות במה שהמנהל רואה מולו על הלוח, לא לסתור אותו (WR-01,
+      // code review Phase 8).
+      : boardCount > 0
+        ? "המשימות שהוגדרו לא דורשות איסוף זמינות — צריך לפחות משמרת אחת כדי להמשיך"
+        : "צריך לפחות משמרת אחת כדי להמשיך",
+  };
+  const allActions = [
+    // בצבא אין שלב לוח נפרד, אז "בניית שבוע" ממשיכה ישר לזמינות.
+    army ? toAvailability : toBoard,
+    toAvailability,
     {
       children: t("nav.smart"),
       icon: "zap",
       onClick: () => {
         setAssignMode("auto");
-        setStep(3);
+        goTo("smart");
       },
       disabled: !hasShifts || guards.length === 0,
       hint:
@@ -292,7 +293,7 @@ export default function WeekFlow({
     {
       children: "הסידור מוכן — לשלוח לצוות",
       icon: "left",
-      onClick: () => setStep(4),
+      onClick: () => goTo("schedule"),
       disabled: slots.filled === 0,
       hint:
         slots.filled === 0
@@ -328,7 +329,8 @@ export default function WeekFlow({
           ? "כל המשמרות פורסמו. כל שינוי כאן יופיע אצלם מיד."
           : "אחרי השליחה כל אחד רואה בטלפון את התורנויות שלו",
     },
-  ][step];
+  ];
+  const action = allActions[ALL_STEPS.indexOf(stepIds[current])];
 
   return (
     <div className="space-y-5">
@@ -344,7 +346,7 @@ export default function WeekFlow({
           -mx-3 px-3 pt-3 pb-2 lg:-mx-6 lg:px-6 lg:pt-6 bg-bg/90 backdrop-blur-md"
       >
         {meta.map((s, i) => {
-          const active = i === step;
+          const active = i === current;
           return (
             <li key={s.id} className="flex-1 min-w-[9.5rem]">
               <button

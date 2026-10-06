@@ -7,7 +7,7 @@
 // overwrites a day the commander changed by hand, the screen lies.
 
 import {
-  buildPostWeek, isAfterMidnight, opDayOf, planTemplateSync, postBlocks, renamePostTitle,
+  buildPostWeek, countMissing, isAfterMidnight, opDayOf, planTemplateSync, postBlocks, renamePostTitle,
 } from "../src/lib/postWeek.js";
 import { buildDivisionRows, plannedRowsForWeek } from "../src/lib/positions.js";
 import { shiftPartName } from "../src/lib/dates.js";
@@ -140,6 +140,26 @@ const renamed = planTemplateSync({
 });
 check("שינוי שם מעדכן תווית ומיקום בכל המשמרות של העמדה",
   renamed.update.some((u) => u.fields.label === "סיור צפוני – משמרת 1" && u.fields.location === "סיור צפוני" && u.ids.length === 7));
+
+// ============================================================
+console.log("\nמקומות חסרים — אותו מספר שהמפקד רואה בתאים\n");
+// ============================================================
+
+const grid = buildPostWeek({ shifts, positions, tasks: [], weekDates: week, mode: "army" });
+const emptyCount = countMissing(grid);
+const shownNeed = shifts.filter((s) => week.includes(opDayOf(s))).reduce((n, s) => n + (s.requiredGuards || 1), 0);
+check("לפני שיבוץ: אף אחד לא משובץ", emptyCount.assigned === 0, `assigned=${emptyCount.assigned}`);
+check("לפני שיבוץ: החסרים הם כל מה שמוצג בתאים", emptyCount.missing === shownNeed, `missing=${emptyCount.missing} expected=${shownNeed}`);
+
+const one = shifts.map((s, i) => (i === 0 ? { ...s, assignedGuards: ["g1"] } : s));
+const afterOne = countMissing(buildPostWeek({ shifts: one, positions, tasks: [], weekDates: week, mode: "army" }));
+check("שיבוץ אחד מוריד בדיוק מקום חסר אחד", afterOne.missing === emptyCount.missing - 1 && afterOne.assigned === 1,
+  `${afterOne.missing} / ${emptyCount.missing}`);
+
+const over = shifts.map((s, i) => (i === 0 ? { ...s, assignedGuards: ["g1", "g2", "g3", "g4", "g5"] } : s));
+const overCount = countMissing(buildPostWeek({ shifts: over, positions, tasks: [], weekDates: week, mode: "army" }));
+check("משמרת עם יותר משובצים מהנדרש לא יוצרת חוסר שלילי", overCount.missing >= 0 && overCount.missing < emptyCount.missing,
+  `missing=${overCount.missing}`);
 
 console.log(failures === 0 ? "\nPASS\n" : `\n${failures} FAILURE(S)\n`);
 process.exit(failures === 0 ? 0 : 1);

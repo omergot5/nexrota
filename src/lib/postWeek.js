@@ -183,6 +183,31 @@ export function buildPostWeek({ shifts = [], positions = [], tasks = [], weekDat
   );
 }
 
+/**
+ * כמה מקומות חסרים ברשת, וכמה משמרות בה כבר קיבלו מישהו. נספר רק מה שמוצג
+ * (תאים עם משמרת) — אותו מספר שהמפקד רואה בתאים, לא חישוב שני על הנתונים
+ * הגולמיים שעלול לחלוק עליו. "assigned" קובע אם בכלל להציג חוסרים: לפני שמישהו
+ * שובץ, כל תא ריק, ולסמן את כולם כחסרים זה רעש ולא מידע.
+ * @returns {{missing: number, assigned: number}}
+ */
+export function countMissing(posts = []) {
+  let missing = 0;
+  let assigned = 0;
+  for (const post of posts) {
+    for (const block of post.blocks) {
+      if (block.weekly) continue;
+      for (const cell of block.cells) {
+        for (const shift of cell.shifts) {
+          const have = (shift.assignedGuards || []).length;
+          assigned += have;
+          missing += Math.max(0, (shift.requiredGuards || 1) - have);
+        }
+      }
+    }
+  }
+  return { missing, assigned };
+}
+
 function cellFor(block, date, lastDate) {
   const list = (block.byDay.get(date) || []).slice().sort((a, b) => String(a.id).localeCompare(String(b.id)));
   if (list.length) return { date, state: "shift", shifts: list };

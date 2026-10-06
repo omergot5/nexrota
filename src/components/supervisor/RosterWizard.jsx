@@ -1,10 +1,13 @@
 // ============================================================
-// בניית שבוע — צבא.
+// בניית שבוע — צבא. גם הלוח של השבוע (המסך "תמונת מצב שבועית" התמזג לכאן).
 //
 // המסך הוא השבוע עצמו, ברוחב מלא: כל עמדה היא כותרת, ומתחתיה המשמרות שלה
 // על פני שבעה ימים (PostWeekGrid). המפקד רואה את כל האירוע בתמונה אחת,
 // בלי גלילה הצידה ובלי משפטים שמסיחים את הדעת. עמדה נפתחת לעריכה בלחיצה
-// על השם שלה (PostEditor); יום בודד — בלחיצה על התא שלו (DayShiftEditor).
+// על השם שלה (PostEditor); יום בודד — בלחיצה על התא שלו (DayShiftEditor), שם
+// גם מסירים ומוסיפים אנשים. גרירת שם בין תאים מעבירה אותו (moveAssignment).
+// משימות שאינן עמדה (TaskMgmt) מופיעות מתחת לגריד, כדי שמשמרות ומשימות
+// יישארו באותו מסך ולא יחזרו להיות שני עולמות עיוורים זה לזה.
 //
 // לא מנוע חדש: שכבת UI מעל gs_positions (התבנית שחוזרת כל שבוע) ו-
 // gs_work_items (מה שנוצר בשבוע הזה בפועל). "הכול חוסם הכול" ממשיך לקרות
@@ -13,14 +16,16 @@
 // ============================================================
 
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { Btn, Card, ConfirmDialog } from "../ui.jsx";
+import { Alert, Badge, Btn, Card, ConfirmDialog } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import PostWeekGrid from "./PostWeekGrid.jsx";
 import PostEditor from "./PostEditor.jsx";
 import DayShiftEditor from "./DayShiftEditor.jsx";
 import { foldersFor } from "../../lib/categories.js";
-import { buildPostWeek } from "../../lib/postWeek.js";
-import { teamRules } from "../../lib/autoAssign.js";
+import { buildPostWeek, countMissing } from "../../lib/postWeek.js";
+import { boardItemsForDates, shortDate } from "../../lib/dates.js";
+import { People } from "./views.jsx";
+import { checkAssignment, teamRules } from "../../lib/autoAssign.js";
 import { subscribeTerms, termProfile } from "../../lib/terms.js";
 
 // נקודות פתיחה לצוות שעוד לא הגדיר כלום — לחיצה פותחת את העורך כבר מלא.
@@ -42,6 +47,7 @@ const SUGGESTIONS = [
 
 export default function RosterWizard({
   positions = [], guards = [], weekDates = [], actions, busy, team, shifts = [], tasks = [],
+  availability = {}, onNavigate,
 }) {
   // תחום הפעילות מוחל מ-subscribeTerms/termProfile (D-07) — אותו מקור אמת
   // שצביעת הקטגוריות בגריד קוראת ממנו.
@@ -53,13 +59,48 @@ export default function RosterWizard({
   const [editorTarget, setEditorTarget] = useState(null); // null = סגור; {} = עמדה חדשה; {seed}; {post} = עריכה
   const [dayEditId, setDayEditId] = useState(null); // תורנות של יום אחד שנפתחה מהגריד
   const [confirmState, setConfirmState] = useState(null); // CONFIRM-05: מחיקת עמדה או משמרות שלה
+  const [moveNotice, setMoveNotice] = useState(null); // גרירה שנדחתה — למה
 
   const posts = useMemo(
     () => buildPostWeek({ shifts, positions, tasks, weekDates, mode }),
     [shifts, positions, tasks, weekDates, mode]
   );
+  // חוסרים מוצגים רק אחרי ששובץ מישהו בשבוע — עד אז כל התאים ריקים וסימון כולם
+  // כחסרים הוא רעש. אותו מספר בדיוק שהתאים מציגים (countMissing), לא חישוב שני.
+  const { missing, assigned } = useMemo(() => countMissing(posts), [posts]);
+  const showMissing = assigned > 0;
+
+  // משימות שאינן עמדה: אלה שנוצרו ב-TaskMgmt. משימה שנולדה מעמדה שבועית כבר
+  // מוצגת בגריד כשורה "כל השבוע", ולא תופיע פעמיים.
+  const looseTasks = useMemo(() => {
+    const board = boardItemsForDates([], tasks.filter((tk) => !tk.positionId), weekDates);
+    return board.days.flatMap((d) => [...d.timeless, ...d.timed]);
+  }, [tasks, weekDates]);
+
   // נגזר מ-shifts בכל רינדור — אחרי שמירה העורך מציג את הנתונים הטריים.
   const dayEditShift = dayEditId ? shifts.find((s) => s.id === dayEditId) || null : null;
+
+  // גרירת שם בין תורנויות. actions.moveAssignment בודקת כשירות בלבד, אבל כאן
+  // ההוספה עוברת בדיקה מלאה (חפיפה, מנוחה, רצף, זמינות, תקרה) — וגרירה היא
+  // אותה פעולה בעטיפה אחרת, אז היא נבדקת באותו אופן. האדם מוסר מהתורנות
+  // שממנה גוררים לפני הבדיקה: תורנות צמודה אליה היא לא התנגשות בעצמו.
+  const moveGuard = (fromShiftId, toShiftId, guardId) => {
+    const guard = guards.find((g) => g.id === guardId);
+    const target = shifts.find((s) => s.id === toShiftId);
+    if (!guard || !target) return;
+    const without = shifts.map((s) =>
+      s.id === fromShiftId ? { ...s, assignedGuards: (s.assignedGuards || []).filter((g) => g !== guardId) } : s
+    );
+    const legality = checkAssignment({
+      guard, shift: target, shifts: without, availability, tasks, rules: teamRules(team),
+    });
+    if (!legality.ok) {
+      setMoveNotice(`לא ניתן להעביר את ${guard.name}: ${legality.reason}`);
+      return;
+    }
+    setMoveNotice(null);
+    return actions.moveAssignment(fromShiftId, toShiftId, guardId);
+  };
 
   const send = async (plan) => {
     await actions.savePost({ ...plan, weekDates });
@@ -124,13 +165,26 @@ export default function RosterWizard({
       ) : (
         <>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-[12.5px] text-muted">
-              {`${posts.length} עמדות · לחיצה על עמדה — עריכה · על יום — שינוי ליום הזה`}
+            <p className="text-[12.5px] text-muted flex items-center gap-2 flex-wrap">
+              <span>
+                {`${posts.length} עמדות · לחיצה על עמדה — עריכה · על תורנות — שעות ואנשים`}
+                {showMissing ? " · גרירת שם — העברה" : ""}
+              </span>
+              {showMissing && (
+                <Badge tone={missing > 0 ? "warn" : "accent"} icon={missing > 0 ? "alert" : "check"}>
+                  <span data-numeric>{missing > 1 ? `${missing} מקומות לא מאוישים` : missing === 1 ? "מקום אחד לא מאויש" : "הכול מאויש"}</span>
+                </Badge>
+              )}
             </p>
             <Btn size="sm" icon="plus" onClick={() => setEditorTarget({})}>
               עמדה חדשה
             </Btn>
           </div>
+          {moveNotice && (
+            <Alert tone="warn" onClose={() => setMoveNotice(null)}>
+              {moveNotice}
+            </Alert>
+          )}
           <Card className="p-0 overflow-hidden">
             <PostWeekGrid
               posts={posts}
@@ -138,9 +192,38 @@ export default function RosterWizard({
               guards={guards}
               onEditPost={(post) => setEditorTarget({ post })}
               onEditShift={(shift) => setDayEditId(shift.id)}
+              onMove={moveGuard}
+              showMissing={showMissing}
             />
           </Card>
         </>
+      )}
+
+      {looseTasks.length > 0 && (
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <h3 className="text-[13px] font-extrabold text-content">
+              משימות נוספות בשבוע · <span data-numeric>{looseTasks.length}</span>
+            </h3>
+            {onNavigate && (
+              <Btn size="sm" variant="ghost" onClick={() => onNavigate("tasks")}>
+                לניהול המשימות
+              </Btn>
+            )}
+          </div>
+          <ul className="divide-y divide-hairline/60">
+            {looseTasks.map((item) => (
+              <li key={`${item.timeless ? "t" : "s"}-${item.id}`} className="flex items-center gap-3 py-1.5 text-[12.5px]">
+                <span className="font-bold text-content truncate flex-1">{item.label}</span>
+                <span className="text-muted flex-shrink-0" data-numeric>
+                  {shortDate(item.date)}
+                  {!item.timeless && item.startTime ? ` · ${item.startTime}–${item.endTime}` : ""}
+                </span>
+                <People ids={item.assignedGuards || []} guards={guards} size={20} max={3} />
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
 
       <PostEditor
@@ -159,6 +242,12 @@ export default function RosterWizard({
         onSave={(next) => actions.updateShift(next.id, next)}
         onCancelDay={(shift) => actions.deleteShift(shift.id)}
         longShiftCategories={longShiftCategories}
+        guards={guards}
+        shifts={shifts}
+        availability={availability}
+        tasks={tasks}
+        team={team}
+        onToggleAssignment={actions.toggleAssignment}
         busy={busy}
       />
 
