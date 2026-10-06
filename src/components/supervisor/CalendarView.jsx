@@ -6,6 +6,10 @@ import { categoryTone, TONE_VARS } from "../../design/categoryPalette.js";
 import { buildResourceRows } from "../../lib/resourceView.js";
 import ResourceGrid from "./ResourceGrid.jsx";
 import PostWeekGrid from "./PostWeekGrid.jsx";
+import DayShiftEditor from "./DayShiftEditor.jsx";
+import ShareWeekBtn from "./ShareWeekBtn.jsx";
+import { teamRules } from "../../lib/autoAssign.js";
+import { initialCursor } from "../../lib/calendarCursor.js";
 import { buildPostWeek, countMissing, opDayOf, orderShiftsByPost } from "../../lib/postWeek.js";
 import {
   DAYS_HE, DAYS_HE_SHORT, addDays, boardItemsForDates, formatDateHe, fromISODate, monthGrid,
@@ -53,7 +57,9 @@ const coverageOf = (dayItems) => {
   return { need, got, full: got >= need, empty: got === 0 };
 };
 
-export default function CalendarView({ shifts, tasks = [], guards, onNavigate, team, positions = [] }) {
+export default function CalendarView({
+  shifts, tasks = [], guards, onNavigate, team, positions = [], actions, availability = {}, busy,
+}) {
   // תחום הפעילות מוחל מ-useGuardian (setTermProfile) ולא מפרופ — אותה
   // קריאה בדיוק כמו PositionsScreen (ומסך "מבט משאבים" הישן שהוסר), כדי שהצבע-לפי-קטגוריה
   // לא ייסחף משני מקורות אמת (היה הפער לפני התיקון: הרכיב הזה קיבל mode
@@ -64,7 +70,10 @@ export default function CalendarView({ shifts, tasks = [], guards, onNavigate, t
   // וחור נראה רק על ציר שעות (הועבר לכאן מ-SupervisorApp.jsx, שנהג לעטוף את
   // המסך הזה בבורר שבוע/חודש חיצוני משלו — שני מתגים לאותה שאלה בדיוק).
   const [mode, setMode] = useState("week");
-  const [cursor, setCursor] = useState(today); // any date inside the shown range
+  const [cursor, setCursor] = useState(() => initialCursor(shifts, today)); // any date inside the shown range
+  const [editId, setEditId] = useState(null); // תורנות שנפתחה לעריכה מהגריד או מהיום
+  const editShift = editId ? shifts.find((s) => s.id === editId) || null : null;
+  const canEdit = Boolean(actions);
 
   const cur = fromISODate(cursor);
   const dates =
@@ -135,12 +144,30 @@ export default function CalendarView({ shifts, tasks = [], guards, onNavigate, t
 
   const shown = dates.flatMap((d) => byDate.get(d) || []);
 
+  // שבוע שאף אחד עוד לא שובץ בו הוא "טרם שובץ", לא "ריק": עד שמריצים שיבוץ כל
+  // יום בו אפס, ולצבוע את כל החודש באדום זה רעש. חוסר מסומן רק בשבוע שכבר התחיל להיבנות.
+  const assignedWeeks = useMemo(() => {
+    const set = new Set();
+    for (const s of shifts) if ((s.assignedGuards || []).length) set.add(startOfWeek(opDayOf(s)));
+    return set;
+  }, [shifts]);
+
   return (
     <div className="space-y-5">
       <PageHeader
         title={t("nav.calendar")}
         subtitle={`${shown.length} פריטים בתצוגה`}
         actions={
+          <div className="flex items-center gap-2 flex-wrap">
+          {army && mode === "week" && missing.assigned + missing.missing > 0 && (
+            <ShareWeekBtn
+              dates={dates}
+              shifts={shifts.filter((s) => dates.includes(opDayOf(s)))}
+              guards={guards}
+              posts={posts}
+              teamName={team?.name}
+            />
+          )}
           <div
             role="radiogroup"
             aria-label="רזולוציית תצוגה"
@@ -164,6 +191,7 @@ export default function CalendarView({ shifts, tasks = [], guards, onNavigate, t
                 </button>
               );
             })}
+          </div>
           </div>
         }
       />
@@ -194,6 +222,7 @@ export default function CalendarView({ shifts, tasks = [], guards, onNavigate, t
             byDate={byDate}
             today={today}
             teamMode={teamMode}
+            assignedWeeks={assignedWeeks}
             onPick={(d) => {
               setCursor(d);
               setMode("day");
@@ -217,7 +246,14 @@ export default function CalendarView({ shifts, tasks = [], guards, onNavigate, t
                 )}
               </p>
             )}
-            <PostWeekGrid posts={posts} dates={dates} guards={guards} showMissing fullNames />
+            <PostWeekGrid
+              posts={posts}
+              dates={dates}
+              guards={guards}
+              showMissing
+              fullNames
+              onEditShift={canEdit ? (s) => setEditId(s.id) : undefined}
+            />
           </div>
         )}
 
@@ -233,12 +269,36 @@ export default function CalendarView({ shifts, tasks = [], guards, onNavigate, t
         )}
 
         {mode === "day" && army && (
-          <DayByPost date={cursor} shifts={shifts} items={byDate.get(cursor) || []} guards={guards} teamMode={teamMode} />
+          <DayByPost
+            date={cursor}
+            shifts={shifts}
+            items={byDate.get(cursor) || []}
+            guards={guards}
+            teamMode={teamMode}
+            onEdit={canEdit ? (s) => setEditId(s.id) : undefined}
+          />
         )}
         {mode === "day" && !army && (
           <DayList date={cursor} items={byDate.get(cursor) || []} guards={guards} teamMode={teamMode} />
         )}
       </Card>
+
+      {canEdit && (
+        <DayShiftEditor
+          shift={editShift}
+          onClose={() => setEditId(null)}
+          onSave={(next) => actions.updateShift(next.id, next)}
+          onCancelDay={(shift) => actions.deleteShift(shift.id)}
+          longShiftCategories={teamRules(team).longShiftCategories}
+          guards={guards}
+          shifts={shifts}
+          availability={availability}
+          tasks={tasks}
+          team={team}
+          onToggleAssignment={actions.toggleAssignment}
+          busy={busy}
+        />
+      )}
 
       {shown.length === 0 && mode !== "day" && (
         <EmptyState
@@ -258,7 +318,7 @@ export default function CalendarView({ shifts, tasks = [], guards, onNavigate, t
   );
 }
 
-function MonthGrid({ dates, month, byDate, today, onPick, teamMode }) {
+function MonthGrid({ dates, month, byDate, today, onPick, teamMode, assignedWeeks }) {
   return (
     <div>
       <div className="grid grid-cols-7 gap-1 mb-1">
@@ -273,6 +333,8 @@ function MonthGrid({ dates, month, byDate, today, onPick, teamMode }) {
         {dates.map((date) => {
           const dayItems = byDate.get(date) || [];
           const cov = coverageOf(dayItems);
+          // יום בשבוע שעוד לא שובץ: מספר שקט, בלי איקס אדום.
+          const unplanned = cov?.empty && !assignedWeeks.has(startOfWeek(date));
           const inMonth = fromISODate(date).getMonth() === month;
           const isToday = date === today;
           return (
@@ -304,9 +366,12 @@ function MonthGrid({ dates, month, byDate, today, onPick, teamMode }) {
                   ))}
                 </div>
               )}
-              {cov && (
+              {cov && unplanned && (
+                <span className="mt-auto text-[10px] text-faint font-semibold">טרם שובץ</span>
+              )}
+              {cov && !unplanned && (
                 <span
-                  className={`mt-auto inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-extrabold ${
+                  className={`mt-auto inline-flex flex-col sm:flex-row items-center sm:gap-0.5 text-[9px] sm:text-[11px] leading-tight font-extrabold ${
                     cov.empty ? "text-danger" : cov.full ? "text-accent" : "text-warn"
                   }`}
                   data-numeric
@@ -345,7 +410,7 @@ function MonthGrid({ dates, month, byDate, today, onPick, teamMode }) {
  * אחת. "יום" הוא היום המבצעי — 00:00–05:00 שייך ללילה של היום הקודם, אותו כלל
  * כמו בגריד השבועי. משימות בלי שעות נשארות בקבוצה נפרדת בסוף.
  */
-function DayByPost({ date, shifts, items, guards, teamMode }) {
+function DayByPost({ date, shifts, items, guards, teamMode, onEdit }) {
   const dayShifts = orderShiftsByPost(shifts.filter((s) => opDayOf(s) === date), teamMode);
   const loose = items.filter((s) => s.timeless);
   if (!dayShifts.length && !loose.length) {
@@ -407,7 +472,23 @@ function DayByPost({ date, shifts, items, guards, teamMode }) {
                 return (
                   <div
                     key={s.id}
-                    className="flex items-center gap-3 px-3 py-2 rounded-xl bg-surface-sunken ring-1 ring-inset ring-hairline"
+                    {...(onEdit
+                      ? {
+                          role: "button",
+                          tabIndex: 0,
+                          "aria-label": `עריכת ${group.post} ${shiftPartName(s)}`,
+                          onClick: () => onEdit(s),
+                          onKeyDown: (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              onEdit(s);
+                            }
+                          },
+                        }
+                      : {})}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-xl bg-surface-sunken ring-1 ring-inset ring-hairline ${
+                      onEdit ? "cursor-pointer hover:ring-brand/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60" : ""
+                    }`}
                   >
                     <div className="w-28 flex-shrink-0">
                       <div className="text-[13px] font-bold text-content">{shiftPartName(s) || "משמרת"}</div>
