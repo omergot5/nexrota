@@ -21,6 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient.js";
 import * as api from "../lib/api.js";
 import { seedDemoTeam, seedArmyRoster, demoShiftIdsForWeek, DEMO_TEAM_NAME } from "../lib/demoData.js";
+import { ARMY_DEMO_SOLDIERS } from "../lib/armyDemo.js";
 import { setTermProfile } from "../lib/terms.js";
 // שכבת ה-state הראשונה שנוגעת במנוע (Phase 3, QUAL-04 מסלול 4): שיבוץ ידני
 // מבצע כתיבה ישירה, ולכן חייב לשאול את אותה שאלה שהמנוע שואל לפני שהוא
@@ -289,8 +290,8 @@ export function useGuardian() {
       if (status === "SUBSCRIBED") refresh();
     });
     return () => {
-      supabase.removeChannel(channel);
       clearTimeout(timer);
+      supabase.removeChannel(channel);
     };
   }, [teamCode, refresh]);
 
@@ -526,7 +527,7 @@ export function useGuardian() {
           if (rpcErr) throw new Error("פתיחת ההדגמה נכשלה — נסה שוב");
           const row = Array.isArray(rows) ? rows[0] : rows;
 
-          await seedArmyRoster({ teamCode: row.team_code, existingGuards: [], existingPositions: [], guardCount: 15 });
+          await seedArmyRoster({ teamCode: row.team_code, existingGuards: [], existingPositions: [], guardCount: ARMY_DEMO_SOLDIERS });
           await hydrateSelf();
           return row.team_code;
         },
@@ -599,7 +600,10 @@ export function useGuardian() {
                   teamCode: team?.code,
                   existingGuards: guards,
                   existingPositions: positions,
-                  guardCount: guardCount ?? 20,
+                  guardCount: guardCount ?? ARMY_DEMO_SOLDIERS,
+                  // רק צוות ההדגמה עצמו מיושר למבנה הנוכחי; בצוות אמיתי
+                  // ההדגמה רק מוסיפה מה שחסר ולא נוגעת בעמדות של המפקד.
+                  reconcile: team?.name === DEMO_TEAM_NAME,
                 })
               : await seedDemoTeam({
                   teamCode: team?.code,

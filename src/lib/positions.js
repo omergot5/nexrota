@@ -88,21 +88,27 @@ export function missingRowsForWeek(position, sundayISO, realized = []) {
 }
 
 /**
- * מחלק 24 שעות לבלוקים שווים, מ-00:00 — הדרך שבה עמדת 24/7 הופכת
- * למספר עמדות-תבנית (RosterWizard, demoData). הבלוק האחרון מסתיים
- * ב-"00:00" בדיוק כמו "משמרת לילה" הקיימת (19:00→07:00): endTime
- * שקטן/שווה ל-startTime כבר מפורש בכל האפליקציה כחוצה חצות, אין
- * צורך בטיפול מיוחד. טהורה בכוונה (D-01 בראש הקובץ) כדי שגם
- * RosterWizard (UI) וגם demoData (seed) יסכימו על אותה חלוקה בדיוק.
+ * מחלק 24 שעות לבלוקים שווים — הדרך שבה עמדת 24/7 הופכת למספר
+ * עמדות-תבנית (RosterWizard, demoData). הבלוק הראשון מתחיל ב-startTime,
+ * וברירת המחדל היא 06:00: היום של מפקד מתחיל בבוקר, לא בחצות — 3×8 יוצא
+ * בוקר 06–14, צהריים 14–22, לילה 22–06. endTime שקטן/שווה ל-startTime
+ * כבר מפורש בכל האפליקציה כחוצה חצות, אין צורך בטיפול מיוחד. טהורה
+ * בכוונה (D-01 בראש הקובץ) כדי שגם RosterWizard (UI) וגם demoData (seed)
+ * יסכימו על אותה חלוקה בדיוק.
  */
-export function buildDivisionRows(title, hours) {
+export function buildDivisionRows(title, hours, startTime = "06:00") {
   const count = Math.round(24 / hours);
   const pad = (n) => String(n).padStart(2, "0");
-  const fmt = (m) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
+  const [h, m] = String(startTime).split(":").map(Number);
+  const base = (h || 0) * 60 + (m || 0);
+  const fmt = (minutes) => {
+    const x = ((minutes % 1440) + 1440) % 1440;
+    return `${pad(Math.floor(x / 60))}:${pad(x % 60)}`;
+  };
   return Array.from({ length: count }, (_, i) => ({
     title: count > 1 ? `${title} – משמרת ${i + 1}` : title,
-    startTime: fmt(i * hours * 60),
-    endTime: fmt((i + 1) * hours * 60),
+    startTime: fmt(base + i * hours * 60),
+    endTime: fmt(base + (i + 1) * hours * 60),
   }));
 }
 

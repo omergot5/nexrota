@@ -11,14 +11,14 @@ import { supabase } from "./supabaseClient.js";
 import { SHIFT_TONES } from "../design/shiftPalette.js";
 import { weekByOffset } from "./dates.js";
 import { shiftFromRow, shiftRowToWorkItem, SHIFT_SELECT, positionFromRow, positionToRow } from "./api.js";
-import { buildDivisionRows, missingRowsForWeek } from "./positions.js";
+import { missingRowsForWeek } from "./positions.js";
+import { ARMY_DEMO_SOLDIERS, demoAvailabilityCode, planArmyDemoPositions } from "./armyDemo.js";
 
 // 7 הראשונים שומרים על הדפוס הידני המקורי (PATTERN למטה) — קנה מידה
 // שממחיש חלוקה-לא-1:1 (יותר תקנים מאנשים) בלי לרוקן את הדוגמה לשישה
-// אנשים. מעבר לשבעה, שם הצוות (פלוגה/מחלקה אמיתית) גדול הרבה יותר
-// (15-25 איש) — אז המאגר הורחב ל-20 כדי ש-`guardCount` יוכל לבקש
-// גם 14/15/20 בלי לייצר שמות גנריים ("שומר 8"). מ-8 ומעלה אין PATTERN
-// ידני — `fallbackStatus` (למטה) כבר מכסה אותם דטרמיניסטית.
+// אנשים. הדגמת הצבא צריכה 45 חיילים (ARMY_DEMO_SOLDIERS, armyDemo.js),
+// אז המאגר מחזיק 45 שמות אמיתיים — לא שמות גנריים ("שומר 8"). מ-8 ומעלה
+// אין PATTERN ידני — `fallbackStatus` (למטה) כבר מכסה אותם דטרמיניסטית.
 /** שם צוות ההדגמה האורחת. ההדגמה צבאית בלבד — המסך מזהה אותה לפי השם הזה. */
 export const DEMO_TEAM_NAME = "פלוגת הדגמה";
 
@@ -43,6 +43,31 @@ const DEMO_GUARDS = [
   { name: "נתן אוחיון", phone: "050-2226666" },
   { name: "אלה ביטון", phone: "054-2227777" },
   { name: "אסף רז", phone: "052-2228888" },
+  { name: "אביב דהן", phone: "050-3330001" },
+  { name: "בר שטרן", phone: "052-3330002" },
+  { name: "גלעד נחמיאס", phone: "054-3330003" },
+  { name: "דנה אלון", phone: "058-3330004" },
+  { name: "הראל גבאי", phone: "053-3330005" },
+  { name: "זיו קליין", phone: "050-3330006" },
+  { name: "חן עמר", phone: "052-3330007" },
+  { name: "טליה רוזנברג", phone: "054-3330008" },
+  { name: "ינון שלום", phone: "058-3330009" },
+  { name: "כרמל פרץ", phone: "053-3330010" },
+  { name: "לביא אדרי", phone: "050-3330011" },
+  { name: "מתן זכאי", phone: "052-3330012" },
+  { name: "נוי חזן", phone: "054-3330013" },
+  { name: "סהר יוסף", phone: "058-3330014" },
+  { name: "עדי גולדשטיין", phone: "053-3330015" },
+  { name: "פלג סויסה", phone: "050-3330016" },
+  { name: "צליל ברגר", phone: "052-3330017" },
+  { name: "קובי נגר", phone: "054-3330018" },
+  { name: "רוני אסולין", phone: "058-3330019" },
+  { name: "שקד מימון", phone: "053-3330020" },
+  { name: "תום פרלמן", phone: "050-3330021" },
+  { name: "איתי שגיא", phone: "052-3330022" },
+  { name: "אריאל דוד", phone: "054-3330023" },
+  { name: "יהונתן עזרא", phone: "058-3330024" },
+  { name: "ליה טננבאום", phone: "053-3330025" },
 ];
 
 const DAY = { label: "משמרת יום", startTime: "07:00", endTime: "19:00", type: "morning", color: SHIFT_TONES.morning };
@@ -74,18 +99,10 @@ const COMMENTS = {
 
 const STATUS = { a: "available", u: "unavailable", m: "maybe" };
 
-/**
- * זמינות לשומרי הדגמה מעבר לששת הראשונים (שיש להם PATTERN ידני
- * למעלה) — דטרמיניסטית וקבועה בין הרצות, לא Math.random. תמהיל גס
- * (כ-10% לא-זמין, 20% אולי, השאר זמין) שמספיק כדי שהשיבוץ החכם יהיה
- * לו על מה להתלבט, בלי להקליד דפוס יד לכל שומר/ת נוסף/ת.
- */
-function fallbackStatus(gi, di, kind) {
-  const seed = (gi * 7 + di * 3 + (kind === "night" ? 1 : 0)) % 10;
-  if (seed === 0) return "u";
-  if (seed === 1 || seed === 2) return "m";
-  return "a";
-}
+// זמינות לשומרי הדגמה מעבר לששת הראשונים (שיש להם PATTERN ידני למעלה) —
+// דטרמיניסטית, ומוגדרת ב-armyDemo.js כדי שגם בדיקת הכיסוי ב-Node תשתמש
+// בדיוק באותו תמהיל.
+const fallbackStatus = demoAvailabilityCode;
 
 /**
  * מה שכבר יושב בצוות נקרא **מהשרת**, ולא רק ממה שהקורא מסר.
@@ -233,82 +250,70 @@ export async function seedDemoTeam({ teamCode, existingGuards = [], existingShif
 // ============================================================
 // הדגמת צבא — סד"כ מלא, לא שתי משמרות גנריות ליום.
 //
-// seedDemoTeam למעלה (הכללי, גם למסלול האורח האנונימי) נשאר בדיוק כמו
-// שהיה — הוא לא נוגע בצבא בכלל. הפונקציה הזו היא הרחבה נפרדת: מבקש
-// שהדגמה במצב army תיתן תמונה אמיתית של "כמעט-שבוע-שלם" — חמש
-// משימות בדיוק כמו שאשף בניית הסד"כ (RosterWizard) היה בונה ידנית,
-// כולל שתי עמדות 24/7 שמחולקות למשמרות (לא "עמדה" יחידה בלי שעות),
-// כדי שמפקד שלוחץ "מלא לי נתוני הדגמה" יראה מיד את התמונה המלאה שהוא
-// עצמו יבנה בפועל — לא דוגמה ממוזערת.
+// seedDemoTeam למעלה (הכללי) לא נוגע בצבא בכלל. המבנה עצמו — אילו עמדות,
+// כמה משמרות, כמה חיילים בכל אחת — חי ב-armyDemo.js (טהור, נבדק ב-Node);
+// כאן רק כותבים אותו לשרת.
 // ============================================================
 
-/** חמש הקטגוריות הקבועות של RosterWizard — לא עמדות 24/7, שעות רגילות. */
-const ARMY_FIXED_POSITIONS = [
-  { title: "סיור", category: "סיור", weekdays: [0, 1, 2, 3, 4, 5, 6], startTime: "06:00", endTime: "18:00" },
-  { title: "כוננות", category: "כוננות", weekdays: [0, 1, 2, 3, 4, 5, 6], startTime: "18:00", endTime: "06:00" },
-  { title: "תורנות מטבח", category: "תורנות מטבח", weekdays: [0, 1, 2, 3, 4, 5], startTime: "05:30", endTime: "13:30" },
-];
-
-// שתי עמדות שמירה, שתיהן 24/7 ומחולקות ל-3 משמרות של 8 שעות — בדיוק
-// האופציה ש-RosterWizard מציע ("לכמה שעות לחלק כל שמירה?"), לא עמדת
-// weekly רציפה בלי שעות: מפקד שמסתכל על ההדגמה אמור לראות איך חלוקה
-// נראית בפועל, כי זו הדרך שרוב הצוותים באמת מאיישים עמדת שמירה קבועה.
-const ARMY_GUARD_POSTS = ["עמדת שמירה 1", "עמדת שמירה 2"];
-const ARMY_GUARD_POST_DIVISION_HOURS = 8;
-
 /**
- * בונה את חמש המשימות הקבועות (כולל שתי עמדות השמירה, כל אחת מחולקת
- * ל-3 משמרות) עבור צוות army — רק את מה שחסר, לפי כותרת. מחזיר את כל
- * העמדות הפעילות של הצוות (קיימות + חדשות), כמו allGuards ב-ensureDemoGuards.
+ * מביא את עמדות הצוות למבנה ההדגמה (ר' planArmyDemoPositions). מחזיר את
+ * העמדות הפעילות אחרי השינוי, ואת מזהי העמדות שהשתנו או כובו — שהמשמרות
+ * שכבר מומשו מהן השבוע צריכות להיבנות מחדש.
  */
-async function ensureArmyPositions(teamCode, existingPositions) {
-  const { data: rows, error } = await supabase
-    .from("gs_positions")
-    .select("*")
-    .eq("team_code", teamCode)
-    .eq("active", true);
-  if (error) throw new Error(`קריאת עמדות הצוות נכשלה: ${error.message}`);
-
-  const known = mergeById(existingPositions, (rows || []).map(positionFromRow));
-  const haveTitles = new Set(known.map((p) => p.title));
-
-  const planned = [
-    ...ARMY_FIXED_POSITIONS,
-    ...ARMY_GUARD_POSTS.flatMap((title) =>
-      buildDivisionRows(title, ARMY_GUARD_POST_DIVISION_HOURS).map((row) => ({
-        ...row,
-        category: "תורנות שמירה",
-        weekdays: [0, 1, 2, 3, 4, 5, 6],
-      }))
-    ),
-  ].filter((p) => !haveTitles.has(p.title));
-
-  let created = [];
-  if (planned.length) {
-    const { data, error: insErr } = await supabase
+async function ensureArmyPositions(teamCode, existingPositions, { reconcile = false } = {}) {
+  const readActive = async () => {
+    const { data, error } = await supabase
       .from("gs_positions")
-      .insert(planned.map((p) => positionToRow({ ...p, shape: "template", requiredGuards: 1, active: true }, teamCode)))
-      .select();
-    if (insErr) throw new Error(`יצירת עמדות ההדגמה נכשלה: ${insErr.message}`);
-    created = (data || []).map(positionFromRow);
+      .select("*")
+      .eq("team_code", teamCode)
+      .eq("active", true);
+    if (error) throw new Error(`קריאת עמדות הצוות נכשלה: ${error.message}`);
+    return (data || []).map(positionFromRow);
+  };
+
+  const known = mergeById(existingPositions.filter((p) => p.active !== false), await readActive());
+  const { insert, update, deactivate } = planArmyDemoPositions(known, { reconcile });
+
+  for (const { id, patch } of update) {
+    const { data, error } = await supabase
+      .from("gs_positions").update(positionToRow(patch, teamCode)).eq("id", id).select("id");
+    if (error || !data?.length) throw new Error(`עדכון עמדת ההדגמה "${patch.title}" נכשל`);
+  }
+  if (deactivate.length) {
+    const { error } = await supabase.from("gs_positions").update({ active: false }).in("id", deactivate).select("id");
+    if (error) throw new Error(`כיבוי עמדות ההדגמה הישנות נכשל: ${error.message}`);
+  }
+  if (insert.length) {
+    const { error } = await supabase
+      .from("gs_positions")
+      .insert(insert.map((p) => positionToRow({ ...p, shape: "template", active: true }, teamCode)))
+      .select("id");
+    if (error) throw new Error(`יצירת עמדות ההדגמה נכשלה: ${error.message}`);
   }
 
-  return { allPositions: [...known, ...created], positionsAdded: created.length };
+  const touched = update.length || deactivate.length || insert.length;
+  return {
+    allPositions: touched ? await readActive() : known,
+    positionsAdded: insert.length,
+    changedIds: new Set([...update.map((u) => u.id), ...deactivate]),
+  };
 }
 
 /**
- * הדגמה מלאה למצב army: `guardCount` חיילים + חמש המשימות
- * הקבועות (כולל שתי עמדות 24/7 מחולקות) + זמינות דטרמיניסטית לכל
- * המשמרות שמומשו מהן לשבוע הבא. Safe to re-run — כל שלב מוסיף רק מה
- * שחסר, באותו אופן בדיוק כמו seedDemoTeam.
+ * הדגמה מלאה למצב army: `guardCount` חיילים + מבנה העמדות של armyDemo.js
+ * + זמינות דטרמיניסטית לכל המשמרות שמומשו מהן לשבוע הבא. Safe to re-run —
+ * כל שלב מוסיף רק מה שחסר. `reconcile` (רק לצוות ההדגמה עצמו) מיישר גם
+ * עמדות ישנות למבנה הנוכחי, ובונה מחדש את משמרות-ההדגמה של השבוע שלהן.
  */
-export async function seedArmyRoster({ teamCode, existingGuards = [], existingPositions = [], guardCount = 20 }) {
+export async function seedArmyRoster({
+  teamCode, existingGuards = [], existingPositions = [], guardCount = ARMY_DEMO_SOLDIERS, reconcile = false,
+}) {
   const dates = weekByOffset(1);
   const sundayISO = dates[0];
 
-  const [{ allGuards, guardsAdded }, { allPositions, positionsAdded }] = await Promise.all([
+  const [{ allGuards, guardsAdded }, { allPositions, positionsAdded, changedIds }] = await Promise.all([
     ensureDemoGuards(teamCode, existingGuards, guardCount),
-    ensureArmyPositions(teamCode, existingPositions),
+    ensureArmyPositions(teamCode, existingPositions, { reconcile }),
   ]);
 
   // ---- מימוש המשמרות של השבוע מכל עמדה פעילה (כולן template — אין
@@ -321,7 +326,18 @@ export async function seedArmyRoster({ teamCode, existingGuards = [], existingPo
     .eq("kind", "shift")
     .in("start_date", dates);
   if (weekErr) throw new Error(`קריאת השבוע נכשלה: ${weekErr.message}`);
-  const realizedShifts = (existingWorkItems || []).map(shiftFromRow);
+  let realizedShifts = (existingWorkItems || []).map(shiftFromRow);
+
+  // משמרות-הדגמה של השבוע שנוצרו מעמדה שהשתנתה או כובתה עכשיו — נמחקות
+  // ונבנות מחדש מהעמדה המעודכנת למטה. רק isDemo: משמרת שמפקד יצר בעצמו
+  // לא נמחקת אף פעם. שיבוצים וזמינות שלהן נמחקים איתן (cascade).
+  const stale = realizedShifts.filter((s) => s.isDemo && changedIds.has(s.positionId)).map((s) => s.id);
+  if (stale.length) {
+    const { error } = await supabase.from("gs_work_items").delete().in("id", stale).select("id");
+    if (error) throw new Error(`ניקוי משמרות ההדגמה הישנות נכשל: ${error.message}`);
+    const gone = new Set(stale);
+    realizedShifts = realizedShifts.filter((s) => !gone.has(s.id));
+  }
 
   const missing = allPositions
     .filter((p) => p.active && p.shape === "template")
@@ -365,11 +381,16 @@ export async function seedArmyRoster({ teamCode, existingGuards = [], existingPo
     });
   });
 
-  if (availRows.length) {
-    const { error } = await supabase
-      .from("gs_availability").upsert(availRows, { onConflict: "shift_id,guard_id" });
-    if (error) throw new Error(`הגשות זמינות ההדגמה נכשלו: ${error.message}`);
-  }
+  // 45 חיילים × ~95 תורנויות בשבוע ≈ 4,400 שורות — נשלחות במנות (שבקשה
+  // אחת לא תתקרב למגבלת הגודל של השרת), ובמקביל: כל מנה לוקחת לשרת כמה
+  // שניות, ובטור ההדגמה האורחת חיכתה עליהן כחצי דקה לפני שנפתחה.
+  const chunks = [];
+  for (let i = 0; i < availRows.length; i += 1000) chunks.push(availRows.slice(i, i + 1000));
+  const results = await Promise.all(
+    chunks.map((chunk) => supabase.from("gs_availability").upsert(chunk, { onConflict: "shift_id,guard_id" }))
+  );
+  const failed = results.find((r) => r.error);
+  if (failed) throw new Error(`הגשות זמינות ההדגמה נכשלו: ${failed.error.message}`);
 
   return {
     guardsAdded,
