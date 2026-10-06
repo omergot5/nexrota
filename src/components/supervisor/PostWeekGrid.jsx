@@ -76,14 +76,14 @@ export default function PostWeekGrid({
     <div className="overflow-x-auto">
       <table className="w-full min-w-[760px] table-fixed border-collapse text-sm" dir="rtl">
         <colgroup>
-          <col className="w-[11.5rem]" />
+          <col className="w-[8.5rem] sm:w-[11.5rem]" />
           {dates.map((d) => (
             <col key={d} />
           ))}
         </colgroup>
         <thead>
           <tr className="bg-surface-sunken">
-            <th className="sticky right-0 z-10 bg-surface-sunken text-right px-3 py-2.5 text-xs font-bold text-muted">
+            <th className="sticky right-0 z-10 bg-bg shadow-[inset_0_0_0_999px_rgba(128,128,128,0.08)] text-right px-3 py-2.5 text-xs font-bold text-muted">
               עמדה / משמרת
             </th>
             {dates.map((date) => (
@@ -133,7 +133,7 @@ export default function PostWeekGrid({
                 <tr key={block.key} className="border-t border-hairline/60">
                   <th
                     scope="row"
-                    className="sticky right-0 z-10 bg-surface text-right px-3 py-1.5 align-middle font-normal"
+                    className="sticky right-0 z-10 bg-bg text-right px-3 py-1.5 align-middle font-normal"
                     title={block.afterMidnight ? "הלילה שאחרי כל יום — מתחיל ב-00:00 של היום שלמחרת" : undefined}
                   >
                     <span className="text-[12.5px] font-bold text-content">{block.part || "משמרת"}</span>{" "}

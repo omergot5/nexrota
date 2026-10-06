@@ -2729,18 +2729,6 @@ export function TeamView({
     <div className="space-y-6">
       <PageHeader title={t("nav.team")} subtitle={team?.name || `נהל ${t("noun.memberPlural")} ושתף את קוד הצוות`} />
 
-      <ProfilePicker team={team} actions={actions} busy={busy} shifts={shifts} tasks={tasks} />
-
-      <DeadlineSettings team={team} actions={actions} busy={busy} />
-
-      <RestHoursSettings team={team} actions={actions} busy={busy} />
-
-      <LongShiftSettings team={team} actions={actions} busy={busy} />
-
-      <FairnessWindowSettings team={team} actions={actions} busy={busy} />
-
-      <CategoryWeightSettings team={team} actions={actions} busy={busy} categories={categories} />
-
       <Card>
         <div className="flex items-center justify-between gap-6 flex-wrap">
           <div className="min-w-0">
@@ -2842,7 +2830,7 @@ export function TeamView({
             {guards.map((g) => (
               <li
                 key={g.id}
-                className="flex items-center justify-between p-3 bg-surface-sunken rounded-xl ring-1 ring-inset ring-hairline"
+                className="flex flex-wrap items-center justify-between gap-2 p-3 bg-surface-sunken rounded-xl ring-1 ring-inset ring-hairline"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <Avatar id={g.id} name={g.name} size={36} />
@@ -2899,7 +2887,7 @@ export function TeamView({
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <div className="flex items-center gap-1 flex-wrap max-sm:w-full max-sm:justify-end">
                   {team?.mode === "army" && (
                     <div className="w-32 ml-1">
                       <Select
@@ -2968,6 +2956,32 @@ export function TeamView({
           </ul>
         )}
       </Card>
+
+      {/* ההגדרות יושבות אחרי הרשימה ומקופלות: מנהל שבא להוסיף אדם או
+          לשלוח קוד לא צריך לגלול מעבר לחוקי שיבוץ. הבסיס (תחום, מועד הגשה,
+          מנוחה) פתוח בלחיצה אחת; הרך והנדיר — מתחת ל"מתקדם". */}
+      <details className="rounded-2xl ring-1 ring-inset ring-hairline bg-surface">
+        <summary className="cursor-pointer select-none p-4 flex items-center gap-2 font-bold text-content">
+          <Icon name="sliders" size={18} className="text-brand" />
+          הגדרות הצוות והשיבוץ
+          <span className="text-xs font-normal text-muted">תחום פעילות, מועד הגשה, מנוחה ועוד</span>
+        </summary>
+        <div className="space-y-6 p-4 pt-0">
+          <ProfilePicker team={team} actions={actions} busy={busy} shifts={shifts} tasks={tasks} />
+          <DeadlineSettings team={team} actions={actions} busy={busy} />
+          <RestHoursSettings team={team} actions={actions} busy={busy} />
+          <details className="rounded-xl ring-1 ring-inset ring-hairline">
+            <summary className="cursor-pointer select-none p-3 text-sm font-bold text-muted">
+              מתקדם: משמרות ארוכות, חלון הוגנות, משקלי קטגוריות
+            </summary>
+            <div className="space-y-6 p-3 pt-0">
+              <LongShiftSettings team={team} actions={actions} busy={busy} />
+              <FairnessWindowSettings team={team} actions={actions} busy={busy} />
+              <CategoryWeightSettings team={team} actions={actions} busy={busy} categories={categories} />
+            </div>
+          </details>
+        </div>
+      </details>
 
       <Modal
         open={Boolean(qualEditing)}
