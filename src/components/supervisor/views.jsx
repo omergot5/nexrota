@@ -8,7 +8,7 @@ import {
 } from "../ui.jsx";
 import { Dot, Icon } from "../icons.jsx";
 import { DEMO_TEAM_NAME } from "../../lib/demoData.js";
-import { ARMY_DEMO_SOLDIERS } from "../../lib/armyDemo.js";
+import { ARMY_DEMO_SMALL_MAX, ARMY_DEMO_SOLDIERS } from "../../lib/armyDemo.js";
 import {
   availabilityDeadline, byStartTime, dayName, DAYS_HE_SHORT, formatDateHe, fromISODate, isTaskEngineEligible,
   rangeLabelHe, rangeTextHe, recentItems, shortDate, toISODate, todayISO, weekByOffset, withEngineTasks,
@@ -67,12 +67,11 @@ const WEEK_PATTERNS = [
 // האורח האנונימי לפני התחברות, AuthPage.jsx) לא עובר דרך הרכיב הזה
 // בכלל — הוא מחוץ לסקופ במפורש, וממשיך להיות לחיצה-אחת-בלי-דיאלוג.
 function SeedDemoDialog({ open, onClose, onConfirm, busy }) {
-  // בצבא המבנה של ההדגמה (armyDemo.js — כוננות של 7, סיור של 3, שתי
-  // עמדות 24/7) דורש 45 חיילים כדי להתאייש; 20 מכסים רק כחצי, וזה מה
-  // שהאפשרויות הקטנות יותר מראות. בתחומים האחרים ההדגמה היא שתי משמרות
-  // ביום, ו-7/14/15/20 נשארים כמו שהיו.
+  // בצבא המבנה מתאים לגודל הצוות (armyDemo.js): 30 חיילים — שתי עמדות
+  // שמירה, סיור, כוננות ומטבח; 20 — מבנה קטן יותר. שניהם מתאיישים במלואם.
+  // בתחומים האחרים ההדגמה היא שתי משמרות ביום, ו-7/14/15/20 נשארים.
   const army = termProfile() === "army";
-  const counts = army ? [20, 30, ARMY_DEMO_SOLDIERS] : [7, 14, 15, 20];
+  const counts = army ? [ARMY_DEMO_SMALL_MAX, ARMY_DEMO_SOLDIERS] : [7, 14, 15, 20];
   const fallback = army ? ARMY_DEMO_SOLDIERS : 20;
   const [guardCount, setGuardCount] = useState(fallback);
   // מאפס לברירת המחדל בכל פתיחה — אחרת בחירה קודמת שבוטלה "נדבקת"

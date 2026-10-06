@@ -3,11 +3,16 @@
 //   node scripts/verify-army-demo.mjs
 //
 // Pure modules only — no browser, no database. The point of the coverage
-// section: a demo that opens 15 soldiers against 229 weekly slots shows a
+// section: a demo whose structure needs more soldiers than it opens shows a
 // half-empty roster and teaches the commander that the engine is broken.
-// If someone changes the structure or the soldier count, this fails first.
+// The first demo (229 slots, 45 soldiers) was too big to be a recognisable
+// company; at 30 soldiers it was 79% staffed and at 20 only 52%. So the
+// structure now scales with the team — and this fails first if someone
+// changes the structure or the soldier count without the other.
 
-import { ARMY_DEMO_POSITIONS, ARMY_DEMO_SOLDIERS, demoAvailabilityCode, planArmyDemoPositions } from "../src/lib/armyDemo.js";
+import {
+  ARMY_DEMO_SMALL_MAX, ARMY_DEMO_SOLDIERS, armyDemoPositions, demoAvailabilityCode, planArmyDemoPositions,
+} from "../src/lib/armyDemo.js";
 import { buildDivisionRows, plannedRowsForWeek } from "../src/lib/positions.js";
 import { autoAssign, teamRules } from "../src/lib/autoAssign.js";
 import { splitShiftLabel } from "../src/lib/dates.js";
@@ -43,84 +48,125 @@ check(
 check("כל משמרת בחלוקה נושאת את שם העמדה לפני ' – '", four.every((r) => splitShiftLabel(r.title).post === "עמדה"));
 
 // ============================================================
-console.log("\nמבנה ההדגמה — בדיוק מה שהמפקד שלח\n");
+console.log("\nגדלים — עד 30 חיילים, ומבנה קטן ל-20\n");
 // ============================================================
 
-const byPost = new Map();
-for (const p of ARMY_DEMO_POSITIONS) {
-  const { post } = splitShiftLabel(p.title);
-  if (!byPost.has(post)) byPost.set(post, []);
-  byPost.get(post).push(p);
-}
-const post = (name) => byPost.get(name) || [];
+check("ברירת המחדל היא 30 חיילים לכל היותר", ARMY_DEMO_SOLDIERS <= 30 && ARMY_DEMO_SOLDIERS > ARMY_DEMO_SMALL_MAX);
+check(
+  "עד 20 חיילים — המבנה הקטן; 21 ומעלה — הרגיל",
+  armyDemoPositions(20) !== armyDemoPositions(21) &&
+    armyDemoPositions(20) === armyDemoPositions(5) &&
+    armyDemoPositions(25) === armyDemoPositions(30)
+);
 
-check("שתי עמדות שמירה, 4 משמרות של 6 שעות, חייל אחד בכל אחת",
-  ["עמדת שמירה 1", "עמדת שמירה 2"].every((n) => post(n).length === 4 && post(n).every((p) => p.requiredGuards === 1)));
-check("סיור: 3 משמרות של 8 שעות, 3 חיילים בכל אחת",
-  post("סיור").length === 3 && post("סיור").every((p) => p.requiredGuards === 3));
-check("כוננות: 2 משמרות של 12 שעות, 7 חיילים במקביל",
-  post("כוננות").length === 2 && post("כוננות").every((p) => p.requiredGuards === 7));
+const byPost = (positions) => {
+  const m = new Map();
+  for (const p of positions) {
+    const { post } = splitShiftLabel(p.title);
+    if (!m.has(post)) m.set(post, []);
+    m.get(post).push(p);
+  }
+  return (name) => m.get(name) || [];
+};
+const slotsOf = (positions) => positions.reduce((n, p) => n + p.requiredGuards * p.weekdays.length, 0);
+
+const std = armyDemoPositions(30);
+const post = byPost(std);
+check(
+  "רגיל: שתי עמדות שמירה, 4 משמרות של 6 שעות, חייל אחד בכל אחת",
+  ["עמדת שמירה 1", "עמדת שמירה 2"].every((n) => post(n).length === 4 && post(n).every((p) => p.requiredGuards === 1))
+);
+check(
+  "רגיל: סיור — 3 משמרות של 8 שעות, 2 חיילים בכל אחת",
+  post("סיור").length === 3 && post("סיור").every((p) => p.requiredGuards === 2)
+);
+check(
+  "רגיל: כוננות — 2 משמרות של 12 שעות, 3 חיילים במקביל",
+  post("כוננות").length === 2 && post("כוננות").every((p) => p.requiredGuards === 3)
+);
 const kitchen = post("תורנות מטבח");
-check("מטבח: 06:30–20:30, 2 חיילים, א'–ו'",
+check(
+  "רגיל: מטבח 06:30–20:30, 2 חיילים, א'–ו'",
   kitchen.length === 1 && kitchen[0].startTime === "06:30" && kitchen[0].endTime === "20:30" &&
-  kitchen[0].requiredGuards === 2 && kitchen[0].weekdays.join() === "0,1,2,3,4,5");
-check("כל עמדה מחולקת מתחילה בבוקר (06:00)",
-  ["עמדת שמירה 1", "עמדת שמירה 2", "סיור", "כוננות"].every((n) => post(n)[0].startTime === "06:00"));
+    kitchen[0].requiredGuards === 2 && kitchen[0].weekdays.join() === "0,1,2,3,4,5"
+);
+check(
+  "רגיל: כל עמדה מחולקת מתחילה בבוקר (06:00)",
+  ["עמדת שמירה 1", "עמדת שמירה 2", "סיור", "כוננות"].every((n) => post(n)[0].startTime === "06:00")
+);
+check("רגיל: 152 מקומות בשבוע", slotsOf(std) === 152, `got ${slotsOf(std)}`);
+
+const small = armyDemoPositions(20);
+const sPost = byPost(small);
+check(
+  "קטן: עמדת שמירה אחת, סיור של חייל, כוננות של 3, מטבח של אחד",
+  sPost("עמדת שמירה 2").length === 0 && sPost("עמדת שמירה 1").length === 4 &&
+    sPost("סיור").every((p) => p.requiredGuards === 1) && sPost("כוננות").every((p) => p.requiredGuards === 3) &&
+    sPost("תורנות מטבח")[0].requiredGuards === 1
+);
+check("קטן: 97 מקומות בשבוע", slotsOf(small) === 97, `got ${slotsOf(small)}`);
+
+// ============================================================
+console.log("\nכיסוי — המבנה מתאייש במלואו עם הצוות שמיועד לו\n");
+// ============================================================
 
 const sunday = "2026-10-11";
-let pid = 0;
-let sid = 0;
-const positions = ARMY_DEMO_POSITIONS.map((p) => ({ ...p, id: `p${++pid}`, shape: "template", active: true }));
-const shifts = positions
-  .flatMap((p) => plannedRowsForWeek(p, sunday))
-  .map((r) => ({ ...r, id: `s${++sid}`, assignedGuards: [] }));
-const need = shifts.reduce((n, s) => n + s.requiredGuards, 0);
-check("229 מקומות בשבוע", need === 229, `got ${need}`);
+function week(positions) {
+  let pid = 0;
+  let sid = 0;
+  const withIds = positions.map((p) => ({ ...p, id: `p${++pid}`, shape: "template", active: true }));
+  return withIds.flatMap((p) => plannedRowsForWeek(p, sunday)).map((r) => ({ ...r, id: `s${++sid}`, assignedGuards: [] }));
+}
 
-// ============================================================
-console.log("\nכיסוי — 45 חיילים מאיישים את השבוע\n");
-// ============================================================
-
-const guards = Array.from({ length: ARMY_DEMO_SOLDIERS }, (_, i) => ({ id: `g${i}`, name: `g${i}` }));
-const dates = [...new Set(shifts.map((s) => s.date))].sort();
-const STATUS = { a: "available", u: "unavailable", m: "maybe" };
-const availability = {};
-guards.forEach((g, gi) =>
-  dates.forEach((date, di) => {
-    shifts
-      .filter((s) => s.date === date)
-      .sort((a, b) => a.startTime.localeCompare(b.startTime))
-      .forEach((s, si) => {
-        availability[`${g.id}-${s.id}`] = STATUS[demoAvailabilityCode(gi, di * 5 + si, si % 2 === 0 ? "day" : "night")];
-      });
-  })
-);
-
-const missingOf = (res, pred = () => true) =>
-  (res.unfilled || []).filter((u) => pred(u)).reduce((m, u) => m + u.missing, 0);
-const isKitchen = (u) => String(u.shift?.label || u.label || "").includes("מטבח");
+const STATUS = { a: "available", u: "unavailable" };
+function staff(shifts, soldiers, rules) {
+  const guards = Array.from({ length: soldiers }, (_, i) => ({ id: `g${i}`, name: `g${i}` }));
+  const dates = [...new Set(shifts.map((s) => s.date))].sort();
+  const availability = {};
+  guards.forEach((g, gi) =>
+    dates.forEach((date, di) => {
+      shifts
+        .filter((s) => s.date === date)
+        .sort((a, b) => a.startTime.localeCompare(b.startTime))
+        .forEach((s, si) => {
+          availability[`${g.id}-${s.id}`] = STATUS[demoAvailabilityCode(gi, di * 5 + si, si % 2 === 0 ? "day" : "night")];
+        });
+    })
+  );
+  const need = shifts.reduce((n, s) => n + s.requiredGuards, 0);
+  const result = autoAssign({ shifts, guards, availability, rules });
+  return { result, need, filled: result.summary.filledSlots };
+}
 
 // כללי צוות צבאי כמו שהם באמת: מנוחה 10, ומטבח+כוננות מותרים מעל 12 שעות.
-const armyRules = { ...teamRules({ mode: "army", restHours: 10 }) };
-const army = autoAssign({ shifts, guards, availability, rules: armyRules });
-check(
-  "בכללי הצבא (מטבח מותר מעל 12): לפחות 99% מהמקומות מאוישים",
-  (need - missingOf(army)) / need >= 0.99,
-  `${need - missingOf(army)}/${need}`
-);
-check("המטבח (14 שעות, יש הפסקות) מאויש במלואו", missingOf(army, isKitchen) === 0, `${missingOf(army, isKitchen)} חסרים במטבח`);
+const army = teamRules({ mode: "army", restHours: 10 });
+const stdShifts = week(std);
+const smallShifts = week(small);
 
-const noException = autoAssign({ shifts, guards, availability, rules: { minRestHours: 10, longShiftCategories: [] } });
+const at30 = staff(stdShifts, ARMY_DEMO_SOLDIERS, army);
+check(`רגיל + ${ARMY_DEMO_SOLDIERS} חיילים: כל המקומות מאוישים (כולל המטבח, 14 שעות)`, at30.filled === at30.need, `${at30.filled}/${at30.need}`);
+
+const at25 = staff(stdShifts, 25, army);
+check("רגיל + 25 חיילים: לפחות 95% מאוישים", at25.filled / at25.need >= 0.95, `${at25.filled}/${at25.need}`);
+
+const small20 = staff(smallShifts, ARMY_DEMO_SMALL_MAX, army);
+check(`קטן + ${ARMY_DEMO_SMALL_MAX} חיילים: כל המקומות מאוישים`, small20.filled === small20.need, `${small20.filled}/${small20.need}`);
+
+const std20 = staff(stdShifts, ARMY_DEMO_SMALL_MAX, army);
 check(
-  "בלי ההיתר המנוע לא עוקף את כלל ה-12: המטבח נשאר פתוח",
-  missingOf(noException, isKitchen) === 12,
-  `${missingOf(noException, isKitchen)} חסרים במטבח`
+  "רגיל + 20 חיילים (לא המבנה שלהם): חלקי, בין 70% ל-90% — המנוע לא מסתיר את החוסר",
+  std20.filled / std20.need >= 0.7 && std20.filled / std20.need < 0.9,
+  `${std20.filled}/${std20.need}`
 );
-const half = autoAssign({ shifts, guards: guards.slice(0, 20), availability, rules: armyRules });
+check("... ולא עובר את תקרת 6 התורנויות לחייל", std20.result.fairness.perGuard.every((p) => p.shifts <= 6));
+
+const missingOf = (res, pred) => (res.unfilled || []).filter(pred).reduce((m, u) => m + u.missing, 0);
+const isKitchen = (u) => String(u.shift?.label || u.label || "").includes("מטבח");
+const strict = staff(stdShifts, ARMY_DEMO_SOLDIERS, { minRestHours: 10, longShiftCategories: [] });
 check(
-  "20 חיילים לא מספיקים (פחות מ-60%) — לכן ההדגמה פותחת 45",
-  (need - missingOf(half)) / need < 0.6,
-  `${need - missingOf(half)}/${need}`
+  "בלי ההיתר ל'משמרות ארוכות' המנוע לא עוקף את כלל ה-12: רק המטבח נשאר פתוח",
+  missingOf(strict.result, (u) => !isKitchen(u)) === 0 && missingOf(strict.result, isKitchen) === 12,
+  `${missingOf(strict.result, isKitchen)} חסרים במטבח`
 );
 
 // ============================================================
@@ -128,7 +174,8 @@ console.log("\nיישור עמדות קיימות — צוות אמיתי מול
 // ============================================================
 
 const fresh = planArmyDemoPositions([]);
-check("צוות ריק: מוסיפים את כל העמדות", fresh.insert.length === ARMY_DEMO_POSITIONS.length && !fresh.update.length);
+check("צוות ריק: מוסיפים את כל העמדות", fresh.insert.length === std.length && !fresh.update.length);
+check("צוות ריק ב-20: מוסיפים את המבנה הקטן", planArmyDemoPositions([], { soldiers: 20 }).insert.length === small.length);
 
 // הדגמה ישנה: סיור בודד 06–18 לאדם אחד, ועמדת שמירה שחולקה מחצות ל-8 שעות.
 const old = [
@@ -141,10 +188,35 @@ check("צוות אמיתי: לא מעדכנים ולא מכבים שום עמד�
 check("צוות אמיתי: מוסיפים רק שמות שחסרים", !realTeam.insert.some((p) => p.title === "עמדת שמירה 1 – משמרת 1"));
 
 const demoTeam = planArmyDemoPositions(old, { reconcile: true });
-check("צוות ההדגמה: עמדה באותו שם שהוגדרה אחרת מתעדכנת (משמרת 1 → 06–12)",
-  demoTeam.update.some((u) => u.id === "o2" && u.patch.startTime === "06:00" && u.patch.endTime === "12:00"));
+check(
+  "צוות ההדגמה: עמדה באותו שם שהוגדרה אחרת מתעדכנת (משמרת 1 → 06–12)",
+  demoTeam.update.some((u) => u.id === "o2" && u.patch.startTime === "06:00" && u.patch.endTime === "12:00")
+);
 check("צוות ההדגמה: עמדה שכבר תואמת לא נוגעים בה", !demoTeam.update.some((u) => u.id === "o3"));
 check("צוות ההדגמה: 'סיור' הבודד הישן כבה (הסיור החדש מחולק)", demoTeam.deactivate.includes("o1"));
+
+// הדגמה ישנה של 45: סיור של 3 וכוננות של 7 — מתכווצות לכמויות הרגילות.
+const big = std.map((p, i) => ({
+  ...p, id: `b${i}`, shape: "template", active: true,
+  requiredGuards: p.category === "סיור" ? 3 : p.category === "כוננות" ? 7 : p.requiredGuards,
+}));
+const shrink = planArmyDemoPositions(big, { reconcile: true });
+check(
+  "הדגמה ישנה (סיור ×3, כוננות ×7) מתעדכנת לכמויות הרגילות (×2, ×3)",
+  shrink.update.length === 5 &&
+    shrink.update.filter((u) => u.patch.category === "סיור").every((u) => u.patch.requiredGuards === 2) &&
+    shrink.update.filter((u) => u.patch.category === "כוננות").every((u) => u.patch.requiredGuards === 3),
+  `${shrink.update.length} עדכונים`
+);
+const toSmall = planArmyDemoPositions(
+  std.map((p, i) => ({ ...p, id: `s${i}`, shape: "template", active: true })),
+  { reconcile: true, soldiers: 20 }
+);
+check(
+  "מעבר ל-20: עמדת שמירה 2 כבית (4 משמרות), ושאר העמדות לא נוספות מחדש",
+  toSmall.deactivate.length === 4 && toSmall.insert.length === 0,
+  `deactivate=${toSmall.deactivate.length} insert=${toSmall.insert.length}`
+);
 
 console.log(failures === 0 ? "\nPASS\n" : `\n${failures} FAILURE(S)\n`);
 process.exit(failures === 0 ? 0 : 1);

@@ -6,10 +6,12 @@
 // אבל ארבע כוננויות של 12 שעות אינן חמש עמדות של 6, ומעבר האיזון עצר אחרי
 // שני מהלכים. 9 חיילים עשו את כל המטבח, ואחד מהם שלוש פעמים.
 //
-// הספים כאן הם מה שהמנוע מגיע אליו היום, עם מרווח קטן. מי ששובר אותם צריך
-// לדעת שהוא החזיר פער אמיתי בין אנשים, לא רק שינה מספר.
+// נבדק בשלושה גדלים של הדגמת הצבא — 30 חיילים (המבנה הרגיל), 25 (אותו מבנה,
+// פחות אנשים) ו-20 (המבנה הקטן). הספים הם מה שהמנוע מגיע אליו היום, עם
+// מרווח קטן, והמנוע שלפני התיקון נכשל בהם (ר' ההערה לכל בדיקה). מי ששובר אותם
+// צריך לדעת שהוא החזיר פער אמיתי בין אנשים, לא רק שינה מספר.
 
-import { ARMY_DEMO_POSITIONS, ARMY_DEMO_SOLDIERS, demoAvailabilityCode } from "../src/lib/armyDemo.js";
+import { ARMY_DEMO_SMALL_MAX, ARMY_DEMO_SOLDIERS, armyDemoPositions, demoAvailabilityCode } from "../src/lib/armyDemo.js";
 import { plannedRowsForWeek } from "../src/lib/positions.js";
 import { autoAssign, shiftLoad, teamRules } from "../src/lib/autoAssign.js";
 import { shiftHours } from "../src/lib/dates.js";
@@ -48,86 +50,95 @@ function measure(result, shifts, guards) {
   };
 }
 
-// ============================================================
-console.log("\nמבנה הצבא — 229 מקומות, 45 חיילים, משמרות של 6/8/12/14 שעות\n");
-// ============================================================
-
 const sunday = "2026-10-11";
-let pid = 0;
-let sid = 0;
-const positions = ARMY_DEMO_POSITIONS.map((p) => ({ ...p, id: `p${++pid}`, shape: "template", active: true }));
-const shifts = positions
-  .flatMap((p) => plannedRowsForWeek(p, sunday))
-  .map((r) => ({ ...r, id: `s${++sid}`, assignedGuards: [] }));
-const guards = Array.from({ length: ARMY_DEMO_SOLDIERS }, (_, i) => ({ id: `g${i}`, name: `g${i}` }));
-const dates = [...new Set(shifts.map((s) => s.date))].sort();
-const STATUS = { a: "available", u: "unavailable", m: "maybe" };
-const availability = {};
-guards.forEach((g, gi) =>
-  dates.forEach((date, di) => {
-    shifts
-      .filter((s) => s.date === date)
-      .sort((a, b) => a.startTime.localeCompare(b.startTime))
-      .forEach((s, si) => {
-        availability[`${g.id}-${s.id}`] = STATUS[demoAvailabilityCode(gi, di * 5 + si, si % 2 === 0 ? "day" : "night")];
-      });
-  })
-);
+const STATUS = { a: "available", u: "unavailable" };
 
-const strictRun = autoAssign({ shifts, guards, availability, rules: { minRestHours: 10 } });
-const strict = measure(strictRun, shifts, guards);
-check(
-  "פער הנטל בין הכי עמוס לפנוי ביותר — עד 12 (היה 25.6)",
-  strict.spread <= 12,
-  `spread=${round1(strict.spread)}`
-);
-check("סטיית התקן של הנטל — עד 3 (הייתה 8.0)", strict.sd <= 3, `sd=${round1(strict.sd)}`);
-check("מעבר האיזון באמת עובד — יותר מ-10 מהלכים (היו 2)", strictRun.summary.balanceMoves > 10,
-  `balanceMoves=${strictRun.summary.balanceMoves}`);
+/** שבוע מלא של המבנה שמתאים ל-`structureFor` חיילים, עם `soldiers` חיילים. */
+function scenario(soldiers, structureFor, rules) {
+  let pid = 0;
+  let sid = 0;
+  const positions = armyDemoPositions(structureFor).map((p) => ({ ...p, id: `p${++pid}`, shape: "template", active: true }));
+  const shifts = positions
+    .flatMap((p) => plannedRowsForWeek(p, sunday))
+    .map((r) => ({ ...r, id: `s${++sid}`, assignedGuards: [] }));
+  const guards = Array.from({ length: soldiers }, (_, i) => ({ id: `g${i}`, name: `g${i}` }));
+  const dates = [...new Set(shifts.map((s) => s.date))].sort();
+  const availability = {};
+  guards.forEach((g, gi) =>
+    dates.forEach((date, di) => {
+      shifts
+        .filter((s) => s.date === date)
+        .sort((a, b) => a.startTime.localeCompare(b.startTime))
+        .forEach((s, si) => {
+          availability[`${g.id}-${s.id}`] = STATUS[demoAvailabilityCode(gi, di * 5 + si, si % 2 === 0 ? "day" : "night")];
+        });
+    })
+  );
+  const need = shifts.reduce((n, s) => n + s.requiredGuards, 0);
+  const result = autoAssign({ shifts, guards, availability, rules });
+  const sig = result.assignments.map((a) => `${a.shiftId}:${a.guardId}`).sort().join("|");
+  return { shifts, guards, availability, need, result, sig, m: measure(result, shifts, guards), rules };
+}
 
-const relaxedRun = autoAssign({ shifts, guards, availability, rules: { minRestHours: 10, maxConsecutiveHours: 14 } });
-const relaxed = measure(relaxedRun, shifts, guards);
-check("גם כשהמטבח מאויש: פער הנטל עד 12", relaxed.spread <= 12, `spread=${round1(relaxed.spread)}`);
-check(
-  "המטבח עובר בסבב: 12 חיילים שונים על 12 התורנויות (היו 9)",
-  relaxed.inCategory("תורנות מטבח") === 12,
-  `${relaxed.inCategory("תורנות מטבח")} חיילים`
-);
-check(
-  "אף חייל לא עושה מטבח פעמיים באותו שבוע (היה 3)",
-  relaxed.maxInCategory("תורנות מטבח") === 1,
-  `max=${relaxed.maxInCategory("תורנות מטבח")}`
-);
-check(
-  "הסבב לא עולה בכיסוי: כל 229 המקומות מאוישים",
-  relaxedRun.summary.filledSlots === 229,
-  `${relaxedRun.summary.filledSlots}/229`
-);
+const army = teamRules({ mode: "army", restHours: 10 });
+const kitchenSlots = (sc) => sc.shifts.filter((s) => s.category === "תורנות מטבח").reduce((n, s) => n + s.requiredGuards, 0);
 
-// הכללים שהצוות באמת רץ איתם (teamRules, 0029): מטבח וכוננות מותרים מעל 12.
-const teamRun = autoAssign({
-  shifts, guards, availability, rules: { ...teamRules({ mode: "army", restHours: 10 }) },
-});
-const team = measure(teamRun, shifts, guards);
-check("בכללי הצוות: כל 229 המקומות מאוישים — ההוגנות לא עולה בכיסוי", teamRun.summary.filledSlots === 229,
-  `${teamRun.summary.filledSlots}/229`);
-check("בכללי הצוות: פער הנטל עד 10 (היה 35.8)", team.spread <= 10, `spread=${round1(team.spread)}`);
-check("בכללי הצוות: המטבח — 12 חיילים, פעם אחת כל אחד", team.inCategory("תורנות מטבח") === 12 && team.maxInCategory("תורנות מטבח") === 1,
-  `${team.inCategory("תורנות מטבח")} חיילים, max=${team.maxInCategory("תורנות מטבח")}`);
+const SCENARIOS = [
+  { name: `${ARMY_DEMO_SOLDIERS} חיילים — המבנה הרגיל (ברירת המחדל)`, soldiers: ARMY_DEMO_SOLDIERS, structure: ARMY_DEMO_SOLDIERS, minCover: 1, moves: 10 },
+  { name: "25 חיילים — אותו מבנה, פחות אנשים", soldiers: 25, structure: ARMY_DEMO_SOLDIERS, minCover: 0.97, moves: 0 },
+  { name: `${ARMY_DEMO_SMALL_MAX} חיילים — המבנה הקטן`, soldiers: ARMY_DEMO_SMALL_MAX, structure: ARMY_DEMO_SMALL_MAX, minCover: 1, moves: 0 },
+];
+
+for (const spec of SCENARIOS) {
+  console.log(`\n${spec.name}\n`);
+  const sc = scenario(spec.soldiers, spec.structure, army);
+  const { m } = sc;
+  const filled = sc.result.summary.filledSlots;
+
+  // המנוע שלפני התיקון: פער נטל 20–46, סטיית תקן 6–11 — הסף נמוך מכך בהרבה.
+  check(`כיסוי: ${filled}/${sc.need}`, filled / sc.need >= spec.minCover, `${filled}/${sc.need}`);
+  check("פער הנטל בין הכי עמוס לפנוי ביותר — עד 12", m.spread <= 12, `spread=${round1(m.spread)}`);
+  check("סטיית התקן של הנטל — עד 3.6", m.sd <= 3.6, `sd=${round1(m.sd)}`);
+  check("אף חייל לא עובר את תקרת 6 התורנויות", sc.result.fairness.perGuard.every((p) => p.shifts <= 6));
+  if (spec.moves) {
+    check(`מעבר האיזון באמת עובד — יותר מ-${spec.moves} מהלכים (היו 4 במנוע הישן)`, sc.result.summary.balanceMoves > spec.moves,
+      `balanceMoves=${sc.result.summary.balanceMoves}`);
+  }
+
+  // הסבב: כל משבצת מטבח אצל אדם אחר כל עוד יש מי שעוד לא עשה — ללא כפילות.
+  const ks = kitchenSlots(sc);
+  const kitchenFilled = sc.shifts
+    .filter((s) => s.category === "תורנות מטבח")
+    .reduce((n, s) => n + (sc.result.byShift[s.id] || []).length, 0);
+  if (ks > 0 && kitchenFilled === ks && spec.soldiers >= ks) {
+    check(`המטבח עובר בסבב: ${ks} משבצות, ${ks} חיילים שונים, פעם אחת כל אחד`,
+      m.inCategory("תורנות מטבח") === ks && m.maxInCategory("תורנות מטבח") === 1,
+      `${m.inCategory("תורנות מטבח")} חיילים, max=${m.maxInCategory("תורנות מטבח")}`);
+  }
+
+  const again = scenario(spec.soldiers, spec.structure, army);
+  check("אותם נתונים, אותו סידור (דטרמיניזם)", again.sig === sc.sig);
+}
 
 // ============================================================
-console.log("\nדטרמיניזם — אותם נתונים, אותו סידור\n");
+console.log("\nבלי ההיתר ל'משמרות ארוכות' — המנוע עדיין לא עוקף את כלל ה-12\n");
 // ============================================================
 
-const again = autoAssign({ shifts, guards, availability, rules: { minRestHours: 10, maxConsecutiveHours: 14 } });
-const sig = (r) => r.assignments.map((a) => `${a.shiftId}:${a.guardId}`).sort().join("|");
-check("שתי הרצות זהות לגמרי", sig(again) === sig(relaxedRun));
+{
+  const strict = scenario(ARMY_DEMO_SOLDIERS, ARMY_DEMO_SOLDIERS, { minRestHours: 10, longShiftCategories: [] });
+  const open = strict.result.unfilled.reduce((n, u) => n + u.missing, 0);
+  const kitchenOpen = strict.result.unfilled
+    .filter((u) => String(u.shift?.label || "").includes("מטבח"))
+    .reduce((n, u) => n + u.missing, 0);
+  check("רק המטבח (14 שעות) נשאר פתוח", open === kitchenOpen && kitchenOpen === kitchenSlots(strict), `${open} פתוחים, ${kitchenOpen} במטבח`);
+  check("ועדיין פער הנטל סביר", strict.m.spread <= 14, `spread=${round1(strict.m.spread)}`);
+}
 
 // ============================================================
 console.log("\nרוסטר אזרחי מעורב — עמדות של 6 שעות וכוננות של 12, 14 אנשים\n");
 // ============================================================
 
-const civilDates = dates;
+const civilDates = ["2026-10-11", "2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16", "2026-10-17"];
 const civilShifts = [];
 let cid = 0;
 for (const date of civilDates) {

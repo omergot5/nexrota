@@ -1,18 +1,23 @@
 // ============================================================
 // הדגמת צבא — המבנה עצמו, בלי Supabase (נבדק ב-scripts/verify-army-demo.mjs).
 //
-// המבנה הוא מה שמפקד אמיתי בנה ושלח כדוגמה: שתי עמדות שמירה מאוישות
-// 24/7 בארבע משמרות של 6 שעות (חייל אחד בכל משמרת), סיור בשלוש משמרות של
-// 8 שעות (3 חיילים), כוננות בשתי משמרות של 12 שעות (7 חיילים במקביל),
-// ותורנות מטבח 06:30–20:30 (2 חיילים, א'–ו').
+// שני גדלים, כי מבנה צריך להתאים לצוות שמאייש אותו (מדוד בסקריפט, לא מנחוש):
 //
-// זה 229 מקומות בשבוע. עם תקרה של 6 תורנויות לחייל ו-3 לילות, 15–20
-// חיילים מכסים רק חצי מהם — ולכן ההדגמה פותחת 45 חיילים, שזה מה שהמבנה
-// הזה דורש בפועל.
+//   רגיל (עד 30 חיילים): שתי עמדות שמירה מאוישות 24/7 בארבע משמרות של 6
+//   שעות (חייל אחד בכל משמרת), סיור בשלוש משמרות של 8 שעות (2 חיילים), כוננות
+//   בשתי משמרות של 12 שעות (3 חיילים במקביל) ותורנות מטבח 06:30–20:30 (2
+//   חיילים, א'–ו'). 152 מקומות בשבוע, כ-5 תורנויות לחייל — מתאייש במלואו.
 //
-// תורנות המטבח היא 14 שעות רצופות — יותר ממקסימום ה-12. היא מאוישת כי
-// בצבא "תורנות מטבח" ו"כוננות" מותרות כמשמרות ארוכות (יש בהן הפסקות —
-// LONG_SHIFT_DEFAULTS ב-autoAssign.js, ניתן לשינוי בהגדרות הצוות).
+//   קטן (עד 20 חיילים): עמדת שמירה אחת, סיור של חייל אחד, כוננות של 3 ומטבח
+//   של אחד. 97 מקומות, כ-5 לחייל.
+//
+// המבנה הראשון של ההדגמה (229 מקומות, 45 חיילים) היה מוגזם: צוות דוגמה
+// צריך להיראות כמו פלוגה שאפשר להכיר, לא כמו גדוד. 30 חיילים על 229 מקומות
+// מתאיישים רק ב-79%, ו-20 ב-52% — לכן המבנה מתכווץ יחד עם הצוות.
+//
+// שימו לב: תורנות המטבח היא 14 שעות רצופות, ובכללי ברירת המחדל (מקסימום
+// 12) המנוע לא משבץ אליה. בצוות צבאי היא מותרת ארוכה (LONG_SHIFT_DEFAULTS,
+// הגדרת הצוות "משמרות ארוכות") — אמת על המבנה, לא הסתרה.
 // ============================================================
 
 import { buildDivisionRows } from "./positions.js";
@@ -23,23 +28,42 @@ const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const divided = (title, hours, category, requiredGuards) =>
   buildDivisionRows(title, hours).map((row) => ({ ...row, category, weekdays: ALL_DAYS, requiredGuards }));
 
-export const ARMY_DEMO_POSITIONS = [
+const kitchen = (requiredGuards) => ({
+  title: "תורנות מטבח",
+  category: "תורנות מטבח",
+  weekdays: [0, 1, 2, 3, 4, 5],
+  startTime: "06:30",
+  endTime: "20:30",
+  requiredGuards,
+});
+
+const STANDARD_POSITIONS = [
   ...divided("עמדת שמירה 1", 6, "תורנות שמירה", 1),
   ...divided("עמדת שמירה 2", 6, "תורנות שמירה", 1),
-  ...divided("סיור", 8, "סיור", 3),
-  ...divided("כוננות", 12, "כוננות", 7),
-  {
-    title: "תורנות מטבח",
-    category: "תורנות מטבח",
-    weekdays: [0, 1, 2, 3, 4, 5],
-    startTime: "06:30",
-    endTime: "20:30",
-    requiredGuards: 2,
-  },
+  ...divided("סיור", 8, "סיור", 2),
+  ...divided("כוננות", 12, "כוננות", 3),
+  kitchen(2),
 ];
 
-/** כמה חיילים ההדגמה פותחת — מה שהמבנה למעלה צריך כדי להתאייש (ר' ראש הקובץ). */
-export const ARMY_DEMO_SOLDIERS = 45;
+const SMALL_POSITIONS = [
+  ...divided("עמדת שמירה 1", 6, "תורנות שמירה", 1),
+  ...divided("סיור", 8, "סיור", 1),
+  ...divided("כוננות", 12, "כוננות", 3),
+  kitchen(1),
+];
+
+/** כמה חיילים ההדגמה פותחת כברירת מחדל — המקסימום שהמבנה הרגיל מחזיק (ר' ראש הקובץ). */
+export const ARMY_DEMO_SOLDIERS = 30;
+
+/** עד כמה חיילים המבנה הקטן מספיק; מעל זה — הרגיל. */
+export const ARMY_DEMO_SMALL_MAX = 20;
+
+/** המבנה שמתאים לצוות בגודל הזה. */
+export const armyDemoPositions = (soldiers = ARMY_DEMO_SOLDIERS) =>
+  soldiers <= ARMY_DEMO_SMALL_MAX ? SMALL_POSITIONS : STANDARD_POSITIONS;
+
+/** המבנה הרגיל — מה שההדגמה פותחת כברירת מחדל. */
+export const ARMY_DEMO_POSITIONS = STANDARD_POSITIONS;
 
 /**
  * זמינות לדוגמה — דטרמיניסטית וקבועה בין הרצות, לא Math.random. בצבא החייל עונה
@@ -70,15 +94,17 @@ const matchesPlan = (pos, plan) =>
  * אחרת, ומכבים עמדות שאינן במבנה — כדי ש"מלא נתוני הדגמה" על הדגמה ישנה
  * ייתן בדיוק את המבנה הנוכחי, ולא תערובת של הישן והחדש.
  *
+ * `soldiers` בוחר את המבנה (רגיל או קטן) — אותו דבר שההדגמה פותחת לצוות בגודל הזה.
  * @returns {{insert: object[], update: {id: string, patch: object}[], deactivate: string[]}}
  */
-export function planArmyDemoPositions(active = [], { reconcile = false } = {}) {
+export function planArmyDemoPositions(active = [], { reconcile = false, soldiers = ARMY_DEMO_SOLDIERS } = {}) {
+  const PLAN = armyDemoPositions(soldiers);
   const byTitle = new Map(active.map((p) => [p.title, p]));
-  const insert = ARMY_DEMO_POSITIONS.filter((p) => !byTitle.has(p.title));
+  const insert = PLAN.filter((p) => !byTitle.has(p.title));
   if (!reconcile) return { insert, update: [], deactivate: [] };
 
-  const planned = new Set(ARMY_DEMO_POSITIONS.map((p) => p.title));
-  const update = ARMY_DEMO_POSITIONS.filter((p) => byTitle.has(p.title) && !matchesPlan(byTitle.get(p.title), p)).map(
+  const planned = new Set(PLAN.map((p) => p.title));
+  const update = PLAN.filter((p) => byTitle.has(p.title) && !matchesPlan(byTitle.get(p.title), p)).map(
     (p) => ({ id: byTitle.get(p.title).id, patch: { ...p, shape: "template", active: true } })
   );
   const deactivate = active.filter((p) => !planned.has(p.title)).map((p) => p.id);

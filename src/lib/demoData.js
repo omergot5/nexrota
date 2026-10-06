@@ -16,8 +16,8 @@ import { ARMY_DEMO_SOLDIERS, demoAvailabilityCode, planArmyDemoPositions } from 
 
 // 7 הראשונים שומרים על הדפוס הידני המקורי (PATTERN למטה) — קנה מידה
 // שממחיש חלוקה-לא-1:1 (יותר תקנים מאנשים) בלי לרוקן את הדוגמה לשישה
-// אנשים. הדגמת הצבא צריכה 45 חיילים (ARMY_DEMO_SOLDIERS, armyDemo.js),
-// אז המאגר מחזיק 45 שמות אמיתיים — לא שמות גנריים ("שומר 8"). מ-8 ומעלה
+// אנשים. הדגמת הצבא פותחת עד 30 חיילים (ARMY_DEMO_SOLDIERS, armyDemo.js),
+// אז המאגר מחזיק 30 שמות אמיתיים — לא שמות גנריים ("שומר 8"). מ-8 ומעלה
 // אין PATTERN ידני — `fallbackStatus` (למטה) כבר מכסה אותם דטרמיניסטית.
 /** שם צוות ההדגמה האורחת. ההדגמה צבאית בלבד — המסך מזהה אותה לפי השם הזה. */
 export const DEMO_TEAM_NAME = "פלוגת הדגמה";
@@ -53,21 +53,6 @@ const DEMO_GUARDS = [
   { name: "טליה רוזנברג", phone: "054-3330008" },
   { name: "ינון שלום", phone: "058-3330009" },
   { name: "כרמל פרץ", phone: "053-3330010" },
-  { name: "לביא אדרי", phone: "050-3330011" },
-  { name: "מתן זכאי", phone: "052-3330012" },
-  { name: "נוי חזן", phone: "054-3330013" },
-  { name: "סהר יוסף", phone: "058-3330014" },
-  { name: "עדי גולדשטיין", phone: "053-3330015" },
-  { name: "פלג סויסה", phone: "050-3330016" },
-  { name: "צליל ברגר", phone: "052-3330017" },
-  { name: "קובי נגר", phone: "054-3330018" },
-  { name: "רוני אסולין", phone: "058-3330019" },
-  { name: "שקד מימון", phone: "053-3330020" },
-  { name: "תום פרלמן", phone: "050-3330021" },
-  { name: "איתי שגיא", phone: "052-3330022" },
-  { name: "אריאל דוד", phone: "054-3330023" },
-  { name: "יהונתן עזרא", phone: "058-3330024" },
-  { name: "ליה טננבאום", phone: "053-3330025" },
 ];
 
 const DAY = { label: "משמרת יום", startTime: "07:00", endTime: "19:00", type: "morning", color: SHIFT_TONES.morning };
@@ -260,7 +245,7 @@ export async function seedDemoTeam({ teamCode, existingGuards = [], existingShif
  * העמדות הפעילות אחרי השינוי, ואת מזהי העמדות שהשתנו או כובו — שהמשמרות
  * שכבר מומשו מהן השבוע צריכות להיבנות מחדש.
  */
-async function ensureArmyPositions(teamCode, existingPositions, { reconcile = false } = {}) {
+async function ensureArmyPositions(teamCode, existingPositions, { reconcile = false, soldiers } = {}) {
   const readActive = async () => {
     const { data, error } = await supabase
       .from("gs_positions")
@@ -272,7 +257,7 @@ async function ensureArmyPositions(teamCode, existingPositions, { reconcile = fa
   };
 
   const known = mergeById(existingPositions.filter((p) => p.active !== false), await readActive());
-  const { insert, update, deactivate } = planArmyDemoPositions(known, { reconcile });
+  const { insert, update, deactivate } = planArmyDemoPositions(known, { reconcile, soldiers });
 
   for (const { id, patch } of update) {
     const { data, error } = await supabase
@@ -313,7 +298,7 @@ export async function seedArmyRoster({
 
   const [{ allGuards, guardsAdded }, { allPositions, positionsAdded, changedIds }] = await Promise.all([
     ensureDemoGuards(teamCode, existingGuards, guardCount),
-    ensureArmyPositions(teamCode, existingPositions, { reconcile }),
+    ensureArmyPositions(teamCode, existingPositions, { reconcile, soldiers: guardCount }),
   ]);
 
   // ---- מימוש המשמרות של השבוע מכל עמדה פעילה (כולן template — אין
@@ -369,7 +354,7 @@ export async function seedArmyRoster({
   }
   for (const list of byDate.values()) list.sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-  // 45 חיילים × ~97 תורנויות ≈ 4,400 שורות. כ-JSON זה ~600KB, ובהעלאה איטית
+  // 30 חיילים × ~97 תורנויות ≈ 2,900 שורות. כ-JSON זה ~600KB, ובהעלאה איטית
   // ההדגמה חיכתה עליהן עשרות שניות. במקום זה: אות אחת לכל חייל×תורנות
   // (~10KB), והשרת פורש אותה לשורות (gs_seed_availability, מיגרציה 0030 —
   // עם אותן הרשאות RLS כמו כתיבה רגילה).
