@@ -572,7 +572,10 @@ export function useGuardian() {
           if (rpcErr) throw new Error("פתיחת ההדגמה נכשלה — נסה שוב");
           const row = Array.isArray(rows) ? rows[0] : rows;
 
-          await seedArmyRoster({ teamCode: row.team_code, existingGuards: [], existingPositions: [], guardCount: ARMY_DEMO_SOLDIERS });
+          // הצוות הזה נוצר עכשיו כצוות הדגמה — לכן reconcile (כולל מנוחה של 8 שעות, ר' seedArmyRoster).
+          await seedArmyRoster({
+            teamCode: row.team_code, existingGuards: [], existingPositions: [], guardCount: ARMY_DEMO_SOLDIERS, reconcile: true,
+          });
           await hydrateSelf();
           return row.team_code;
         },

@@ -17,6 +17,7 @@
 
 import { isCommander } from "./dutyRoles.js";
 import {
+  addDays,
   shiftInterval,
   shiftHours,
   isNightShift,
@@ -43,6 +44,8 @@ export const DEFAULT_RULES = {
   // קטגוריות שבכל משמרת שלהן חייב להיות לפחות בעל תפקיד אחד (סמל / מפקץ / מפקד כיתה).
   // נאכף רק אם בצוות יש בעלי תפקיד בכלל.
   commandCategories: [],
+  // קטגוריות שבהן אדם עושה לכל היותר משמרת אחת ביום מבצעי (סיור: אין "סיור כפול").
+  oncePerDayCategories: [],
 };
 
 /**
@@ -56,6 +59,17 @@ export const LONG_SHIFT_DEFAULTS = { army: ["תורנות מטבח", "כוננו
 export const COMMAND_DEFAULTS = { army: ["סיור", "כוננות"] };
 
 /**
+ * בצבא: לא שני סיורים לאותו חייל באותו יום, גם כשהמנוחה (8 שעות) מאפשרת 06:00–14:00 ו-22:00–06:00.
+ * היום המבצעי: 00:00–05:00 שייך ליום הקודם, כמו בגריד השבועי.
+ */
+export const ONCE_PER_DAY_DEFAULTS = { army: ["סיור"] };
+
+const opDayKey = (shift) => {
+  const h = minutesOfTime(shift.startTime || "12:00") / 60;
+  return h < 5 ? addDays(shift.date, -1) : shift.date;
+};
+
+/**
  * הכללים הקבועים של צוות — המקור היחיד לכל מסך שבודק שיבוץ (השיבוץ החכם,
  * שיבוץ ידני, אישור החלפה אצל המשתתף), כדי שכולם יסכימו על אותה תשובה.
  */
@@ -64,6 +78,7 @@ export function teamRules(team) {
     ...(team?.restHours ? { minRestHours: team.restHours } : {}),
     longShiftCategories: team?.longShiftCategories ?? LONG_SHIFT_DEFAULTS[team?.mode] ?? [],
     commandCategories: team?.commandCategories ?? COMMAND_DEFAULTS[team?.mode] ?? [],
+    oncePerDayCategories: ONCE_PER_DAY_DEFAULTS[team?.mode] ?? [],
   };
 }
 
@@ -316,6 +331,13 @@ function checkHardConstraints({ guard, shift, load, availability, rules }) {
   }
   if (overlaps(load.shifts, candidate)) {
     return { ok: false, code: "overlap", reason: "חופף למשמרת אחרת שכבר שובצה" };
+  }
+
+  if ((rules.oncePerDayCategories || []).includes(shift.category)) {
+    const day = opDayKey(shift);
+    if (load.shifts.some((s) => s.category === shift.category && s.startTime && opDayKey(s) === day)) {
+      return { ok: false, code: "same-day", reason: `כבר משובץ/ת ל${shift.category} באותו יום` };
+    }
   }
 
   const block = blockHoursAround(load.shifts, candidate);
@@ -585,7 +607,7 @@ export function autoAssign({
   const addAssignment = (shift, guard, score, parts, locked = false, raw = null) => {
     const iv = shiftInterval(shift);
     const l = load.get(guard.id);
-    l.shifts.push({ ...iv, shiftId: shift.id, type: shift.type, date: shift.date, category: shift.category || null });
+    l.shifts.push({ ...iv, shiftId: shift.id, type: shift.type, date: shift.date, startTime: shift.startTime, category: shift.category || null });
     l.count += 1;
     l.hours += shiftHours(shift);
     l.load += shiftLoad(shift, taskWeights);
@@ -1194,7 +1216,7 @@ function removeFromLoad(l, shift, weights = {}) {
 
 function addToLoad(l, shift, weights = {}) {
   const iv = shiftInterval(shift);
-  l.shifts.push({ ...iv, shiftId: shift.id, type: shift.type, date: shift.date, category: shift.category || null });
+  l.shifts.push({ ...iv, shiftId: shift.id, type: shift.type, date: shift.date, startTime: shift.startTime, category: shift.category || null });
   l.count += 1;
   l.hours += shiftHours(shift);
   l.load += shiftLoad(shift, weights);
@@ -1363,7 +1385,9 @@ export function checkAssignment({ guard, shift, shifts = [], availability = {}, 
   }
 
   if ((shift.assignedGuards || []).includes(guard.id)) {
-    load.shifts.push({ ...shiftInterval(shift), shiftId: shift.id, type: shift.type, date: shift.date });
+    load.shifts.push({
+      ...shiftInterval(shift), shiftId: shift.id, type: shift.type, date: shift.date, startTime: shift.startTime, category: shift.category || null,
+    });
   }
 
   return checkHardConstraints({ guard, shift, load, availability, rules });
@@ -1390,6 +1414,7 @@ export function explainUnfilled(entry) {
     "no-availability": "לא הגישו זמינות",
     "maybe-blocked": 'סימנו "אולי"',
     already: "כבר משובצים",
+    "same-day": "כבר בסיור באותו יום",
   };
   return Object.entries(byCode)
     .map(([code, n]) => `${n} ${labels[code] || code}`)

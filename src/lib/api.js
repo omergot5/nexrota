@@ -504,7 +504,7 @@ export async function loadTeam(teamCode) {
           // או 12 בלבד (rest_hours_check ב-0020) — לא שדה חופשי לפי-הרצה
           // כמו שהיה ב-SmartAssign. ערך לא-תקין (שורה ישנה, DB לא מעודכן)
           // נופל ל-10, לא צונח בשקט למשהו מחוץ לשתי האפשרויות המוגדרות.
-          restHours: [10, 12].includes(teamRes.data.rest_hours) ? teamRes.data.rest_hours : 10,
+          restHours: [8, 10, 12].includes(teamRes.data.rest_hours) ? teamRes.data.rest_hours : 10,
           // שלב 5: כמה אחורה rollingLoad/fairnessPlan (fairness.js) מסתכלים
           // כדי לחשב חוב הוגנות — הגדרת-צוות, לא RECENT_DAYS שרוף בקוד.
           // מקור-האמת לרשימת הערכים המותרים הוא fairnessWindow.js, לא כאן.
@@ -822,7 +822,7 @@ export async function updateTeamSettings(
   // שלב 4: רק 10 או 12 — ערך אחר נופל ל-10 כאן, לפני שהוא בכלל מגיע
   // ל-DB constraint (gs_teams_rest_hours_check), כדי שכפתור שנשלח בטעות
   // עם ערך זר לא ייכשל בשגיאת SQL גולמית.
-  if (restHours !== undefined) patch.rest_hours = [10, 12].includes(restHours) ? restHours : 10;
+  if (restHours !== undefined) patch.rest_hours = [8, 10, 12].includes(restHours) ? restHours : 10;
   // שלב 5: אותו עיקרון — נורמליזציה כאן, לפני ה-constraint, לא רק בקריאה.
   if (fairnessWindowDays !== undefined) {
     patch.fairness_window_days = normalizeFairnessWindow(fairnessWindowDays);

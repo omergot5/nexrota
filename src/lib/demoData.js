@@ -312,6 +312,13 @@ export async function seedArmyRoster({
   const dates = weekByOffset(1);
   const sundayISO = dates[0];
 
+  // צוות ההדגמה בלבד: מנוחה של 8 שעות. עם כוננות של 6 וסיור של 3 מנוחה של 10 משאירה מקומות
+  // פתוחים (נמדד, scripts/explore-structure.mjs); בצוות אמיתי ההגדרה נשארת בידי המפקד.
+  if (reconcile) {
+    const { error } = await supabase.from("gs_teams").update({ rest_hours: 8 }).eq("code", teamCode);
+    if (error) throw new Error(`הגדרת מנוחת ההדגמה נכשלה: ${error.message}`);
+  }
+
   const [{ allGuards, guardsAdded }, { allPositions, positionsAdded, changedIds }] = await Promise.all([
     ensureDemoGuards(teamCode, existingGuards, guardCount, { withRoles: true }),
     ensureArmyPositions(teamCode, existingPositions, { reconcile, soldiers: guardCount }),

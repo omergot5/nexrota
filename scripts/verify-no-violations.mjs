@@ -21,7 +21,6 @@ const check = (label, cond, extra = "") => {
 };
 
 const sunday = "2026-10-11";
-const REST = 10;
 const MAX_BLOCK = 12;
 const LONG = ["תורנות מטבח", "כוננות"];
 const mins = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
@@ -32,7 +31,7 @@ const interval = (s) => {
   return [start, end];
 };
 
-function violations({ soldiers, commanders, offset }) {
+function violations({ soldiers, commanders, offset, REST }) {
   let pid = 0;
   let sid = 0;
   const positions = armyDemoPositions(soldiers).map((p) => ({ ...p, id: `p${++pid}`, shape: "template", active: true }));
@@ -99,10 +98,12 @@ function violations({ soldiers, commanders, offset }) {
 }
 
 console.log("\nשמונה שבועות, כמה גדלי צוות — אף אדם לא מקבל חפיפה, מנוחה קצרה, רצף ארוך או שני סיורים ביום\n");
-for (const [soldiers, commanders] of [[30, 6], [30, 8], [30, 0], [25, 6], [20, 6]]) {
-  const all = [];
-  for (let offset = 0; offset < 8; offset++) all.push(...violations({ soldiers, commanders, offset }));
-  check(`${soldiers} חיילים, ${commanders} בעלי תפקיד`, all.length === 0, all.slice(0, 3).join("; "));
+for (const REST of [8, 10]) {
+  for (const [soldiers, commanders] of [[30, 6], [30, 8], [30, 0], [25, 6], [20, 6]]) {
+    const all = [];
+    for (let offset = 0; offset < 8; offset++) all.push(...violations({ soldiers, commanders, offset, REST }));
+    check(`מנוחה ${REST}: ${soldiers} חיילים, ${commanders} בעלי תפקיד`, all.length === 0, all.slice(0, 3).join("; "));
+  }
 }
 
 console.log(failures === 0 ? "\nPASS\n" : `\n${failures} FAILURE(S)\n`);

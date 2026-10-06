@@ -77,8 +77,8 @@ check(
   post("עמדת שמירה 2").length === 0 && post("עמדת שמירה 1").length === 4 && post("עמדת שמירה 1").every((p) => p.requiredGuards === 1)
 );
 check(
-  "רגיל: סיור — 3 משמרות של 8 שעות, חייל אחד בכל אחת (בעל תפקיד)",
-  post("סיור").length === 3 && post("סיור").every((p) => p.requiredGuards === 1)
+  "רגיל: סיור — 3 משמרות של 8 שעות, 3 חיילים בכל אחת (אחד מהם בעל תפקיד)",
+  post("סיור").length === 3 && post("סיור").every((p) => p.requiredGuards === 3)
 );
 check(
   "רגיל: כוננות — 2 משמרות של 12 שעות, 6 חיילים במקביל",
@@ -94,7 +94,7 @@ check(
   "רגיל: כל עמדה מחולקת מתחילה בבוקר (06:00)",
   ["עמדת שמירה 1", "סיור", "כוננות"].every((n) => post(n)[0].startTime === "06:00")
 );
-check("רגיל: 139 מקומות בשבוע", slotsOf(std) === 139, `got ${slotsOf(std)}`);
+check("רגיל: 181 מקומות בשבוע", slotsOf(std) === 181, `got ${slotsOf(std)}`);
 
 const small = armyDemoPositions(20);
 const sPost = byPost(small);
@@ -139,30 +139,30 @@ function staff(shifts, soldiers, rules) {
 }
 
 // כללי צוות צבאי כמו שהם באמת: מנוחה 10, ומטבח+כוננות מותרים מעל 12 שעות.
-const army = teamRules({ mode: "army", restHours: 10 });
+const army = teamRules({ mode: "army", restHours: 8 });
 const stdShifts = week(std);
 const smallShifts = week(small);
 
 const at30 = staff(stdShifts, ARMY_DEMO_SOLDIERS, army);
-check(`רגיל + ${ARMY_DEMO_SOLDIERS} חיילים: כל המקומות מאוישים (כולל המטבח, 14 שעות)`, at30.filled === at30.need, `${at30.filled}/${at30.need}`);
+check(`רגיל + ${ARMY_DEMO_SOLDIERS} חיילים (מנוחה 8): לפחות 99% מאוישים — 30 חיילים הם 180 תורנויות לכל היותר`, at30.filled / at30.need >= 0.99, `${at30.filled}/${at30.need}`);
 
 const at25 = staff(stdShifts, 25, army);
-check("רגיל + 25 חיילים: לפחות 95% מאוישים", at25.filled / at25.need >= 0.95, `${at25.filled}/${at25.need}`);
+check("רגיל + 25 חיילים: לפחות 80% מאוישים", at25.filled / at25.need >= 0.8, `${at25.filled}/${at25.need}`);
 
 const small20 = staff(smallShifts, ARMY_DEMO_SMALL_MAX, army);
 check(`קטן + ${ARMY_DEMO_SMALL_MAX} חיילים: כל המקומות מאוישים`, small20.filled === small20.need, `${small20.filled}/${small20.need}`);
 
 const std20 = staff(stdShifts, ARMY_DEMO_SMALL_MAX, army);
 check(
-  "רגיל + 20 חיילים (לא המבנה שלהם): חלקי, בין 70% ל-90% — המנוע לא מסתיר את החוסר",
-  std20.filled / std20.need >= 0.7 && std20.filled / std20.need < 0.9,
+  "רגיל + 20 חיילים (לא המבנה שלהם): חלקי, בין 60% ל-90% — המנוע לא מסתיר את החוסר",
+  std20.filled / std20.need >= 0.6 && std20.filled / std20.need < 0.9,
   `${std20.filled}/${std20.need}`
 );
 check("... ולא עובר את תקרת 6 התורנויות לחייל", std20.result.fairness.perGuard.every((p) => p.shifts <= 6));
 
 const missingOf = (res, pred) => (res.unfilled || []).filter(pred).reduce((m, u) => m + u.missing, 0);
 const isKitchen = (u) => String(u.shift?.label || u.label || "").includes("מטבח");
-const strict = staff(stdShifts, ARMY_DEMO_SOLDIERS, { minRestHours: 10, longShiftCategories: [] });
+const strict = staff(stdShifts, ARMY_DEMO_SOLDIERS, { minRestHours: 8, longShiftCategories: [] });
 check(
   "בלי ההיתר ל'משמרות ארוכות' המנוע לא עוקף את כלל ה-12: רק המטבח נשאר פתוח",
   missingOf(strict.result, (u) => !isKitchen(u)) === 0 && missingOf(strict.result, isKitchen) === 6,
@@ -202,9 +202,9 @@ const big = std.map((p, i) => ({
 }));
 const shrink = planArmyDemoPositions(big, { reconcile: true });
 check(
-  "הדגמה ישנה (סיור ×3, כוננות ×7) מתעדכנת לכמויות הרגילות (×1, ×6)",
-  shrink.update.length === 5 &&
-    shrink.update.filter((u) => u.patch.category === "סיור").every((u) => u.patch.requiredGuards === 1) &&
+  "הדגמה ישנה (כוננות ×7) מתעדכנת לכמות הרגילה (×6); סיור ×3 כבר תואם",
+  shrink.update.length === 2 &&
+    shrink.update.every((u) => u.patch.category === "כוננות") &&
     shrink.update.filter((u) => u.patch.category === "כוננות").every((u) => u.patch.requiredGuards === 6),
   `${shrink.update.length} עדכונים`
 );
@@ -213,8 +213,10 @@ const toSmall = planArmyDemoPositions(
   { reconcile: true, soldiers: 20 }
 );
 check(
-  "מעבר ל-20: הכוננות קטנה מ-6 ל-4 (2 עדכונים), בלי כיבוי ובלי הוספה",
-  toSmall.update.length === 2 && toSmall.update.every((u) => u.patch.category === "כוננות" && u.patch.requiredGuards === 4) &&
+  "מעבר ל-20: סיור 3→1 (3 עדכונים) וכוננות 6→4 (2), בלי כיבוי ובלי הוספה",
+  toSmall.update.length === 5 &&
+    toSmall.update.filter((u) => u.patch.category === "סיור").every((u) => u.patch.requiredGuards === 1) &&
+    toSmall.update.filter((u) => u.patch.category === "כוננות").every((u) => u.patch.requiredGuards === 4) &&
     toSmall.deactivate.length === 0 && toSmall.insert.length === 0,
   `update=${toSmall.update.length} deactivate=${toSmall.deactivate.length} insert=${toSmall.insert.length}`
 );

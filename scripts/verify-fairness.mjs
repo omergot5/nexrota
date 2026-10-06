@@ -80,12 +80,12 @@ function scenario(soldiers, structureFor, rules) {
   return { shifts, guards, availability, need, result, sig, m: measure(result, shifts, guards), rules };
 }
 
-const army = teamRules({ mode: "army", restHours: 10 });
+const army = teamRules({ mode: "army", restHours: 8 });
 const kitchenSlots = (sc) => sc.shifts.filter((s) => s.category === "תורנות מטבח").reduce((n, s) => n + s.requiredGuards, 0);
 
 const SCENARIOS = [
-  { name: `${ARMY_DEMO_SOLDIERS} חיילים — המבנה הרגיל (ברירת המחדל)`, soldiers: ARMY_DEMO_SOLDIERS, structure: ARMY_DEMO_SOLDIERS, minCover: 1, moves: 10, maxSpread: 12 },
-  { name: "25 חיילים — אותו מבנה, פחות אנשים", soldiers: 25, structure: ARMY_DEMO_SOLDIERS, minCover: 0.97, moves: 0, maxSpread: 15 }, // 139 מקומות ל-25: אחרי שכלל המנוחה נאכף משני הצדדים נשארים פחות חילופים חוקיים (נמדד 13.9)
+  { name: `${ARMY_DEMO_SOLDIERS} חיילים — המבנה הרגיל (ברירת המחדל)`, soldiers: ARMY_DEMO_SOLDIERS, structure: ARMY_DEMO_SOLDIERS, minCover: 0.99, moves: 10, maxSpread: 13 },
+  { name: "25 חיילים — אותו מבנה, פחות אנשים", soldiers: 25, structure: ARMY_DEMO_SOLDIERS, minCover: 0.8, moves: 0, maxSpread: 15 }, // 139 מקומות ל-25: אחרי שכלל המנוחה נאכף משני הצדדים נשארים פחות חילופים חוקיים (נמדד 13.9)
   { name: `${ARMY_DEMO_SMALL_MAX} חיילים — המבנה הקטן`, soldiers: ARMY_DEMO_SMALL_MAX, structure: ARMY_DEMO_SMALL_MAX, minCover: 1, moves: 0, maxSpread: 12 },
 ];
 
@@ -125,7 +125,7 @@ console.log("\nבלי ההיתר ל'משמרות ארוכות' — המנוע ע
 // ============================================================
 
 {
-  const strict = scenario(ARMY_DEMO_SOLDIERS, ARMY_DEMO_SOLDIERS, { minRestHours: 10, longShiftCategories: [] });
+  const strict = scenario(ARMY_DEMO_SOLDIERS, ARMY_DEMO_SOLDIERS, { minRestHours: 8, longShiftCategories: [] });
   const open = strict.result.unfilled.reduce((n, u) => n + u.missing, 0);
   const kitchenOpen = strict.result.unfilled
     .filter((u) => String(u.shift?.label || "").includes("מטבח"))

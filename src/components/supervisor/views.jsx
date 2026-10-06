@@ -2414,7 +2414,7 @@ function RestHoursSettings({ team, actions, busy }) {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {[10, 12].map((hours) => (
+          {[8, 10, 12].map((hours) => (
             <Btn
               key={hours}
               size="sm"
