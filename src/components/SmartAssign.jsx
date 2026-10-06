@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { autoAssign, availStatus, DEFAULT_RULES, explainUnfilled } from "../lib/autoAssign.js";
+import { autoAssign, availStatus, DEFAULT_RULES, explainUnfilled, teamRules } from "../lib/autoAssign.js";
 import { formatDateHe, groupShiftsByPost, rangeLabelHe, shiftPartName, shortDate, splitShiftLabel, withEngineTasks } from "../lib/dates.js";
 import { loadShareHint, rollingLoad } from "../lib/fairness.js";
 import { DEFAULT_FAIRNESS_WINDOW_DAYS } from "../lib/fairnessWindow.js";
@@ -38,7 +38,7 @@ const KIND_ICON = {
   turn: "clock",
 };
 
-function RulesPanel({ rules, setRules, restHours, open, onClose }) {
+function RulesPanel({ rules, setRules, restHours, longShiftCategories = [], open, onClose }) {
   const num = (key, label, min, max, suffix) => (
     <div className="flex items-center justify-between gap-4 py-2.5 border-b border-hairline last:border-0">
       <p className="text-sm font-medium text-content min-w-0">{label}</p>
@@ -102,6 +102,13 @@ function RulesPanel({ rules, setRules, restHours, open, onClose }) {
       </div>
       <div className="bg-surface-sunken rounded-xl px-4 py-1 mb-4">
         {num("maxConsecutiveHours", "מקסימום שעות רצופות", 4, 24, "שעות")}
+        {longShiftCategories.length > 0 && (
+          // הגדרת צוות ולא כלל להרצה הזו — מוצגת כאן כדי שהמספר למעלה לא
+          // ייקרא כאילו הוא חל גם על המטבח והכוננות.
+          <p className="text-xs text-muted py-2 border-b border-hairline">
+            {`חוץ מ${longShiftCategories.join(" ו")} — שם מותרת משמרת ארוכה יותר · נקבע בהגדרות הצוות`}
+          </p>
+        )}
         {num("maxShiftsPerWeek", `מקסימום ${t("unit.shifts")} בשבוע`, 1, 14, t("unit.shifts"))}
         {num("maxNightsPerWeek", "מקסימום לילות בשבוע", 0, 7, "לילות")}
       </div>
@@ -234,7 +241,7 @@ export default function SmartAssign({
   // קבועה (gs_teams.rest_hours, 10 או 12 בלבד), ולכן נמזגת כאן בכל שימוש
   // במקום להישמר ב-state של המסך הזה.
   const effectiveRules = useMemo(
-    () => ({ ...rules, minRestHours: team?.restHours ?? DEFAULT_RULES.minRestHours }),
+    () => ({ ...rules, ...teamRules(team), minRestHours: team?.restHours ?? DEFAULT_RULES.minRestHours }),
     [rules, team]
   );
   const [plan, setPlan] = useState(null);
@@ -818,6 +825,7 @@ export default function SmartAssign({
         rules={rules}
         setRules={setRules}
         restHours={effectiveRules.minRestHours}
+        longShiftCategories={effectiveRules.longShiftCategories}
         open={showRules}
         onClose={() => setShowRules(false)}
       />

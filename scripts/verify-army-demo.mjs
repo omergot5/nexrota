@@ -9,7 +9,7 @@
 
 import { ARMY_DEMO_POSITIONS, ARMY_DEMO_SOLDIERS, demoAvailabilityCode, planArmyDemoPositions } from "../src/lib/armyDemo.js";
 import { buildDivisionRows, plannedRowsForWeek } from "../src/lib/positions.js";
-import { autoAssign } from "../src/lib/autoAssign.js";
+import { autoAssign, teamRules } from "../src/lib/autoAssign.js";
 import { splitShiftLabel } from "../src/lib/dates.js";
 
 let failures = 0;
@@ -100,24 +100,23 @@ const missingOf = (res, pred = () => true) =>
   (res.unfilled || []).filter((u) => pred(u)).reduce((m, u) => m + u.missing, 0);
 const isKitchen = (u) => String(u.shift?.label || u.label || "").includes("מטבח");
 
-const strict = autoAssign({ shifts, guards, availability, rules: { minRestHours: 10 } });
+// כללי צוות צבאי כמו שהם באמת: מנוחה 10, ומטבח+כוננות מותרים מעל 12 שעות.
+const armyRules = { ...teamRules({ mode: "army", restHours: 10 }) };
+const army = autoAssign({ shifts, guards, availability, rules: armyRules });
 check(
-  "בכללי ברירת המחדל: כל מה שאינו מטבח מאויש",
-  missingOf(strict, (u) => !isKitchen(u)) === 0,
-  `${missingOf(strict, (u) => !isKitchen(u))} חסרים מחוץ למטבח`
+  "בכללי הצבא (מטבח מותר מעל 12): לפחות 99% מהמקומות מאוישים",
+  (need - missingOf(army)) / need >= 0.99,
+  `${need - missingOf(army)}/${need}`
 );
+check("המטבח (14 שעות, יש הפסקות) מאויש במלואו", missingOf(army, isKitchen) === 0, `${missingOf(army, isKitchen)} חסרים במטבח`);
+
+const noException = autoAssign({ shifts, guards, availability, rules: { minRestHours: 10, longShiftCategories: [] } });
 check(
-  "המטבח (14 שעות רצופות) לא מאויש כשהמקסימום 12 — המנוע לא עוקף את הכלל",
-  missingOf(strict, isKitchen) === 12,
-  `${missingOf(strict, isKitchen)} חסרים במטבח`
+  "בלי ההיתר המנוע לא עוקף את כלל ה-12: המטבח נשאר פתוח",
+  missingOf(noException, isKitchen) === 12,
+  `${missingOf(noException, isKitchen)} חסרים במטבח`
 );
-const relaxed = autoAssign({ shifts, guards, availability, rules: { minRestHours: 10, maxConsecutiveHours: 14 } });
-check(
-  "כשמעלים את המקסימום ל-14: לפחות 99% מהמקומות מאוישים",
-  (need - missingOf(relaxed)) / need >= 0.99,
-  `${need - missingOf(relaxed)}/${need}`
-);
-const half = autoAssign({ shifts, guards: guards.slice(0, 20), availability, rules: { minRestHours: 10 } });
+const half = autoAssign({ shifts, guards: guards.slice(0, 20), availability, rules: armyRules });
 check(
   "20 חיילים לא מספיקים (פחות מ-60%) — לכן ההדגמה פותחת 45",
   (need - missingOf(half)) / need < 0.6,

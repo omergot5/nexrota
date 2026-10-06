@@ -15,7 +15,7 @@ import {
   shiftDisplayName,
 } from "../../lib/dates.js";
 import { loadWindowMode, RECENT_DAYS, setLoadWindowMode, subscribeLoadWindow } from "../../lib/loadWindow.js";
-import { availStatus, checkAssignment, isQualified } from "../../lib/autoAssign.js";
+import { availStatus, checkAssignment, DEFAULT_RULES, isQualified, teamRules } from "../../lib/autoAssign.js";
 import { PROFILES, subscribeTerms, t, termProfile } from "../../lib/terms.js";
 import { explainConflict, findConflicts } from "../../lib/conflicts.js";
 import { fairnessHint, fairnessPlan } from "../../lib/fairness.js";
@@ -1275,7 +1275,7 @@ export function AssignView({
                           ? { ok: true }
                           : checkAssignment({
                               guard: g, shift, shifts, availability, tasks,
-                              rules: team?.restHours ? { minRestHours: team.restHours } : undefined,
+                              rules: teamRules(team),
                             });
                         const overlapRefusal = !legality.ok ? legality.reason : "";
                         const titleParts = [
@@ -1659,7 +1659,7 @@ export function SwapMgmt({ guards, shifts, availability = {}, swapRequests, acti
     }
     return checkAssignment({
       guard, shift, shifts, availability, tasks,
-      rules: team?.restHours ? { minRestHours: team.restHours } : undefined,
+      rules: teamRules(team),
     });
   };
   const pending = swapRequests.filter((r) => r.status === "pending");
@@ -2655,6 +2655,55 @@ function RestHoursSettings({ team, actions, busy }) {
 }
 
 /**
+ * קטגוריות שבהן משמרת אחת רשאית לעבור את מקסימום השעות הרצופות: במטבח יש
+ * הפסקות, וכוננות היא זמינות ולא נוכחות. הגדרת-צוות (gs_teams.long_shift_categories,
+ * 0029) כמו המנוחה למעלה, ומגיעה לכל בדיקת שיבוץ דרך teamRules — המנוע, שיבוץ
+ * ידני ואישור החלפה מסכימים על אותה תשובה.
+ */
+function LongShiftSettings({ team, actions, busy }) {
+  const categories = foldersFor(team?.mode).map((f) => f.name);
+  const selected = teamRules(team).longShiftCategories;
+  const toggle = (category) =>
+    actions.updateTeamSettings({
+      longShiftCategories: selected.includes(category)
+        ? selected.filter((c) => c !== category)
+        : [...selected, category],
+    });
+  return (
+    <Card>
+      <h2 className="font-bold text-content mb-1 flex items-center gap-2">
+        <Icon name="clock" size={18} className="text-brand" />
+        משמרות ארוכות
+      </h2>
+      <p className="text-sm text-muted mb-4">
+        {`במה שמסומן כאן מותרת משמרת של יותר מ-${DEFAULT_RULES.maxConsecutiveHours} שעות ברצף — יש בה הפסקות. להוסיף אליה עוד משמרת צמודה עדיין אסור.`}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {categories.map((category) => {
+          const on = selected.includes(category);
+          return (
+            <button
+              key={category}
+              type="button"
+              aria-pressed={on}
+              disabled={busy}
+              onClick={() => toggle(category)}
+              className={`h-9 px-3 rounded-lg text-[13px] font-bold cursor-pointer ring-1 ring-inset transition-colors
+                disabled:opacity-60 disabled:cursor-not-allowed ${
+                  on ? "bg-brand text-on-brand ring-brand" : "bg-surface-sunken text-muted ring-hairline hover:text-content"
+                }`}
+            >
+              {on && <Icon name="check" size={13} className="inline -mt-0.5 ml-1" />}
+              {category}
+            </button>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+/**
  * שלב 5 (מחזור האיחוד, החלטה 5): חלון ההוגנות שהמנוע (SmartAssign) ומסך
  * "אסדר בעצמי" (AssignView) מסתכלים אחורה כדי לחשב מי "חייב עוד" — הגדרת-
  * צוות אחת ב-gs_teams.fairness_window_days, לא 14 שרוף בקוד. חמש אפשרויות
@@ -2879,6 +2928,8 @@ export function TeamView({
       <DeadlineSettings team={team} actions={actions} busy={busy} />
 
       <RestHoursSettings team={team} actions={actions} busy={busy} />
+
+      <LongShiftSettings team={team} actions={actions} busy={busy} />
 
       <FairnessWindowSettings team={team} actions={actions} busy={busy} />
 

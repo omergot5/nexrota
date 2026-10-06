@@ -20,6 +20,7 @@ import PostEditor from "./PostEditor.jsx";
 import DayShiftEditor from "./DayShiftEditor.jsx";
 import { foldersFor } from "../../lib/categories.js";
 import { buildPostWeek } from "../../lib/postWeek.js";
+import { teamRules } from "../../lib/autoAssign.js";
 import { subscribeTerms, termProfile } from "../../lib/terms.js";
 
 // נקודות פתיחה לצוות שעוד לא הגדיר כלום — לחיצה פותחת את העורך כבר מלא.
@@ -40,12 +41,14 @@ const SUGGESTIONS = [
 ];
 
 export default function RosterWizard({
-  positions = [], guards = [], weekDates = [], actions, busy, shifts = [], tasks = [],
+  positions = [], guards = [], weekDates = [], actions, busy, team, shifts = [], tasks = [],
 }) {
   // תחום הפעילות מוחל מ-subscribeTerms/termProfile (D-07) — אותו מקור אמת
   // שצביעת הקטגוריות בגריד קוראת ממנו.
   const mode = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
   const categories = foldersFor("army").map((f) => f.name);
+  // קטגוריות שמותרת בהן משמרת ארוכה (הגדרות הצוות) — בלי אזהרת "יותר מ-12" עליהן.
+  const longShiftCategories = teamRules(team).longShiftCategories;
 
   const [editorTarget, setEditorTarget] = useState(null); // null = סגור; {} = עמדה חדשה; {seed}; {post} = עריכה
   const [dayEditId, setDayEditId] = useState(null); // תורנות של יום אחד שנפתחה מהגריד
@@ -146,6 +149,7 @@ export default function RosterWizard({
         onSubmit={submit}
         onDelete={deletePost}
         categories={categories}
+        longShiftCategories={longShiftCategories}
         busy={busy}
       />
 
@@ -154,6 +158,7 @@ export default function RosterWizard({
         onClose={() => setDayEditId(null)}
         onSave={(next) => actions.updateShift(next.id, next)}
         onCancelDay={(shift) => actions.deleteShift(shift.id)}
+        longShiftCategories={longShiftCategories}
         busy={busy}
       />
 

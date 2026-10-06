@@ -11,7 +11,7 @@ import {
   withEngineTasks,
   shiftDisplayName,
 } from "../lib/dates.js";
-import { availStatus, checkAssignment, teamAverages } from "../lib/autoAssign.js";
+import { availStatus, checkAssignment, teamAverages, teamRules } from "../lib/autoAssign.js";
 import { qualifiedGuardsForPosition } from "../lib/positions.js";
 import { shiftTone } from "../design/shiftPalette.js";
 import { AVAIL, AVAIL_CHOICES } from "../design/availability.js";
@@ -583,7 +583,7 @@ function MySwaps({ user, team, guards, shifts, availability = {}, swapRequests, 
     }
     return checkAssignment({
       guard, shift, shifts, availability, tasks,
-      rules: team?.restHours ? { minRestHours: team.restHours } : undefined,
+      rules: teamRules(team),
     });
   };
   const [showForm, setShowForm] = useState(false);
@@ -611,7 +611,7 @@ function MySwaps({ user, team, guards, shifts, availability = {}, swapRequests, 
     selectedShift
       ? checkAssignment({
           guard: g, shift: selectedShift, shifts, availability, tasks,
-          rules: team?.restHours ? { minRestHours: team.restHours } : undefined,
+          rules: teamRules(team),
         })
       : { ok: true };
 

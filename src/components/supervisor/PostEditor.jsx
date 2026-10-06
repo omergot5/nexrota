@@ -71,7 +71,7 @@ function initialForm(target, categories) {
  * @param {{post?: object, seed?: object} | null} target null = סגור; {post} = עריכה; {seed} או {} = עמדה חדשה
  * @param {(plan: {create: object[], update: object[], remove: string[], summary: string}) => Promise} onSubmit
  */
-export default function PostEditor({ target, onClose, onSubmit, onDelete, categories = [], busy }) {
+export default function PostEditor({ target, onClose, onSubmit, onDelete, categories = [], longShiftCategories = [], busy }) {
   const [form, setForm] = useState(null);
 
   useEffect(() => {
@@ -100,7 +100,8 @@ export default function PostEditor({ target, onClose, onSubmit, onDelete, catego
   // האזהרה היחידה בעורך: משמרת ארוכה מהרצף המותר שהמנוע לעולם לא יאייש.
   // פער מנוחה מול עמדה אחרת לא מוצג כאן — המנוע פשוט לא ישבץ את אותו חייל
   // לשתיהן, ועם הרבה עמדות האזהרה הייתה מופיעה כמעט תמיד בלי שיש מה לעשות איתה.
-  const tooLong = !isWeekly && finalBlocks.some((b) => hoursOf(b) > maxBlock);
+  // קטגוריה שמותרת בה משמרת ארוכה (מטבח, כוננות — הגדרות הצוות) לא מקבלת אזהרה.
+  const tooLong = !isWeekly && !longShiftCategories.includes(form.category) && finalBlocks.some((b) => hoursOf(b) > maxBlock);
 
   const invalid =
     !form.name.trim() ||
@@ -328,7 +329,7 @@ export default function PostEditor({ target, onClose, onSubmit, onDelete, catego
 
         {tooLong && (
           <Alert tone="warn">
-            {`משמרת של יותר מ-${maxBlock} שעות ברצף — השיבוץ האוטומטי לא ישבץ אליה אף אחד, אלא אם מעלים את "מקסימום שעות רצופות" בכללים.`}
+            {`משמרת של יותר מ-${maxBlock} שעות ברצף — השיבוץ האוטומטי לא ישבץ אליה אף אחד. אם יש בה הפסקות, אפשר לסמן את "${form.category}" ב"משמרות ארוכות" בהגדרות הצוות.`}
           </Alert>
         )}
         {form.editing && form.removed.length > 0 && (

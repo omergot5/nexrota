@@ -34,7 +34,7 @@ function whenLabel(shift) {
  * @param {(shift: object) => Promise} onSave מקבל את המשמרת המלאה עם השינויים
  * @param {(shift: object) => void} [onCancelDay] ביטול התורנות ביום הזה בלבד
  */
-export default function DayShiftEditor({ shift, onClose, onSave, onCancelDay, busy }) {
+export default function DayShiftEditor({ shift, onClose, onSave, onCancelDay, longShiftCategories = [], busy }) {
   const [form, setForm] = useState(null);
 
   // טופס חדש לכל משמרת שנפתחת — לא שאריות מהמשמרת הקודמת.
@@ -109,9 +109,9 @@ export default function DayShiftEditor({ shift, onClose, onSave, onCancelDay, bu
           />
         </Field>
 
-        {hours > maxBlock && (
+        {hours > maxBlock && !longShiftCategories.includes(shift.category) && (
           <Alert tone="warn">
-            {`${round1(hours)} שעות ברצף — יותר מ-${maxBlock}. השיבוץ האוטומטי לא ישבץ לתורנות הזו אף אחד, אלא אם מעלים את "מקסימום שעות רצופות" בכללים.`}
+            {`${round1(hours)} שעות ברצף — יותר מ-${maxBlock}. השיבוץ האוטומטי לא ישבץ לתורנות הזו אף אחד, אלא אם הקטגוריה מסומנת ב"משמרות ארוכות" בהגדרות הצוות.`}
           </Alert>
         )}
         {assigned > required && (

@@ -505,6 +505,11 @@ export async function loadTeam(teamCode) {
           // כדי לחשב חוב הוגנות — הגדרת-צוות, לא RECENT_DAYS שרוף בקוד.
           // מקור-האמת לרשימת הערכים המותרים הוא fairnessWindow.js, לא כאן.
           fairnessWindowDays: normalizeFairnessWindow(teamRes.data.fairness_window_days),
+          // קטגוריות שמותרת בהן משמרת ארוכה מהרצף (0029). null = ברירת המחדל
+          // של התחום (LONG_SHIFT_DEFAULTS ב-autoAssign.js); מערך — בחירת המפקד.
+          longShiftCategories: Array.isArray(teamRes.data.long_shift_categories)
+            ? teamRes.data.long_shift_categories
+            : null,
           // {קטגוריה: מכפיל} להוגנות (shiftLoad ב-autoAssign.js) — עמודה
           // חסרה/null/כל דבר שאינו אובייקט ממשי נופל ל-{}, שקול ל"אין
           // אף קטגוריה שהוגדרה משקל מיוחד לה" (D-05: היעדר-שורה = ברירת
@@ -803,7 +808,7 @@ export async function addGuard({ name, phone, teamCode }) {
 
 export async function updateTeamSettings(
   teamCode,
-  { deadlineDays, deadlineHour, reminders, mode, taskWeights, restHours, fairnessWindowDays }
+  { deadlineDays, deadlineHour, reminders, mode, taskWeights, restHours, fairnessWindowDays, longShiftCategories }
 ) {
   const patch = {};
   if (deadlineDays !== undefined) patch.avail_deadline_days = deadlineDays;
@@ -822,6 +827,13 @@ export async function updateTeamSettings(
   // עמודה חסרה/null נופלת ל-{} בכיוון הקריאה (loadTeam), כמו כל שדה אחר
   // שקדם למיגרציה שהוסיפה אותו.
   if (taskWeights !== undefined) patch.task_weights = taskWeights;
+  // קטגוריות שמותרת בהן משמרת ארוכה מהרצף (0029). מערך ריק נשמר כמערך ריק —
+  // "אף קטגוריה" היא בחירה של המפקד, לא חזרה לברירת המחדל של התחום (null).
+  if (longShiftCategories !== undefined) {
+    patch.long_shift_categories = Array.isArray(longShiftCategories)
+      ? [...new Set(longShiftCategories.filter((c) => typeof c === "string" && c.trim()))]
+      : null;
+  }
 
   // `.select()` ולא עדכון עיוור: כש-RLS מסננת את כל השורות, Supabase מחזירה
   // `error: null` ומערך ריק — כלומר "הצלחה" שלא כתבה כלום. בלי הבדיקה הזאת

@@ -37,7 +37,27 @@ export const DEFAULT_RULES = {
   allowUnknown: true, // may assign guards who never submitted availability
   honourPreferences: true, // weigh "מעדיף" above a plain "זמין"
   balancePasses: 40, // local-search iterations
+  // קטגוריות שבהן משמרת *אחת* רשאית לעבור את maxConsecutiveHours (ר' teamRules).
+  longShiftCategories: [],
 };
+
+/**
+ * ברירת המחדל לפי תחום: במטבח יש הפסקות, וכוננות היא זמינות ולא נוכחות —
+ * משמרת של 14 או 24 שעות שם היא נורמלית. המפקד יכול לשנות את הרשימה בהגדרות
+ * הצוות (gs_teams.long_shift_categories, מיגרציה 0029).
+ */
+export const LONG_SHIFT_DEFAULTS = { army: ["תורנות מטבח", "כוננות"] };
+
+/**
+ * הכללים הקבועים של צוות — המקור היחיד לכל מסך שבודק שיבוץ (השיבוץ החכם,
+ * שיבוץ ידני, אישור החלפה אצל המשתתף), כדי שכולם יסכימו על אותה תשובה.
+ */
+export function teamRules(team) {
+  return {
+    ...(team?.restHours ? { minRestHours: team.restHours } : {}),
+    longShiftCategories: team?.longShiftCategories ?? LONG_SHIFT_DEFAULTS[team?.mode] ?? [],
+  };
+}
 
 /**
  * Availability is a ladder, not a switch. "I can work Sunday but I'd rather
@@ -284,7 +304,12 @@ function checkHardConstraints({ guard, shift, load, availability, rules }) {
   }
 
   const block = blockHoursAround(load.shifts, candidate);
-  if (block > rules.maxConsecutiveHours) {
+  // משמרת ארוכה בקטגוריה שמותר בה (מטבח עם הפסקות, כוננות) עוברת את
+  // המקסימום — אבל רק כשהיא עומדת לבד. משמרת שנוגעת בה מלפני או מאחרי
+  // עדיין יוצרת רצף אסור: אחרי 14 שעות במטבח לא נכנסים ישר לשמירה.
+  const alone = Math.abs(block - (candidate.end - candidate.start) / HOUR) < 1e-9;
+  const longAllowed = alone && (rules.longShiftCategories || []).includes(shift.category);
+  if (block > rules.maxConsecutiveHours && !longAllowed) {
     return {
       ok: false,
       code: "consecutive",

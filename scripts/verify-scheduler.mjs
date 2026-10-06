@@ -1586,5 +1586,42 @@ import { shiftLoad as _shiftLoad } from "../src/lib/autoAssign.js";
     Math.abs(_shiftLoad(mk("18:00", "06:00")) - _shiftLoad(mk("06:00", "18:00")) * 1.4) < 1e-9);
 }
 
+// ---------- משמרות ארוכות (0029): מטבח וכוננות מעבר ל-12 שעות ----------
+{
+  const { teamRules, LONG_SHIFT_DEFAULTS } = await import("../src/lib/autoAssign.js");
+  console.log("\nמשמרת ארוכה בקטגוריה שמותר בה\n");
+  const day = "2026-10-11";
+  const kitchen = { id: "k1", date: day, label: "תורנות מטבח", startTime: "06:30", endTime: "20:30", category: "תורנות מטבח", requiredGuards: 1, assignedGuards: [] };
+  const guard = { id: "g1", name: "גיא לוי" };
+
+  check("ברירת מחדל לצבא: מטבח וכוננות", JSON.stringify(LONG_SHIFT_DEFAULTS.army) === JSON.stringify(["תורנות מטבח", "כוננות"]));
+  check("teamRules: צבא בלי בחירה → ברירת המחדל", teamRules({ mode: "army" }).longShiftCategories.includes("תורנות מטבח"));
+  check("teamRules: בחירה מפורשת (גם ריקה) גוברת על ברירת המחדל", teamRules({ mode: "army", longShiftCategories: [] }).longShiftCategories.length === 0);
+  check("teamRules: אבטחה — אין ברירת מחדל", teamRules({ mode: "security" }).longShiftCategories.length === 0);
+
+  const strict = checkAssignment({ guard, shift: kitchen, shifts: [kitchen], rules: { longShiftCategories: [] } });
+  check("מטבח 14 שעות בלי היתר — נחסם על רצף", !strict.ok && strict.code === "consecutive", strict.code);
+  const allowed = checkAssignment({ guard, shift: kitchen, shifts: [kitchen], rules: teamRules({ mode: "army" }) });
+  check("מטבח 14 שעות עם היתר — מותר", allowed.ok, allowed.reason);
+
+  // שרשור: שמירה שמתחילה בדיוק כשהמטבח נגמר — רצף של 18 שעות, אסור גם עם ההיתר.
+  const after = { id: "a1", date: day, label: "עמדת שמירה 1 – משמרת 3", startTime: "20:30", endTime: "00:30", category: "תורנות שמירה", requiredGuards: 1, assignedGuards: [] };
+  const chained = checkAssignment({
+    guard, shift: after, shifts: [{ ...kitchen, assignedGuards: ["g1"] }, after], rules: teamRules({ mode: "army" }),
+  });
+  check("שמירה צמודה למטבח ארוך — עדיין נחסמת על רצף", !chained.ok && chained.code === "consecutive", chained.code);
+  const chainedOnto = checkAssignment({
+    guard, shift: kitchen, shifts: [kitchen, { ...after, assignedGuards: ["g1"] }], rules: teamRules({ mode: "army" }),
+  });
+  check("מטבח ארוך צמוד לשמירה שכבר שובצה — נחסם (ההיתר רק למשמרת שעומדת לבד)", !chainedOnto.ok && chainedOnto.code === "consecutive");
+
+  const longPatrol = { ...kitchen, id: "p1", label: "סיור", category: "סיור" };
+  const patrol = checkAssignment({ guard, shift: longPatrol, shifts: [longPatrol], rules: teamRules({ mode: "army" }) });
+  check("סיור 14 שעות — לא בהיתר, נחסם", !patrol.ok && patrol.code === "consecutive");
+
+  const plan = autoAssign({ shifts: [kitchen], guards: [guard], rules: teamRules({ mode: "army" }) });
+  check("המנוע משבץ למטבח הארוך כשמותר", (plan.unfilled || []).length === 0, JSON.stringify(plan.unfilled?.[0]?.blockers?.map((b) => b.code)));
+}
+
 console.log(`\n${failures === 0 ? "PASS" : `FAIL — ${failures} failing check(s)`}\n`);
 process.exit(failures === 0 ? 0 : 1);
