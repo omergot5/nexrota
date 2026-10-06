@@ -405,6 +405,44 @@ function translateAuthError(error) {
   return new Error(msg || "שגיאה לא צפויה");
 }
 
+// ---------- paging ----------
+//
+// השרת מחזיר לכל היותר 1,000 שורות לבקשה (max-rows של Supabase) — בלי
+// שגיאה ובלי סימן; השאר פשוט לא מגיע. פלוגה של 45 חיילים מגיעה ל-4,000
+// שורות זמינות בשבוע אחד, ומשמרות של כמה חודשים עוברות את הרף. בלי זה
+// "מי דיווח" הראה 12/45 והמנוע ראה "לא ידוע" אצל כל השאר.
+//
+// הבקשה הראשונה מבקשת גם ספירה, והדפים שנשארו נשלפים במקביל. הסדר חייב
+// להיות מלא (עד מפתח ייחודי) — בלי סדר יציב, דף יכול לדלג על שורה או לחזור
+// עליה. `build` בונה שאילתה חדשה בכל קריאה (אובייקט שאילתה הוא חד-פעמי).
+const PAGE = 1000;
+async function selectAll(build) {
+  const first = await build({ count: "exact" }).range(0, PAGE - 1);
+  if (first.error) return first;
+  const rows = [...(first.data || [])];
+  const total = first.count ?? rows.length;
+  // גודל הדף האמיתי הוא מה שהשרת החזיר, גם אם max-rows הוגדר נמוך מ-1,000.
+  const step = rows.length || PAGE;
+  const pending = [];
+  for (let from = rows.length; from < total; from += step) pending.push(build().range(from, from + step - 1));
+  for (const page of await Promise.all(pending)) {
+    if (page.error) return page;
+    rows.push(...(page.data || []));
+  }
+  return { data: rows, error: null };
+}
+
+/** שורות שהופיעו פעמיים כי משהו נכתב בין שני דפים — הראשונה נשארת. */
+const uniqueBy = (rows, key) => {
+  const seen = new Set();
+  return rows.filter((r) => {
+    const k = key(r);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+};
+
 // ---------- team data ----------
 
 export async function loadTeam(teamCode) {
@@ -414,12 +452,16 @@ export async function loadTeam(teamCode) {
   const [teamRes, profilesRes, shiftsRes, availRes, swapsRes, tasksRes, tplRes, compatRes, posRes] = await Promise.all([
     supabase.from("gs_teams").select("*").eq("code", teamCode).maybeSingle(),
     supabase.from("gs_profiles").select("*").eq("team_code", teamCode).order("created_at"),
-    supabase.from("gs_work_items").select(SHIFT_SELECT)
-      .eq("team_code", teamCode).eq("kind", "shift").order("start_date"),
-    supabase.from("gs_availability").select("*"),
+    selectAll((opts) =>
+      supabase.from("gs_work_items").select(SHIFT_SELECT, opts)
+        .eq("team_code", teamCode).eq("kind", "shift").order("start_date").order("id")
+    ),
+    selectAll((opts) => supabase.from("gs_availability").select("*", opts).order("shift_id").order("guard_id")),
     supabase.from("gs_swap_requests").select("*").eq("team_code", teamCode).order("created_at", { ascending: false }),
-    supabase.from("gs_work_items").select(TASK_SELECT)
-      .eq("team_code", teamCode).eq("kind", "task").order("created_at", { ascending: false }),
+    selectAll((opts) =>
+      supabase.from("gs_work_items").select(TASK_SELECT, opts)
+        .eq("team_code", teamCode).eq("kind", "task").order("created_at", { ascending: false }).order("id")
+    ),
     supabase.from("gs_task_templates").select("*")
       .or(`team_code.is.null,team_code.eq.${teamCode}`).order("sort"),
     supabase.from("gs_role_compatibility").select("*")
@@ -476,10 +518,10 @@ export async function loadTeam(teamCode) {
     members: profiles,
     guards: profiles.filter((p) => p.role === "guard"),
     supervisors: profiles.filter((p) => p.role === "supervisor"),
-    shifts: (shiftsRes.data || []).map(shiftFromRow),
+    shifts: uniqueBy(shiftsRes.data || [], (r) => r.id).map(shiftFromRow),
     availability: availabilityFromRows(availRes.data),
     swapRequests: (swapsRes.data || []).map(swapFromRow),
-    tasks: (tasksRes.data || []).map(withAssigneesFromEmbed).map(taskFromRow),
+    tasks: uniqueBy(tasksRes.data || [], (r) => r.id).map(withAssigneesFromEmbed).map(taskFromRow),
     // שתי אלה מכוונות **לא** להיכלל ב-`firstError`. הן העשרה, לא ליבה:
     // בסיס נתונים שהמיגרציה טרם רצה עליו יחזיר שגיאה כאן, והאפליקציה
     // צריכה להמשיך לעבוד בלי תבניות — לא ליפול על מסך שגיאה.

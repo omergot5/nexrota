@@ -255,7 +255,23 @@ export function useGuardian() {
   const teamCode = user?.teamCode;
   useEffect(() => {
     if (!teamCode) return;
-    const onChange = () => refresh();
+    // כתיבה גדולה אחת (זמינות של 45 חיילים להדגמה, פרסום שבוע שלם) היא
+    // אלפי אירועים, וכל אחד הפעיל טעינה מלאה של הצוות — 9 בקשות כל פעם.
+    // ראינו 20,000 בקשות בדקה, והכתיבה עצמה נתקעה מאחוריהן בתור של הדפדפן.
+    // פרץ אירועים מתאחד לטעינה אחת: 400ms של שקט, ולא יותר משתי שניות
+    // מהאירוע הראשון — כך גם זרם שלא נגמר לא משאיר את המסך ישן.
+    let timer = null;
+    let burstStart = 0;
+    const onChange = () => {
+      const now = Date.now();
+      if (!timer) burstStart = now;
+      clearTimeout(timer);
+      const wait = Math.max(0, Math.min(400, 2000 - (now - burstStart)));
+      timer = setTimeout(() => {
+        timer = null;
+        refresh();
+      }, wait);
+    };
     const channel = supabase.channel(`team-${teamCode}`);
     for (const table of [
       "gs_work_items", "gs_work_item_assignments", "gs_availability", "gs_profiles", "gs_swap_requests",
@@ -274,6 +290,7 @@ export function useGuardian() {
     });
     return () => {
       supabase.removeChannel(channel);
+      clearTimeout(timer);
     };
   }, [teamCode, refresh]);
 
