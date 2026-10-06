@@ -233,7 +233,7 @@ export default function WeekFlow({
         <AssignView {...common} onNavigate={() => setAssignMode("auto")} />
       )}
     </div>,
-    <ScheduleMgmt key="publish" {...common} />,
+    <ScheduleMgmt key="publish" {...common} positions={positions} />,
   ];
   const body = allBodies[ALL_STEPS.indexOf(stepIds[current])];
 

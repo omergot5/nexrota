@@ -38,6 +38,7 @@ import { categoryTone, TONE_VARS } from "../../design/categoryPalette.js";
 import { isQualified } from "../../lib/autoAssign.js";
 import { t } from "../../lib/terms.js";
 import { People } from "./views.jsx";
+import { DRAG_MIME } from "./dragMime.js";
 
 // זהה מילה במילה לתג שכבר קיים ב-TaskRow (views.jsx) — לא מנוסח מחדש.
 const OUT_OF_ENGINE_TOOLTIP =
@@ -186,7 +187,7 @@ function DayColumn({ day, guards, onMove, onToggleAssignment, mode }) {
 // מיוצא: CalendarView.jsx's WeekStrip משתמש באותו MIME בדיוק כדי לגרור
 // שם בין תאים ביומן — אותה אינטראקציה, שני רכיבים ויזואליים. מחרוזת
 // אחת, לא שתיים שעלולות להיסחף.
-export const DRAG_MIME = "application/x-nexrota-guard";
+export { DRAG_MIME };
 
 function BoardCard({ item, displayLabel, guards, onMove, onToggleAssignment, mode }) {
   const timeless = Boolean(item.timeless);

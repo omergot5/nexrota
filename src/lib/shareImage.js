@@ -111,6 +111,26 @@ function drawLtr(ctx, text, x, y) {
 }
 
 /**
+ * מצייר שורת טקסט עברית שיש בה מספרים ("11–17 באוקטובר", "28 באוקטובר – 3
+ * בנובמבר") מילה אחר מילה, מימין לשמאל. ציור שלם בהקשר ימין־לשמאל הופך את
+ * הספרות ("17–11 באוקטובר") — אלגוריתם הדו־כיווניות מסדר את שני המספרים
+ * סביב המקף הניטרלי מהסוף להתחלה. טווח תאריכים הפוך בראש סידור הוא בדיוק סוג
+ * הטעות ש-drawLtr נולד כדי למנוע, אז כל מילה נבחרת בנפרד: מילה עם ספרה
+ * נציירת שמאל־לימין, כל השאר כרגיל, והסדר בין המילים נשמר מימין לשמאל.
+ * מעגנת את הקצה הימני ב-x, כמו fillText עם textAlign "right".
+ */
+function drawRtlWords(ctx, text, x, y) {
+  const gap = ctx.measureText(" ").width || 8;
+  let cursor = x;
+  for (const word of String(text).split(" ")) {
+    const w = ctx.measureText(word).width;
+    if (/[0-9]/.test(word)) drawLtr(ctx, word, cursor, y);
+    else ctx.fillText(word, cursor, y);
+    cursor -= w + gap;
+  }
+}
+
+/**
  * שובר רשימת שמות לשורות של "שבבים" (כמו בכרטיסי האפליקציה), בלי לחצות
  * רוחב נתון. כל שם נשאר יחידה שלמה עם הצבע שלו, ולא מוזג לטקסט אחד — כדי
  * שאפשר יהיה לזהות "מי" מהצבע לבד, גם בלי לקרוא את השם.
@@ -208,7 +228,7 @@ export function renderWeekCanvas({ dates, shifts, guards, teamName }) {
   ctx.fillText(teamName || "סידור השבוע", right, 82);
   ctx.fillStyle = C.brand;
   ctx.font = F(30, 600);
-  ctx.fillText(rangeLabelHe(dates), right, 124);
+  drawRtlWords(ctx, rangeLabelHe(dates), right, 124);
 
   let y = HEAD;
   for (const day of days) {
@@ -309,6 +329,243 @@ export function renderWeekCanvas({ dates, shifts, guards, teamName }) {
   return canvas;
 }
 
+// ============================================================
+// השבוע לפי עמדות (צבא) — אותה תמונה שהמפקד בנה במסך "בניית שבוע".
+//
+// שורה לכל משמרת, מקובצת תחת כותרת העמדה, ועמודה לכל יום; השמות המלאים בתוך
+// התאים. הנתונים מגיעים מוכנים מ-buildPostWeek (postWeek.js) — אותו מקור
+// שהגריד שעל המסך קורא, כך שהתמונה והמסך לא יכולים להציג שני סידורים.
+// מקום שעוד פנוי מצויר כשבב ריק ("פנוי"), לא נעלם: מי שקורא בוואטסאפ צריך
+// לדעת שחסר מישהו, לא לחשוב שהשורה קצרה.
+// ============================================================
+
+const GRID_PAD = 32;
+const LABEL_W = 152;
+const PILL_H = 30;
+const PILL_GAP = 6;
+const ROW_PAD = 10;
+const MIN_ROW = 54;
+const POST_HEAD = 50;
+const DAYS_HEAD = 66;
+
+/** מקצר שם שלא נכנס בעמודה, עם שלוש נקודות — עדיף שם חתוך מטקסט שגולש לעמודה השכנה. */
+function ellipsize(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let t = text;
+  while (t.length > 1 && ctx.measureText(`${t}…`).width > maxWidth) t = t.slice(0, -1);
+  return `${t}…`;
+}
+
+function layoutPosts(ctx, posts, nameOf) {
+  const itemH = (item) => (item.kind === "time" ? 22 : PILL_H) + PILL_GAP;
+  const stackH = (items) => items.reduce((n, it) => n + itemH(it), 0) - (items.length ? PILL_GAP : 0);
+
+  let y = 0;
+  const sections = posts.map((post) => {
+    const rows = post.blocks.map((block) => {
+      if (block.weekly) {
+        const entries = (block.task?.assignees || []).map((id) => ({ id, name: nameOf(id) }));
+        ctx.font = F(17, 700);
+        const lines = wrapPills(ctx, entries, W - GRID_PAD * 2 - LABEL_W - 24, 12, 8);
+        const n = Math.max(1, lines.length);
+        return { block, weekly: true, lines, height: Math.max(MIN_ROW, ROW_PAD * 2 + n * (PILL_H + PILL_GAP) - PILL_GAP) };
+      }
+      const cells = block.cells.map((cell) => {
+        if (cell.state !== "shift") return { state: cell.state, items: [] };
+        const items = [];
+        for (const shift of cell.shifts) {
+          // שעות שונות מהתבנית — כתובות מעל השמות, כמו בגריד שעל המסך.
+          if (shift.startTime !== block.startTime || shift.endTime !== block.endTime) {
+            items.push({ kind: "time", text: `${shift.startTime}–${shift.endTime}` });
+          }
+          const ids = shift.assignedGuards || [];
+          for (const id of ids) items.push({ kind: "name", id, name: nameOf(id) });
+          for (let i = ids.length; i < Math.max(1, shift.requiredGuards || 1); i++) items.push({ kind: "open" });
+        }
+        return { state: "shift", items };
+      });
+      const tallest = Math.max(0, ...cells.map((c) => stackH(c.items)));
+      return { block, cells, height: Math.max(MIN_ROW, ROW_PAD * 2 + tallest) };
+    });
+    const section = { post, rows, y, height: POST_HEAD + rows.reduce((n, r) => n + r.height, 0) };
+    y += section.height + 14;
+    return section;
+  });
+  return { sections, total: y };
+}
+
+/**
+ * מצייר את השבוע לפי עמדות ומחזיר קנבס. סינכרוני — הפונטים כבר נטענו.
+ * @param {{posts: object[], dates: string[], guards: object[], teamName?: string}} p
+ *   posts — הפלט של buildPostWeek
+ */
+export function renderPostWeekCanvas({ posts, dates, guards, teamName }) {
+  const measure = document.createElement("canvas").getContext("2d");
+  const nameOf = (id) => guards.find((g) => g.id === id)?.name || "לא ידוע";
+  const colW = (W - GRID_PAD * 2 - LABEL_W) / Math.max(dates.length, 1);
+  const { sections, total } = layoutPosts(measure, posts, nameOf);
+
+  const HEAD = 150;
+  const FOOT = 60;
+  const H = HEAD + DAYS_HEAD + 12 + total + FOOT;
+  const scale = H * EXPORT_SCALE <= MAX_CANVAS_PX ? EXPORT_SCALE : 1;
+  const canvas = document.createElement("canvas");
+  canvas.width = W * scale;
+  canvas.height = H * scale;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(scale, scale);
+  ctx.direction = "rtl";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "alphabetic";
+
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const right = W - GRID_PAD;
+  const colRight = (i) => right - LABEL_W - i * colW;
+
+  ctx.fillStyle = C.ink;
+  ctx.font = F(46, 800);
+  ctx.fillText(teamName || "סידור השבוע", right, 82);
+  ctx.fillStyle = C.brand;
+  ctx.font = F(30, 600);
+  drawRtlWords(ctx, rangeLabelHe(dates), right, 124);
+
+  // שורת הימים
+  let y = HEAD;
+  roundRect(ctx, GRID_PAD, y, W - GRID_PAD * 2, DAYS_HEAD, 18);
+  ctx.fillStyle = C.card;
+  ctx.fill();
+  dates.forEach((date, i) => {
+    const d = fromISODate(date);
+    const cx = colRight(i) - colW / 2;
+    ctx.textAlign = "center";
+    ctx.fillStyle = C.ink;
+    ctx.font = F(22, 700);
+    ctx.fillText(DAYS_HE[d.getDay()], cx, y + 30);
+    ctx.fillStyle = C.faint;
+    ctx.font = F(18, 500);
+    drawLtr(ctx, `${d.getDate()}/${d.getMonth() + 1}`, cx, y + 54);
+  });
+  ctx.textAlign = "right";
+  y += DAYS_HEAD + 12;
+
+  for (const section of sections) {
+    const top = y + section.y;
+    roundRect(ctx, GRID_PAD, top, W - GRID_PAD * 2, section.height, 18);
+    ctx.fillStyle = C.card;
+    ctx.fill();
+
+    // שם העמדה — שבב שחור אחיד, כמו בכל מקום אחר (COLOR-02).
+    ctx.font = F(24, 800);
+    const title = section.post.post;
+    const titleW = ctx.measureText(title).width + 32;
+    roundRect(ctx, right - 16 - titleW, top + 8, titleW, 34, 17);
+    ctx.fillStyle = POSITION_LABEL_BG;
+    ctx.fill();
+    ctx.fillStyle = readableInk(POSITION_LABEL_BG);
+    ctx.textAlign = "center";
+    ctx.fillText(title, right - 16 - titleW / 2, top + 33);
+    ctx.textAlign = "right";
+
+    let ry = top + POST_HEAD;
+    for (const row of section.rows) {
+      ctx.strokeStyle = C.line;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(GRID_PAD + 16, ry);
+      ctx.lineTo(W - GRID_PAD - 16, ry);
+      ctx.stroke();
+
+      // שם המשמרת והשעות פעם אחת, בראש השורה — לא בכל תא.
+      ctx.fillStyle = C.ink;
+      ctx.font = F(22, 700);
+      ctx.fillText(row.block.part || "משמרת", right - 16, ry + 32);
+      if (row.block.startTime) {
+        ctx.fillStyle = C.muted;
+        ctx.font = F(17, 500);
+        drawLtr(ctx, `${row.block.startTime}–${row.block.endTime}`, right - 16, ry + 54);
+      }
+
+      if (row.weekly) {
+        if (!row.lines.length) {
+          ctx.fillStyle = C.faint;
+          ctx.font = F(20);
+          ctx.fillText("עוד לא שובץ", right - LABEL_W, ry + 34);
+        }
+        ctx.font = F(17, 700);
+        row.lines.forEach((line, li) => {
+          let x = right - LABEL_W;
+          const yy = ry + ROW_PAD + li * (PILL_H + PILL_GAP);
+          for (const pill of line) {
+            const color = guardColor(pill.id);
+            roundRect(ctx, x - pill.w, yy, pill.w, PILL_H, 15);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.fillStyle = readableInk(color);
+            ctx.textAlign = "center";
+            ctx.fillText(pill.name, x - pill.w / 2, yy + 21);
+            ctx.textAlign = "right";
+            x -= pill.w + 8;
+          }
+        });
+      } else {
+        row.cells.forEach((cell, i) => {
+          const cx = colRight(i) - colW / 2;
+          const pillW = colW - 10;
+          if (cell.state !== "shift") {
+            ctx.fillStyle = C.faint;
+            ctx.font = F(cell.state === "next-week" ? 14 : 20, 500);
+            ctx.textAlign = "center";
+            ctx.fillText(cell.state === "next-week" ? "שבוע הבא" : "—", cx, ry + 34);
+            ctx.textAlign = "right";
+            return;
+          }
+          let yy = ry + ROW_PAD;
+          for (const item of cell.items) {
+            if (item.kind === "time") {
+              ctx.fillStyle = C.muted;
+              ctx.font = F(15, 700);
+              ctx.textAlign = "center";
+              drawLtr(ctx, item.text, cx, yy + 15);
+              ctx.textAlign = "right";
+              yy += 22 + PILL_GAP;
+              continue;
+            }
+            roundRect(ctx, cx - pillW / 2, yy, pillW, PILL_H, 15);
+            ctx.textAlign = "center";
+            if (item.kind === "name") {
+              const color = guardColor(item.id);
+              ctx.fillStyle = color;
+              ctx.fill();
+              ctx.fillStyle = readableInk(color);
+              ctx.font = F(16, 700);
+              ctx.fillText(ellipsize(ctx, item.name, pillW - 14), cx, yy + 21);
+            } else {
+              ctx.strokeStyle = C.faint;
+              ctx.lineWidth = 1.5;
+              ctx.stroke();
+              ctx.fillStyle = C.muted;
+              ctx.font = F(16, 600);
+              ctx.fillText("פנוי", cx, yy + 21);
+            }
+            ctx.textAlign = "right";
+            yy += PILL_H + PILL_GAP;
+          }
+        });
+      }
+      ry += row.height;
+    }
+  }
+
+  ctx.fillStyle = C.faint;
+  ctx.font = F(22, 500);
+  ctx.textAlign = "center";
+  drawLtr(ctx, "NexRota", W / 2, H - 34);
+
+  return canvas;
+}
+
 const toBlob = (canvas) =>
   new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 
@@ -320,12 +577,15 @@ const toBlob = (canvas) =>
  *
  * @returns {"shared"|"downloaded"|"cancelled"}
  */
-export async function shareWeekImage({ dates, shifts, guards, teamName }) {
+export async function shareWeekImage({ dates, shifts, guards, teamName, posts }) {
   // הכותרת מצוירת ב-Rubik. בלי ההמתנה, לחיצה ראשונה מייצרת תמונה בפונט
   // ברירת המחדל של המערכת.
   if (document.fonts?.ready) await document.fonts.ready;
 
-  const canvas = renderWeekCanvas({ dates, shifts, guards, teamName });
+  // עם posts (צבא) — התמונה לפי עמדות, כמו בניית השבוע; בלי — כרטיסי ימים.
+  const canvas = posts?.length
+    ? renderPostWeekCanvas({ posts, dates, guards, teamName })
+    : renderWeekCanvas({ dates, shifts, guards, teamName });
   const blob = await toBlob(canvas);
   if (!blob) throw new Error("לא הצלחנו ליצור את התמונה");
 

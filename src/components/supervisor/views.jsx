@@ -22,6 +22,8 @@ import { fairnessHint, fairnessPlan } from "../../lib/fairness.js";
 import { DEFAULT_FAIRNESS_WINDOW_DAYS, FAIRNESS_WINDOW_OPTIONS } from "../../lib/fairnessWindow.js";
 import { categoryOptions, folderIcon, foldersFor, UNFILED } from "../../lib/categories.js";
 import WorkItemForm from "./WorkItemForm.jsx";
+import PostPublishView from "./PostPublishView.jsx";
+import { buildPostWeek } from "../../lib/postWeek.js";
 
 /**
  * Whole-week patterns. Two 12-hour shifts is the common security roster, but
@@ -1304,13 +1306,13 @@ export function AssignView({
  * שפורסם באפליקציה. הקוד של הרינדור נטען רק בלחיצה: הוא מיותר לחלוטין
  * לכל מי שרק בונה סידור ולא משתף אותו.
  */
-function ShareWeekBtn({ dates, shifts, guards }) {
+function ShareWeekBtn({ dates, shifts, guards, posts, teamName }) {
   const [state, setState] = useState("idle");
   const run = async () => {
     setState("working");
     try {
       const { shareWeekImage } = await import("../../lib/shareImage.js");
-      const how = await shareWeekImage({ dates, shifts, guards });
+      const how = await shareWeekImage({ dates, shifts, guards, posts, teamName });
       setState(how === "downloaded" ? "downloaded" : "idle");
     } catch {
       setState("failed");
@@ -1337,7 +1339,17 @@ function ShareWeekBtn({ dates, shifts, guards }) {
 // העותקים זהים תו-בתו.
 const POSITION_LABEL_BG = "#0A0A0A";
 
-export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedded = false }) {
+export function ScheduleMgmt({
+  guards, shifts, weekDates, actions, busy, embedded = false, team, positions = [], tasks = [],
+}) {
+  const mode = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
+  // בצבא הפרסום והתמונה לוואטסאפ הם אותו גריד לפי עמדות שנבנה בבניית השבוע
+  // (PostPublishView, renderPostWeekCanvas) — שניהם נגזרים מכאן, פעם אחת.
+  const army = team?.mode === "army";
+  const posts = useMemo(
+    () => (army ? buildPostWeek({ shifts, positions, tasks, weekDates, mode }) : []),
+    [army, shifts, positions, tasks, weekDates, mode]
+  );
   const weekShifts = shifts.filter((s) => weekDates.includes(s.date));
   const allIds = weekShifts.map((s) => s.id);
   const publishedCount = weekShifts.filter((s) => s.published).length;
@@ -1406,7 +1418,7 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
               </Btn>
             )}
             {weekShifts.length > 0 && (
-              <ShareWeekBtn dates={weekDates} shifts={weekShifts} guards={guards} />
+              <ShareWeekBtn dates={weekDates} shifts={weekShifts} guards={guards} posts={army ? posts : undefined} teamName={team?.name} />
             )}
           </>
         }
@@ -1422,7 +1434,16 @@ export function ScheduleMgmt({ guards, shifts, weekDates, actions, busy, embedde
               כפתוחות.
             </Alert>
           )}
-          {weekDates.map((date) => {
+          {army ? (
+            <PostPublishView
+              posts={posts}
+              shifts={shifts}
+              weekDates={weekDates}
+              guards={guards}
+              busy={busy}
+              onAskPublish={askPublish}
+            />
+          ) : weekDates.map((date) => {
             // כרונולוגי לפי שעת ההתחלה בפועל, לא סדר ההכנסה ל-DB — אותה
             // byStartTime בדיוק שתמונת השיתוף ממיינת דרכה (COLOR-04, D-06).
             const dayShifts = weekShifts.filter((s) => s.date === date).sort(byStartTime);

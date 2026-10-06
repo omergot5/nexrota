@@ -22,7 +22,7 @@ import { Icon } from "../icons.jsx";
 import { DAYS_HE, DAYS_HE_SHORT, fromISODate, isToday } from "../../lib/dates.js";
 import { folderIcon } from "../../lib/categories.js";
 import { isQualified } from "../../lib/autoAssign.js";
-import { DRAG_MIME } from "./UnifiedBoard.jsx";
+import { DRAG_MIME } from "./dragMime.js";
 import { subscribeTerms, t, termProfile } from "../../lib/terms.js";
 import { categoryTone, TONE_CLASSES } from "../../design/categoryPalette.js";
 
@@ -59,10 +59,15 @@ function postMeta(post) {
 }
 
 export default function PostWeekGrid({
-  posts = [], dates = [], guards = [], onEditPost, onEditShift, onMove, showMissing = false,
+  posts = [], dates = [], guards = [], onEditPost, onEditShift, onMove, showMissing = false, fullNames = false,
 }) {
   const mode = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
-  const firstName = (id) => (guards.find((g) => g.id === id)?.name || "?").split(" ")[0];
+  // שם פרטי בעריכה (תאים קטנים, והמפקד מכיר את הצוות); שם מלא בפרסום — מי שקורא
+  // את הסידור צריך לדעת איזו דנה זו, וזו אותה תמונה שיוצאת לוואטסאפ.
+  const firstName = (id) => {
+    const name = guards.find((g) => g.id === id)?.name || "?";
+    return fullNames ? name : name.split(" ")[0];
+  };
 
   if (!posts.length) return null;
 
@@ -102,23 +107,24 @@ export default function PostWeekGrid({
             <tbody key={post.post} className="border-t-2 border-hairline">
               <tr>
                 <th colSpan={dates.length + 1} scope="rowgroup" className="text-right p-0 bg-surface-sunken/50">
-                  <button
-                    type="button"
+                  <HeaderTag
+                    editable={Boolean(onEditPost)}
                     onClick={() => onEditPost?.(post)}
                     aria-label={`עריכת העמדה ${post.post}`}
-                    className="group w-full flex items-center gap-2 px-3 py-2 text-right cursor-pointer
-                      hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/50"
+                    className="group w-full flex items-center gap-2 px-3 py-2 text-right"
                   >
                     <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${tone.dot}`} aria-hidden="true" />
                     <Icon name={folderIcon(post.category)} size={15} className="text-muted flex-shrink-0" />
                     <span className="font-extrabold text-content text-[14px]">{post.post}</span>
                     <span className="text-[12px] text-faint font-semibold truncate">· {postMeta(post)}</span>
-                    <Icon
-                      name="pencil"
-                      size={13}
-                      className="text-faint group-hover:text-brand mr-auto flex-shrink-0 transition-colors"
-                    />
-                  </button>
+                    {onEditPost && (
+                      <Icon
+                        name="pencil"
+                        size={13}
+                        className="text-faint group-hover:text-brand mr-auto flex-shrink-0 transition-colors"
+                      />
+                    )}
+                  </HeaderTag>
                 </th>
               </tr>
 
@@ -172,6 +178,20 @@ export default function PostWeekGrid({
   );
 }
 
+/** כותרת עמדה: כפתור כשאפשר לערוך, אחרת טקסט רגיל — בלי "לחצו לעריכה" על מסך שלא עורכים בו. */
+function HeaderTag({ editable, className, children, ...rest }) {
+  if (!editable) return <div className={className}>{children}</div>;
+  return (
+    <button
+      type="button"
+      className={`${className} cursor-pointer hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/50`}
+      {...rest}
+    >
+      {children}
+    </button>
+  );
+}
+
 function Cell({ cell, block, post, tone, firstName, guards, onEditShift, onMove, showMissing }) {
   if (cell.state === "off" || cell.state === "empty") {
     return (
@@ -214,6 +234,7 @@ function Cell({ cell, block, post, tone, firstName, guards, onEditShift, onMove,
 
 function ShiftCell({ shift, block, post, tone, cell, firstName, guards, onEditShift, onMove, showMissing }) {
   const [dragOver, setDragOver] = useState(false);
+  const editable = Boolean(onEditShift); // לפני label: התווית תלויה בו
   const ids = shift.assignedGuards || [];
   const names = ids.map(firstName);
   const need = shift.requiredGuards || 1;
@@ -226,7 +247,7 @@ function ShiftCell({ shift, block, post, tone, cell, firstName, guards, onEditSh
   const flagged = showMissing && missing > 0;
   const label = `${post.post} ${block.part}, ${block.afterMidnight ? `ליל ${dayLong(cell.date)}` : `יום ${dayLong(cell.date)}`}: ${
     names.length ? names.join(", ") : "עוד לא שובץ"
-  }${flagged ? (missing === 1 ? ", חסר מקום אחד" : `, חסרים ${missing}`) : ""} — לחצו לעריכת היום הזה`;
+  }${flagged ? (missing === 1 ? ", חסר מקום אחד" : `, חסרים ${missing}`) : ""}${editable ? " — לחצו לעריכת היום הזה" : ""}`;
 
   const open = () => onEditShift?.(shift);
   const dropProps = onMove
@@ -255,21 +276,26 @@ function ShiftCell({ shift, block, post, tone, cell, firstName, guards, onEditSh
   // בדיוק מה שנגרר. המקלדת מקבלת את אותו תפקיד דרך role + Enter/רווח.
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={open}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          open();
-        }
-      }}
+      {...(editable
+        ? {
+            role: "button",
+            tabIndex: 0,
+            onClick: open,
+            onKeyDown: (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                open();
+              }
+            },
+          }
+        : { role: "group" })}
       aria-label={label}
       title={label}
       {...dropProps}
-      className={`block w-full min-h-[2rem] text-right rounded-md border-r-[3px] px-1.5 py-1 cursor-pointer
+      className={`block w-full min-h-[2rem] text-right rounded-md border-r-[3px] px-1.5 py-1
+        ${editable ? "cursor-pointer hover:ring-1 hover:ring-inset hover:ring-brand/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60" : ""}
         ${tone.bg} ${tone.border} ${flagged ? "ring-1 ring-inset ring-warn" : ""} ${dragOver ? "ring-2 ring-inset ring-content" : ""}
-        hover:ring-1 hover:ring-inset hover:ring-brand/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 transition-shadow`}
+        transition-shadow`}
     >
       {(timesDiffer || countDiffers || partial || flagged) && (
         <span className="flex items-center justify-between gap-1">
