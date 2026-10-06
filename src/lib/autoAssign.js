@@ -255,12 +255,19 @@ function blockHoursAround(intervals, candidate) {
   return (blockEnd - blockStart) / HOUR;
 }
 
-/** Smallest rest gap (hours) between the candidate and any non-touching shift. */
+/**
+ * Smallest rest gap (hours) between the candidate and any shift that does not touch it.
+ * משמרת שנוגעת (סיום = התחלה) היא רצף ולא מנוחה, ונבדקת בנפרד ב-blockHoursAround — אבל היא
+ * לא פוטרת את הצד השני: לפני התיקון, מי שהייתה לה משמרת צמודה מצד אחד לא נבדקה בכלל מול
+ * משמרת רחוקה פחות מ-10 שעות מהצד השני (נתפס על ההדגמה: 6 שעות מנוחה בין 00:00 ל-06:00).
+ */
 function smallestRestGap(intervals, candidate) {
   let gap = Infinity;
   for (const iv of intervals) {
-    if (iv.end <= candidate.start) gap = Math.min(gap, (candidate.start - iv.end) / HOUR);
-    else if (iv.start >= candidate.end) gap = Math.min(gap, (iv.start - candidate.end) / HOUR);
+    let g = null;
+    if (iv.end <= candidate.start) g = (candidate.start - iv.end) / HOUR;
+    else if (iv.start >= candidate.end) g = (iv.start - candidate.end) / HOUR;
+    if (g !== null && g > 0) gap = Math.min(gap, g);
   }
   return gap;
 }
@@ -326,8 +333,7 @@ function checkHardConstraints({ guard, shift, load, availability, rules }) {
   }
 
   const gap = smallestRestGap(load.shifts, candidate);
-  const touching = load.shifts.some((iv) => iv.end === candidate.start || iv.start === candidate.end);
-  if (!touching && gap < rules.minRestHours) {
+  if (gap < rules.minRestHours) {
     return {
       ok: false,
       code: "rest",

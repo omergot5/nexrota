@@ -2333,109 +2333,6 @@ function CategoryWeightSettings({ team, actions, busy, categories }) {
   );
 }
 
-/**
- * מטריצת ההתנגשויות בין קטגוריות (conflicts.js, gs_role_compatibility) —
- * הכתיבה שהייתה חסרה. הטבלה, ה-RLS (gs_role_compat_write) והמנוע
- * (findConflicts, כבר מוצג כאזהרה בטופס המשימה) קיימים מזמן; רק לא
- * הייתה שום דרך למנהל להכניס שורה אליה, אז לכל צוות אמיתי הטבלה הייתה
- * ריקה ושום זוג לא נחסם בפועל.
- */
-function CategoryConflictSettings({ actions, busy, categories, compatibility }) {
-  const [a, setA] = useState("");
-  const [b, setB] = useState("");
-  const [note, setNote] = useState("");
-
-  const add = async () => {
-    if (!a || !b || a === b) return;
-    await actions.addRoleCompatibility(a, b, note);
-    setA("");
-    setB("");
-    setNote("");
-  };
-
-  if (categories.length < 2) return null;
-
-  return (
-    <Card>
-      <h2 className="font-bold text-content mb-1 flex items-center gap-2">
-        <Icon name="alert" size={18} className="text-brand" />
-        התנגשויות בין קטגוריות
-      </h2>
-      <p className="text-sm text-muted mb-4">
-        קבע אילו קטגוריות אסור לאדם אחד לעשות באותו חלון זמן — למשל "{categories[0]}" ו"{categories[1]}".
-        ברירת המחדל: כל שילוב מותר.
-      </p>
-
-      {compatibility.length > 0 && (
-        <div className="space-y-2 mb-4">
-          {compatibility.map((c) => (
-            <div
-              key={c.id}
-              className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-surface-sunken ring-1 ring-inset ring-hairline"
-            >
-              <span className="text-sm text-content min-w-0">
-                <b>{c.a}</b> ↔ <b>{c.b}</b>
-                {c.note && <span className="text-muted"> — {c.note}</span>}
-              </span>
-              {/* כלל מובנה (teamCode null) אף פעם לא ניתן למחיקה — ה-RLS
-                * דוחה את זה תמיד, אז אין טעם להציע כפתור שרק ייכשל.
-                * תג "מובנה" במקומו, לא שתיקה: המנהל צריך לדעת שהכלל הזה
-                * לא הומצא כאן ולא שלו למחוק. */}
-              {c.teamCode ? (
-                <IconBtn
-                  icon="trash"
-                  size="sm"
-                  label={`הסר את החסימה בין ${c.a} ל${c.b}`}
-                  className="flex-shrink-0 hover:text-danger"
-                  onClick={() => actions.removeRoleCompatibility(c.id)}
-                  disabled={busy}
-                />
-              ) : (
-                <Badge tone="neutral" className="flex-shrink-0">
-                  מובנה
-                </Badge>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="grid sm:grid-cols-3 gap-2 items-end">
-        <Field label="קטגוריה א'">
-          <Select value={a} onChange={(e) => setA(e.target.value)} disabled={busy}>
-            <option value="">בחר</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="קטגוריה ב'">
-          <Select value={b} onChange={(e) => setB(e.target.value)} disabled={busy}>
-            <option value="">בחר</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Btn variant="outline" icon="plus" onClick={add} disabled={busy || !a || !b || a === b}>
-          חסום זוג
-        </Btn>
-      </div>
-      <Input
-        className="mt-2"
-        placeholder="הסבר (אופציונלי)…"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        disabled={busy}
-      />
-    </Card>
-  );
-}
-
 function DeadlineSettings({ team, actions, busy }) {
   const days = team?.deadlineDays ?? 3;
   const hour = team?.deadlineHour ?? 14;
@@ -2843,13 +2740,6 @@ export function TeamView({
       <FairnessWindowSettings team={team} actions={actions} busy={busy} />
 
       <CategoryWeightSettings team={team} actions={actions} busy={busy} categories={categories} />
-
-      <CategoryConflictSettings
-        actions={actions}
-        busy={busy}
-        categories={categories}
-        compatibility={compatibility}
-      />
 
       <Card>
         <div className="flex items-center justify-between gap-6 flex-wrap">

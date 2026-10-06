@@ -110,7 +110,7 @@ export const PROFILE_TERMS = {
     "nav.schedule":     "הפץ סד\"כ",
     "nav.swaps":        "בקשות חילוף",
     "nav.tasks":        "משימות",
-    "nav.team":         "החיילים שלי",
+    "nav.team":         "הצוות שלי",
     "nav.positions":    "עמדות קבע",
     "guard.nav.schedule":     "התורנויות שלי",
     "guard.nav.availability": "דיווח זמינות",
