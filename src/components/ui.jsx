@@ -7,7 +7,8 @@
 // than as a class-name soup at the call site.
 // ============================================================
 
-import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from "react";
+import { Children, Fragment, cloneElement, isValidElement, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "./icons.jsx";
 
 /* ------------------------------------------------------------------ *
@@ -544,11 +545,205 @@ export const Input = ({ className = "", invalid, ...rest }) => (
   />
 );
 
-export const Select = ({ className = "", children, ...rest }) => (
-  <select {...rest} className={`${CONTROL} cursor-pointer pl-8 ${className}`}>
-    {children}
-  </select>
-);
+/**
+ * רשימה נפתחת — מחליפה את <select> של הדפדפן, שנראה אחרת בכל מכשיר ובעיקר
+ * כמו שנות ה-90. אותה חתימה כמו <select>: <option> כילדים, value ו-onChange
+ * שמקבל אובייקט עם target.value, כך שאף מסך לא צריך להשתנות.
+ *
+ * התפריט נפתח בפורטל מעל כל השאר (גם מתוך חלון קופץ שחותך תוכן), ונפתח מעלה
+ * כשאין מקום למטה. מקלדת: חצים, Home/End, Enter/רווח, Escape. ה-Escape נתפס
+ * בשלב ה-capture כמו ב-TimeField, כדי שבתוך חלון הוא יסגור את הרשימה ולא את החלון.
+ */
+function readOptions(children) {
+  const out = [];
+  Children.forEach(children, (c) => {
+    if (!isValidElement(c)) return;
+    if (c.type === Fragment) out.push(...readOptions(c.props.children));
+    else if (c.type === "option") {
+      const label = c.props.children;
+      out.push({
+        value: String(c.props.value ?? (typeof label === "string" ? label : "")),
+        label,
+        disabled: Boolean(c.props.disabled),
+      });
+    }
+  });
+  return out;
+}
+
+export const Select = ({ className = "", children, value, onChange, disabled, invalid, ...rest }) => {
+  const options = readOptions(children);
+  const listId = useId();
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const [place, setPlace] = useState(null);
+
+  const selectedIndex = options.findIndex((o) => o.value === String(value ?? ""));
+  const current = selectedIndex >= 0 ? options[selectedIndex] : null;
+  // "בחר ..." (ערך ריק) נראה כמו placeholder, לא כבחירה.
+  const isPlaceholder = !current || current.value === "";
+
+  const firstEnabled = (from, dir) => {
+    for (let i = from; i >= 0 && i < options.length; i += dir) if (!options[i].disabled) return i;
+    return -1;
+  };
+
+  const measure = () => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const want = Math.min(280, options.length * 44 + 12);
+    const below = window.innerHeight - r.bottom - 12;
+    const above = r.top - 12;
+    const down = below >= want || below >= above;
+    setPlace({
+      left: r.left,
+      width: r.width,
+      maxHeight: Math.max(120, Math.min(280, down ? below : above)),
+      ...(down ? { top: r.bottom + 6 } : { bottom: window.innerHeight - r.top + 6 }),
+    });
+  };
+
+  const openMenu = () => {
+    if (disabled) return;
+    setActive(selectedIndex >= 0 && !options[selectedIndex].disabled ? selectedIndex : Math.max(0, firstEnabled(0, 1)));
+    measure();
+    setOpen(true);
+  };
+
+  const choose = (i) => {
+    const opt = options[i];
+    if (!opt || opt.disabled) return;
+    setOpen(false);
+    triggerRef.current?.focus();
+    if (opt.value !== String(value ?? "")) onChange?.({ target: { value: opt.value } });
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (triggerRef.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey, true);
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, options.length]);
+
+  useEffect(() => {
+    if (open) menuRef.current?.querySelector(`[data-i="${active}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [open, active, place]);
+
+  const onKeyDown = (e) => {
+    if (disabled) return;
+    if (!open) {
+      if (["ArrowDown", "ArrowUp", "Enter", " "].includes(e.key)) {
+        e.preventDefault();
+        openMenu();
+      }
+      return;
+    }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const dir = e.key === "ArrowDown" ? 1 : -1;
+      const next = firstEnabled(active + dir, dir);
+      if (next >= 0) setActive(next);
+    } else if (e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      const next = e.key === "Home" ? firstEnabled(0, 1) : firstEnabled(options.length - 1, -1);
+      if (next >= 0) setActive(next);
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      choose(active);
+    } else if (e.key === "Tab") {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        {...rest}
+        ref={triggerRef}
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listId : undefined}
+        aria-activedescendant={open ? `${listId}-${active}` : undefined}
+        aria-invalid={invalid || undefined}
+        disabled={disabled}
+        onClick={() => (open ? setOpen(false) : openMenu())}
+        onKeyDown={onKeyDown}
+        className={`${CONTROL} flex items-center justify-between gap-2 cursor-pointer text-right ${
+          open ? "border-brand ring-2 ring-brand/30" : ""
+        } ${invalid ? "border-danger" : ""} ${className}`}
+      >
+        <span className={`truncate ${isPlaceholder ? "text-faint" : "text-content font-semibold"}`}>
+          {current ? current.label : ""}
+        </span>
+        <Icon
+          name="down"
+          size={16}
+          className={`text-muted flex-shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open &&
+        place &&
+        createPortal(
+          <div
+            ref={menuRef}
+            id={listId}
+            role="listbox"
+            style={{ position: "fixed", zIndex: 300, ...place }}
+            className="overflow-y-auto overscroll-contain rounded-2xl bg-bg ring-1 ring-inset ring-hairline-strong
+              shadow-2xl p-1.5 animate-fade-up [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {options.map((o, i) => {
+              const selected = i === selectedIndex;
+              return (
+                <div
+                  key={`${o.value}-${i}`}
+                  id={`${listId}-${i}`}
+                  data-i={i}
+                  role="option"
+                  aria-selected={selected}
+                  aria-disabled={o.disabled || undefined}
+                  onClick={() => choose(i)}
+                  onPointerEnter={() => !o.disabled && setActive(i)}
+                  className={`min-h-[44px] px-3 rounded-xl flex items-center justify-between gap-3 text-sm select-none
+                    ${o.disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}
+                    ${selected ? "bg-brand/15 text-content font-extrabold" : "text-content font-medium"}
+                    ${i === active && !selected && !o.disabled ? "bg-brand/10" : ""}`}
+                >
+                  <span className={`truncate ${o.value === "" ? "text-faint" : ""}`}>{o.label}</span>
+                  {selected && <Icon name="check" size={16} strokeWidth={2.5} className="text-brand flex-shrink-0" />}
+                </div>
+              );
+            })}
+          </div>,
+          document.body
+        )}
+    </>
+  );
+};
 
 export const Textarea = ({ className = "", rows = 3, ...rest }) => (
   <textarea {...rest} rows={rows} className={`${CONTROL} h-auto py-2.5 resize-y ${className}`} />
