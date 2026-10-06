@@ -50,19 +50,19 @@ check("הרשימה והבאנר מסכימים: מי שאין לו מענה ב�
   }));
 
 console.log("\nטלפון וקישור וואטסאפ\n");
-check("050-123-4567 → 972501234567", waPhone("050-123-4567") === "972501234567");
-check("+972 50 123 4567 נשאר", waPhone("+972 50 123 4567") === "972501234567");
+check("050-000-0000 → 972500000000", waPhone("050-000-0000") === "972500000000");
+check("+972 50 000 0000 נשאר", waPhone("+972 50 000 0000") === "972500000000");
 check("מספר קצר מדי — אין נמען", waPhone("123") === null && waPhone("") === null && waPhone(null) === null);
-const link = whatsappLink({ phone: "0501234567", text: 'היי "דנה"\nשורה שנייה' });
-check("הקישור מכוון למספר", link.startsWith("https://wa.me/972501234567?text="));
+const link = whatsappLink({ phone: "0500000000", text: 'היי "דנה"\nשורה שנייה' });
+check("הקישור מכוון למספר", link.startsWith("https://wa.me/972500000000?text="));
 check("הנוסח מקודד: מירכאות ושורה חדשה לא שוברות את הקישור", !/[\s"]/.test(link.split("?text=")[1]) && link.includes("%0A"));
 check("בלי טלפון נפתח בלי נמען", whatsappLink({ phone: "", text: "x" }) === "https://wa.me/?text=x");
 
 console.log("\nנוסח ההודעה\n");
-const one = reminderText({ name: "דנה", range: "11–17 באוקטובר", deadline: "חמישי 8.10 בשעה 18:00", teamCode: "LA7234" });
+const one = reminderText({ name: "דנה", range: "11–17 באוקטובר", deadline: "חמישי 8.10 בשעה 18:00", teamCode: "TEST01" });
 check("אישית: פונה בשם", one.startsWith("היי דנה"));
-check("אישית: אומרת עד מתי ואיך נכנסים", one.includes("עד חמישי 8.10 בשעה 18:00") && one.includes("LA7234"));
-const group = reminderText({ names: ["מאיה", "רועי"], range: "11–17 באוקטובר", deadline: "חמישי", teamCode: "LA7234" });
+check("אישית: אומרת עד מתי ואיך נכנסים", one.includes("עד חמישי 8.10 בשעה 18:00") && one.includes("TEST01"));
+const group = reminderText({ names: ["מאיה", "רועי"], range: "11–17 באוקטובר", deadline: "חמישי", teamCode: "TEST01" });
 check("קבוצה: מפרטת מי עוד חסר", group.includes("טרם הגישו: מאיה, רועי."));
 check("קבוצה: לא פונה לאדם אחד בשמו", !group.startsWith("היי"));
 
