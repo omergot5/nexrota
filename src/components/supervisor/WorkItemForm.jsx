@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { SHIFT_TONES } from "../../design/shiftPalette.js";
 import { Alert, Avatar, Btn, Field, Input, Select, Textarea } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
+import TimeField from "../TimeField.jsx";
 import { formatDateHe, isSingleDayTask, shiftHours } from "../../lib/dates.js";
 import { isQualified } from "../../lib/autoAssign.js";
 import { explainConflict, findConflicts } from "../../lib/conflicts.js";
@@ -145,6 +146,8 @@ export default function WorkItemForm({
   }, [open, editing, initialKind]);
 
   const field = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  // TimeField מוסר את הערך עצמו ("06:30"), לא אירוע.
+  const timeField = (key) => (value) => setForm((f) => ({ ...f, [key]: value }));
 
   const changeKind = (next) => {
     if (editing) return; // המתג נעול בעריכה — ר' הערת הכותרת.
@@ -296,10 +299,10 @@ export default function WorkItemForm({
               <Input value={form.label} onChange={field("label")} />
             </Field>
             <Field label="שעת התחלה">
-              <Input type="time" value={form.startTime} onChange={field("startTime")} />
+              <TimeField label="שעת התחלה" value={form.startTime} onChange={timeField("startTime")} />
             </Field>
             <Field label="שעת סיום">
-              <Input type="time" value={form.endTime} onChange={field("endTime")} />
+              <TimeField label="שעת סיום" value={form.endTime} onChange={timeField("endTime")} />
             </Field>
             <Field label="מיקום">
               <Input value={form.location} onChange={field("location")} />
@@ -347,10 +350,10 @@ export default function WorkItemForm({
             <div>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="משעה" error={hoursInvalid && !form.startTime ? "חסרה שעת התחלה" : undefined}>
-                  <Input type="time" value={form.startTime} onChange={field("startTime")} />
+                  <TimeField label="משעה" value={form.startTime} onChange={timeField("startTime")} />
                 </Field>
                 <Field label="עד שעה" error={hoursInvalid && !form.endTime ? "חסרה שעת סיום" : undefined}>
-                  <Input type="time" value={form.endTime} onChange={field("endTime")} />
+                  <TimeField label="עד שעה" value={form.endTime} onChange={timeField("endTime")} />
                 </Field>
               </div>
               <p className="text-xs text-faint mt-1.5">

@@ -493,7 +493,8 @@ export const PageHeader = ({ title, subtitle, actions }) => (
  * Forms
  * ------------------------------------------------------------------ */
 
-const CONTROL =
+// מיוצא בשביל שדות שבנויים מחוץ לקובץ הזה (TimeField) ונראים בדיוק כמו Input.
+export const CONTROL =
   "w-full h-11 bg-surface-sunken border border-hairline rounded-xl px-3.5 text-sm text-content " +
   "placeholder:text-faint transition-[border-color,box-shadow] duration-200 " +
   "hover:border-hairline-strong focus:border-brand focus:ring-2 focus:ring-brand/30 focus:outline-none " +

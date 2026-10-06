@@ -20,6 +20,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Alert, Btn, Card, ConfirmDialog, IconBtn, Input, PageHeader, Segmented, Select } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
+import TimeField from "../TimeField.jsx";
 import { DAYS_HE_SHORT, fromISODate, rangeLabelHe } from "../../lib/dates.js";
 import { folderIcon, foldersFor } from "../../lib/categories.js";
 import { buildDivisionRows } from "../../lib/positions.js";
@@ -590,9 +591,23 @@ export default function RosterWizard({
                     );
                   })}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Input type="time" value={form.startTime || ""} onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))} />
-                  <Input type="time" value={form.endTime || ""} onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))} />
+                <div className="grid grid-cols-2 gap-3 items-start">
+                  <div>
+                    <p className="text-[12px] font-bold text-muted mb-1.5">התחלה</p>
+                    <TimeField
+                      label="שעת התחלה"
+                      value={form.startTime || ""}
+                      onChange={(v) => setForm((f) => ({ ...f, startTime: v }))}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[12px] font-bold text-muted mb-1.5">סיום</p>
+                    <TimeField
+                      label="שעת סיום"
+                      value={form.endTime || ""}
+                      onChange={(v) => setForm((f) => ({ ...f, endTime: v }))}
+                    />
+                  </div>
                 </div>
                 {form.startTime && form.endTime && form.weekdays.length > 0 && team?.restHours && (
                   <Alert tone={restWarning ? "warn" : "accent"}>

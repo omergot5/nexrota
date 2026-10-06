@@ -15,6 +15,7 @@ import {
   Badge, Btn, Card, ConfirmDialog, EmptyState, Field, IconBtn, Input, Modal, PageHeader, Segmented, Select,
 } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
+import TimeField from "../TimeField.jsx";
 import { DAYS_HE_SHORT, addDays, rangeLabelHe, shortDate, weekFrom } from "../../lib/dates.js";
 import { subscribeTerms, t, termProfile } from "../../lib/terms.js";
 import { categoryOptions } from "../../lib/categories.js";
@@ -220,17 +221,17 @@ export default function PositionsScreen({
 
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="שעת התחלה">
-                    <Input
-                      type="time"
+                    <TimeField
+                      label="שעת התחלה"
                       value={form.startTime || ""}
-                      onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))}
+                      onChange={(v) => setForm((f) => ({ ...f, startTime: v }))}
                     />
                   </Field>
                   <Field label="שעת סיום">
-                    <Input
-                      type="time"
+                    <TimeField
+                      label="שעת סיום"
                       value={form.endTime || ""}
-                      onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))}
+                      onChange={(v) => setForm((f) => ({ ...f, endTime: v }))}
                     />
                   </Field>
                 </div>
