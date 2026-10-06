@@ -369,34 +369,40 @@ export async function seedArmyRoster({
   }
   for (const list of byDate.values()) list.sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-  const availRows = [];
-  allGuards.forEach((guard, gi) => {
-    dates.forEach((date, di) => {
-      const daily = byDate.get(date) || [];
-      daily.forEach((shift, si) => {
-        const code = fallbackStatus(gi, di * 5 + si, si % 2 === 0 ? "day" : "night");
-        if (code === "?") return;
-        availRows.push({ shift_id: shift.id, guard_id: guard.id, status: STATUS[code], comment: null });
-      });
-    });
-  });
+  // 45 חיילים × ~97 תורנויות ≈ 4,400 שורות. כ-JSON זה ~600KB, ובהעלאה איטית
+  // ההדגמה חיכתה עליהן עשרות שניות. במקום זה: אות אחת לכל חייל×תורנות
+  // (~10KB), והשרת פורש אותה לשורות (gs_seed_availability, מיגרציה 0030 —
+  // עם אותן הרשאות RLS כמו כתיבה רגילה).
+  const ordered = dates.flatMap((date) => byDate.get(date) || []);
+  const position = new Map();
+  dates.forEach((date, di) => (byDate.get(date) || []).forEach((shift, si) => position.set(shift.id, { di, si })));
+  const codes = allGuards
+    .map((_, gi) =>
+      ordered
+        .map((shift) => {
+          const { di, si } = position.get(shift.id);
+          return fallbackStatus(gi, di * 5 + si, si % 2 === 0 ? "day" : "night");
+        })
+        .join("")
+    )
+    .join("");
 
-  // 45 חיילים × ~95 תורנויות בשבוע ≈ 4,400 שורות — נשלחות במנות (שבקשה
-  // אחת לא תתקרב למגבלת הגודל של השרת), ובמקביל: כל מנה לוקחת לשרת כמה
-  // שניות, ובטור ההדגמה האורחת חיכתה עליהן כחצי דקה לפני שנפתחה.
-  const chunks = [];
-  for (let i = 0; i < availRows.length; i += 1000) chunks.push(availRows.slice(i, i + 1000));
-  const results = await Promise.all(
-    chunks.map((chunk) => supabase.from("gs_availability").upsert(chunk, { onConflict: "shift_id,guard_id" }))
-  );
-  const failed = results.find((r) => r.error);
-  if (failed) throw new Error(`הגשות זמינות ההדגמה נכשלו: ${failed.error.message}`);
+  let availabilityAdded = 0;
+  if (ordered.length && allGuards.length) {
+    const { data, error } = await supabase.rpc("gs_seed_availability", {
+      p_shift_ids: ordered.map((s) => s.id),
+      p_guard_ids: allGuards.map((g) => g.id),
+      p_codes: codes,
+    });
+    if (error) throw new Error(`הגשות זמינות ההדגמה נכשלו: ${error.message}`);
+    availabilityAdded = data ?? 0;
+  }
 
   return {
     guardsAdded,
     positionsAdded,
     shiftsAdded: shiftRows.length,
-    availabilityAdded: availRows.length,
+    availabilityAdded,
     weekStart: sundayISO,
   };
 }
