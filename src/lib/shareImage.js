@@ -56,25 +56,13 @@ const C = {
 // אוכפת ששני העותקים לא נסחפים זה מזה.
 const POSITION_LABEL_BG = "#0A0A0A";
 
+import { colorLookup } from "./guardColors.js";
+
 const F = (size, weight = 400) => `${weight} ${size}px Rubik, Arial, sans-serif`;
 
-// פלטת עשרת צבעי החיילים — זהה בדיוק ל-ui.jsx (guardColor) — משוכפלת
-// ולא מיובאת, כי קנבס הוא אחד משלושת המקומות (עם ה-DB ו-Recharts) ש-
-// shiftPalette.js כבר מתעד ש-`rgb(var(--x))` לא מגיע אליהם. בלי הזיהוי
-// הזה (מי בצבע-שומר) התמונה המשותפת בוואטסאפ חוזרת להיות "הכל אותו
-// צבע" — בדיוק התלונה שהובילה לשינוי.
-const GUARD_COLORS = [
-  "#4C9585", "#3E7C9B", "#7A6FA8", "#A85F7A", "#B0763C",
-  "#5E8C5A", "#9A6250", "#4F7FA8", "#8A6B9E", "#2F7A6B",
-];
-const hashColor = (key, palette) => {
-  const s = String(key || "");
-  let hash = 0;
-  for (let i = 0; i < s.length; i++) hash = s.charCodeAt(i) + ((hash << 5) - hash);
-  return palette[Math.abs(hash) % palette.length];
-};
-const guardColor = (id) => hashColor(id, GUARD_COLORS);
-
+// צבע החייל נקבע לפי הצוות כולו (lib/guardColors.js) — אותו צבע בדיוק כמו על המסך, כדי
+// שחייל שמזהה את עצמו לפי צבע יזהה אותו גם בתמונה שנשלחה בוואטסאפ. הקובץ טהור (בלי
+// React ובלי משתני CSS), ולכן מותר לייבא אותו גם לקנבס.
 const toLinear = (c) => {
   const v = c / 255;
   return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
@@ -195,6 +183,7 @@ function layout(ctx, dates, shifts, nameOf) {
 export function renderWeekCanvas({ dates, shifts, guards, teamName }) {
   const measure = document.createElement("canvas").getContext("2d");
   const nameOf = (id) => guards.find((g) => g.id === id)?.name || "לא ידוע";
+  const guardColor = colorLookup(guards);
   const { days, total } = layout(measure, dates, shifts, nameOf);
 
   const HEAD = 150;
@@ -402,6 +391,7 @@ function layoutPosts(ctx, posts, nameOf) {
 export function renderPostWeekCanvas({ posts, dates, guards, teamName }) {
   const measure = document.createElement("canvas").getContext("2d");
   const nameOf = (id) => guards.find((g) => g.id === id)?.name || "לא ידוע";
+  const guardColor = colorLookup(guards);
   const colW = (W - GRID_PAD * 2 - LABEL_W) / Math.max(dates.length, 1);
   const { sections, total } = layoutPosts(measure, posts, nameOf);
 

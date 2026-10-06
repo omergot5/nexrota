@@ -1,4 +1,4 @@
-import { Btn, Card, Meter } from "../ui.jsx";
+import { Btn, Card, Meter, guardColor, readableInk } from "../ui.jsx";
 import { Icon } from "../icons.jsx";
 import { formatDateHe, rangeLabelHe, shiftPartName, splitShiftLabel } from "../../lib/dates.js";
 
@@ -153,8 +153,23 @@ export function FocusDayCard({ focus, guards, onNavigate }) {
                 return (
                   <li key={s.id} className="flex items-baseline gap-2 text-[13px]">
                     <span className="w-[4.5rem] flex-shrink-0 text-muted font-semibold">{shiftPartName(s) || "משמרת"}</span>
-                    <span className="min-w-0 flex-1 text-content">
-                      {ids.map(nameOf).filter(Boolean).join(" · ") || <span className="text-faint">עוד לא שובץ</span>}
+                    <span className="min-w-0 flex-1 text-content flex flex-wrap items-center gap-1">
+                      {ids.map((id) => {
+                        const name = nameOf(id);
+                        if (!name) return null;
+                        const c = guardColor(id);
+                        // הצבע הוא של האדם — אותו צבע בכל מסך ובתמונה שנשלחת. השם תמיד כתוב עליו.
+                        return (
+                          <span
+                            key={id}
+                            className="px-2 py-0.5 rounded-md text-[12px] font-bold"
+                            style={{ background: c, color: readableInk(c) }}
+                          >
+                            {name}
+                          </span>
+                        );
+                      })}
+                      {ids.length === 0 && <span className="text-faint">עוד לא שובץ</span>}
                       {lacking > 0 && ids.length > 0 && (
                         <span className="text-warn font-bold inline-flex items-center gap-0.5 mr-2">
                           <Icon name="alert" size={11} />

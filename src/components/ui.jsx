@@ -15,29 +15,10 @@ import { Icon } from "./icons.jsx";
  * Per-guard identity colour
  * ------------------------------------------------------------------ */
 
-/**
- * צבע הזהות של אדם.
- *
- * כאן, בניגוד למשמרות, **צריך** גיוון: עשרה אנשים חייבים להיות נבדלים
- * זה מזה במבט. הסט הקודם היה סט ברירת המחדל של Tailwind — ליים, ורוד,
- * כתום — והוא צרם על קרם.
- *
- * הסט הזה שומר על עשר משפחות גוון נפרדות אבל בהרוויה נמוכה יותר
- * ובבהירות אחידה, כך שאף שבב לא קופץ מעל האחרים, וכולם יושבים באותו
- * עולם עם הטורקיז. הראשון בסבב הוא הטורקיז של המותג עצמו.
- */
-const GUARD_COLORS = [
-  "#4C9585", "#3E7C9B", "#7A6FA8", "#A85F7A", "#B0763C",
-  "#5E8C5A", "#9A6250", "#4F7FA8", "#8A6B9E", "#2F7A6B",
-];
-
-/** Stable colour per guard, so the same person looks the same everywhere. */
-export const guardColor = (id) => {
-  const s = String(id || "");
-  let hash = 0;
-  for (let i = 0; i < s.length; i++) hash = s.charCodeAt(i) + ((hash << 5) - hash);
-  return GUARD_COLORS[Math.abs(hash) % GUARD_COLORS.length];
-};
+// צבע הזהות של אדם — נקבע לפי הצוות כולו, כך שאף שני אנשים לא חולקים צבע (עד 36).
+// ההסבר המלא והבדיקה ב-lib/guardColors.js; כאן רק מייצאים מחדש, כדי שכל מי שמייבא מ-ui.jsx ימשיך לעבוד.
+import { guardColor } from "../lib/guardColors.js";
+export { guardColor };
 
 /* ------------------------------------------------------------------ *
  * Per-category / per-position identity colour

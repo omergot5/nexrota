@@ -23,6 +23,7 @@ import * as api from "../lib/api.js";
 import { seedDemoTeam, seedArmyRoster, demoShiftIdsForWeek, DEMO_TEAM_NAME } from "../lib/demoData.js";
 import { ARMY_DEMO_SOLDIERS } from "../lib/armyDemo.js";
 import { setTermProfile } from "../lib/terms.js";
+import { assignGuardColors } from "../lib/guardColors.js";
 // שכבת ה-state הראשונה שנוגעת במנוע (Phase 3, QUAL-04 מסלול 4): שיבוץ ידני
 // מבצע כתיבה ישירה, ולכן חייב לשאול את אותה שאלה שהמנוע שואל לפני שהוא
 // כותב — בדיוק כמו ששני מסכי ההחלפה כבר עושים לפני אישור.
@@ -106,6 +107,10 @@ export function useGuardian() {
   useEffect(() => {
     setTermProfile(data.team?.mode || "security");
   }, [data.team?.mode]);
+  // הצבע של כל אדם נקבע לפי הצוות כולו (אף שניים לא חולקים צבע), ולכן מחושב מחדש
+  // כשהרשימה משתנה. נקרא בגוף הרינדור ולא ב-effect: אחרת הרינדור הראשון היה
+  // מצויר עם הצבעים הישנים והיה מבהב.
+  assignGuardColors(data.guards);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   // "הנתונים על המסך הם צילום ישן". מוצג, ולא מוסתר: משתמש שרואה סידור בלי
