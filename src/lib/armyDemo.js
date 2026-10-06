@@ -42,16 +42,14 @@ export const ARMY_DEMO_POSITIONS = [
 export const ARMY_DEMO_SOLDIERS = 45;
 
 /**
- * זמינות לדוגמה — דטרמיניסטית וקבועה בין הרצות, לא Math.random. תמהיל גס
- * (כ-10% לא-זמין, 20% אולי, השאר זמין) שמספיק כדי שלשיבוץ יהיה על מה
- * להתלבט, בלי להקליד דפוס יד לכל חייל.
- * @returns {"a"|"u"|"m"}
+ * זמינות לדוגמה — דטרמיניסטית וקבועה בין הרצות, לא Math.random. בצבא החייל עונה
+ * "יכול" או "לא יכול" בלבד (בלי "אולי"), אז גם ההדגמה: כ-10% לא זמין, השאר
+ * זמין. זה מספיק כדי שלשיבוץ יהיה על מה להתלבט, בלי להקליד דפוס יד לכל חייל.
+ * @returns {"a"|"u"}
  */
 export function demoAvailabilityCode(guardIndex, dayIndex, kind) {
   const seed = (guardIndex * 7 + dayIndex * 3 + (kind === "night" ? 1 : 0)) % 10;
-  if (seed === 0) return "u";
-  if (seed === 1 || seed === 2) return "m";
-  return "a";
+  return seed === 0 ? "u" : "a";
 }
 
 const sameDays = (a = [], b = []) => [...a].sort().join() === [...b].sort().join();

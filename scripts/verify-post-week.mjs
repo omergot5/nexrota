@@ -7,10 +7,10 @@
 // overwrites a day the commander changed by hand, the screen lies.
 
 import {
-  buildPostWeek, countMissing, isAfterMidnight, opDayOf, planTemplateSync, postBlocks, renamePostTitle,
+  buildPostWeek, countMissing, isAfterMidnight, opDayOf, orderShiftsByPost, planTemplateSync, postBlocks, renamePostTitle,
 } from "../src/lib/postWeek.js";
 import { buildDivisionRows, plannedRowsForWeek } from "../src/lib/positions.js";
-import { shiftPartName } from "../src/lib/dates.js";
+import { shiftPartName, splitShiftLabel } from "../src/lib/dates.js";
 
 let failures = 0;
 const check = (label, cond, extra = "") => {
@@ -160,6 +160,23 @@ const over = shifts.map((s, i) => (i === 0 ? { ...s, assignedGuards: ["g1", "g2"
 const overCount = countMissing(buildPostWeek({ shifts: over, positions, tasks: [], weekDates: week, mode: "army" }));
 check("משמרת עם יותר משובצים מהנדרש לא יוצרת חוסר שלילי", overCount.missing >= 0 && overCount.missing < emptyCount.missing,
   `missing=${overCount.missing}`);
+
+// ============================================================
+console.log("\nסדר המשמרות — כמו בגריד, בכל מסך שמפרט אותן\n");
+// ============================================================
+
+const sundayShifts = shifts.filter((s) => opDayOf(s) === week[0]);
+const mixed = [...sundayShifts].reverse();
+const seqOf = (list) => list.map((s) => `${splitShiftLabel(s.label).post}|${shiftPartName(s)}`);
+const gridSeq = grid
+  .filter((p) => !p.weekly)
+  .flatMap((p) => p.blocks.map((b) => `${p.post}|${b.part}`));
+check("סדר המשמרות של יום זהה לסדר השורות בגריד", seqOf(orderShiftsByPost(mixed, "army")).join() === gridSeq.join(),
+  seqOf(orderShiftsByPost(mixed, "army")).slice(0, 6).join(" / "));
+check("עמדה 1 בוקר ואחריה עמדה 1 צהריים, לא עמדה 2 באמצע",
+  seqOf(orderShiftsByPost(mixed, "army")).slice(0, 2).every((x) => x.startsWith("עמדת שמירה 1|")));
+check("הסדר לא תלוי בסדר הקלט (דטרמיניזם)",
+  seqOf(orderShiftsByPost(sundayShifts, "army")).join() === seqOf(orderShiftsByPost(mixed, "army")).join());
 
 console.log(failures === 0 ? "\nPASS\n" : `\n${failures} FAILURE(S)\n`);
 process.exit(failures === 0 ? 0 : 1);

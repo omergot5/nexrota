@@ -15,6 +15,7 @@ import { availStatus, checkAssignment, teamAverages, teamRules } from "../lib/au
 import { qualifiedGuardsForPosition } from "../lib/positions.js";
 import { shiftTone } from "../design/shiftPalette.js";
 import { AVAIL, AVAIL_CHOICES } from "../design/availability.js";
+import { availabilityProgress, deadlineLabelHe } from "../lib/reminders.js";
 import { subscribeTerms, t, termProfile } from "../lib/terms.js";
 import { loadWindowMode, RECENT_DAYS, subscribeLoadWindow } from "../lib/loadWindow.js";
 import UnifiedBoard from "./supervisor/UnifiedBoard.jsx";
@@ -293,7 +294,42 @@ function MySchedule({ user, guards, shifts, tasks = [], positions = [], team }) 
 // AVAILABILITY SUBMISSION
 // ============================================================
 
+// בצבא החייל עונה "יכול" או "לא יכול" — בלי "אולי" ובלי "מעדיף". המנוע מכריע
+// בין מי שיכול לפי הוגנות ומנוחה, ו"אולי" רק מטשטש את מה שהוא צריך לדעת. בשאר
+// התחומים הסולם המלא נשאר כמו שהיה.
+const choicesFor = (team) => (team?.mode === "army" ? ["available", "unavailable"] : AVAIL_CHOICES);
+
+/**
+ * באנר "טרם הגשת זמינות" — מופיע בכל מסך אצל החייל, עד שהוא עונה על כל
+ * משמרות השבוע הבא. נגזר מהנתונים (availabilityProgress), לא מפעולה של
+ * המפקד, ולכן לא תלוי בכך שמישהו זכר לשלוח תזכורת. השבוע הבא הוא השבוע
+ * שנבנה כרגע — אותו ברירת מחדל של מסך ההגשה עצמו.
+ */
+function ReportBanner({ user, team, shifts, tasks, availability, onGo }) {
+  const weekDates = useMemo(() => weekByOffset(1), []);
+  const { total, remaining } = availabilityProgress({ userId: user.id, shifts, tasks, availability, weekDates });
+  if (total === 0 || remaining === 0) return null;
+  const deadline = availabilityDeadline(weekDates[0], team);
+  const past = new Date() > deadline && !user.deadlineExempt;
+  return (
+    <Alert
+      tone={past ? "danger" : "warn"}
+      icon="bell"
+      title={past ? "המועד להגשת הזמינות חלף" : "טרם הגשת זמינות"}
+    >
+      <span className="block">
+        לשבוע {rangeLabelHe(weekDates)} נותרו <b data-numeric>{remaining}</b> משמרות בלי תשובה.{" "}
+        {past ? `המועד היה ${deadlineLabelHe(deadline)} — עדיין אפשר להגיש.` : `יש להגיש עד ${deadlineLabelHe(deadline)}.`}
+      </span>
+      <Btn size="sm" className="mt-2" icon="check-circle" onClick={onGo}>
+        להגשה
+      </Btn>
+    </Alert>
+  );
+}
+
 function MyAvailability({ user, team, shifts, tasks = [], availability, actions, busy }) {
+  const choices = choicesFor(team);
   const [offset, setOffset] = useState(1);
   const [expanded, setExpanded] = useState(false);
   const weekDates = useMemo(() => weekByOffset(offset), [offset]);
@@ -313,7 +349,7 @@ function MyAvailability({ user, team, shifts, tasks = [], availability, actions,
   const deadline = useMemo(() => availabilityDeadline(weekDates[0], team), [weekDates, team]);
   const pastDeadline = new Date() > deadline && !weekStarted;
   const hoursLeft = (deadline - new Date()) / 3600000;
-  const deadlineLabel = `${dayName(toISODate(deadline))}, ${deadline.toLocaleDateString("he-IL")} בשעה ${String(deadline.getHours()).padStart(2, "0")}:00`;
+  const deadlineLabel = deadlineLabelHe(deadline);
 
   const answered = weekShifts.filter(
     (s) => availStatus(availability, user.id, s.id) !== "unknown"
@@ -443,6 +479,7 @@ function MyAvailability({ user, team, shifts, tasks = [], availability, actions,
             {/* Without this, "מעדיף" reads as a stronger "זמין" and everyone
                 picks it. Saying out loud that it costs nothing and grants no
                 guarantee is what keeps the signal meaningful. */}
+            {choices.includes("preferred") && (
             <p className="text-xs text-muted mt-3 pt-3 border-t border-hairline flex items-start gap-2">
               <Icon name="star" size={13} className="text-brand mt-0.5 shrink-0" />
               <span>
@@ -450,6 +487,7 @@ function MyAvailability({ user, team, shifts, tasks = [], availability, actions,
                 זה לא סוגר לך שום אופציה ולא מבטיח שיבוץ — זה רק מכריע בין שני {t("noun.memberPlural")} שממילא פנויים.
               </span>
             </p>
+            )}
           </Card>
 
           {expanded && <div className="space-y-6">
@@ -495,11 +533,11 @@ function MyAvailability({ user, team, shifts, tasks = [], availability, actions,
                           </div>
 
                           <div
-                            className="grid grid-cols-2 sm:grid-cols-4 gap-2"
+                            className={`grid gap-2 ${choices.length === 2 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4"}`}
                             role="radiogroup"
                             aria-label={`זמינות ל${s.label} ב${formatDateHe(s.date)}`}
                           >
-                            {AVAIL_CHOICES.map((val) => {
+                            {choices.map((val) => {
                               const m = AVAIL[val];
                               const on = status === val;
                               const toneCls = {
@@ -913,6 +951,16 @@ export default function GuardApp({ state }) {
               צא וכנס שוב עם השם המדויק שהוא רשם, אחרת המשמרות שלך יגיעו לרשומה השנייה.
               אם זו הפעם הראשונה שלך — הכל תקין, אפשר להתעלם.
             </Alert>
+          )}
+          {view !== "availability" && (
+            <ReportBanner
+              user={user}
+              team={team}
+              shifts={shifts}
+              tasks={tasks}
+              availability={availability}
+              onGo={() => setView("availability")}
+            />
           )}
           {views[view]}
         </div>

@@ -208,6 +208,29 @@ export function countMissing(posts = []) {
   return { missing, assigned };
 }
 
+/**
+ * משמרות בסדר שהגריד מציג אותן: קטגוריה, אחר כך עמדה (לפי שם, מספרית), ובתוך
+ * עמדה מהבוקר עד הלילה. מסך "מי דיווח" וכל מסך אחר שמפרט משמרות קוראים לכאן,
+ * כך ש"עמדה 1 בוקר" ואחריה "עמדה 1 צהריים" נשאר אותו סדר בכל מקום — לא סדר
+ * שני שמישהו ינסה לשמור עקבי ידנית.
+ */
+export function orderShiftsByPost(shifts = [], mode = "army") {
+  const known = foldersFor(mode).map((f) => f.name);
+  const rank = (c) => {
+    const i = known.indexOf(c);
+    return i >= 0 ? i : known.length;
+  };
+  const postOf = (s) => splitShiftLabel(s.label || "").post;
+  return [...shifts].sort(
+    (a, b) =>
+      rank(a.category) - rank(b.category) ||
+      String(a.category || "").localeCompare(String(b.category || ""), "he") ||
+      postOf(a).localeCompare(postOf(b), "he", { numeric: true }) ||
+      dayOrder(a.startTime) - dayOrder(b.startTime) ||
+      String(a.id).localeCompare(String(b.id))
+  );
+}
+
 function cellFor(block, date, lastDate) {
   const list = (block.byDay.get(date) || []).slice().sort((a, b) => String(a.id).localeCompare(String(b.id)));
   if (list.length) return { date, state: "shift", shifts: list };
