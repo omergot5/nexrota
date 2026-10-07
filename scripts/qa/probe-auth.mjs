@@ -1,0 +1,45 @@
+// QA: מקרי קצה בכניסה/הרשמה (ללא צורך בכניסות אנונימיות)
+import { supabase } from "../../src/lib/supabaseClient.js";
+import * as api from "../../src/lib/api.js";
+const t = async (label, fn) => { try { const r = await fn(); console.log(`${label}: OK`, r === undefined ? "" : JSON.stringify(r).slice(0, 120)); } catch (e) { console.log(`${label}: ERR code=${e.code ?? "-"} msg="${e.message}"`); } };
+await supabase.auth.storage.removeItem("gs-auth");
+const stamp = Date.now();
+const email = `qa.auth.${stamp}@mailinator.com`;
+await t("register supervisor (valid)", () => api.registerSupervisor({ email, password: "Guardian!2345", fullName: "אורח", teamName: "QA auth", mode: "security" }));
+const { data: me } = await supabase.auth.getUser();
+const code = (await supabase.rpc("gs_my_team")).data;
+console.log("team", code, "uid", me.user.id);
+await supabase.auth.storage.removeItem("gs-auth");
+await t("register same email again", () => api.registerSupervisor({ email, password: "Guardian!2345", fullName: "x", teamName: "y" }));
+await t("register same email, different case + spaces", () => api.registerSupervisor({ email: `  ${email.toUpperCase()} `, password: "Guardian!2345", fullName: "x", teamName: "y" }));
+await t("register weak password (5 chars)", () => api.registerSupervisor({ email: `qa.auth2.${stamp}@mailinator.com`, password: "12345", fullName: "x", teamName: "y" }));
+await t("register invalid email", () => api.registerSupervisor({ email: "not-an-email", password: "Guardian!2345", fullName: "x", teamName: "y" }));
+await t("login wrong password", () => api.loginSupervisor({ email, password: "wrong-password" }));
+await t("login unknown email", () => api.loginSupervisor({ email: `nobody.${stamp}@mailinator.com`, password: "Guardian!2345" }));
+await t("login correct (email in upper case)", () => api.loginSupervisor({ email: email.toUpperCase(), password: "Guardian!2345" }));
+const prof = await api.getMyProfile();
+console.log("profile after login:", prof?.role, prof?.teamCode === code);
+// supervisor tries to join as guard (to own team and to a random code)
+await t("supervisor joinAsGuard(own team)", () => api.joinAsGuard({ teamCode: code, fullName: "מפקד" }));
+await t("joinAsGuard(unknown code) while signed in", () => api.joinAsGuard({ teamCode: "ZZZZZZ", fullName: "מישהו" }));
+await t("joinAsGuard(blank name)", () => api.joinAsGuard({ teamCode: code, fullName: "   " }));
+await t("joinAsGuard(code with spaces/lowercase)", () => api.joinAsGuard({ teamCode: ` ${code.toLowerCase()} `, fullName: "מפקד" }));
+const longName = "א".repeat(5000);
+await t("addGuard with 5000-char name", async () => { const g = await api.addGuard({ name: longName, teamCode: code }); await api.removeGuard(g.id); return "accepted"; });
+await t("addGuard with HTML/script in name", async () => { const g = await api.addGuard({ name: "<img src=x onerror=alert(1)>", teamCode: code }); return g.name; });
+await t("addGuard blank name", () => api.addGuard({ name: "   ", teamCode: code }));
+await t("team name 10k chars", async () => { await api.updateTeamSettings(code, {}); return "n/a"; });
+const r = await supabase.from("gs_teams").update({ name: "ב".repeat(10000) }).eq("code", code).select("name");
+console.log("team name 10000 chars:", r.error?.message || `accepted (${r.data?.[0]?.name?.length})`);
+const r2 = await supabase.from("gs_work_items").insert({ team_code: code, kind: "shift", start_date: "2026-10-12", due_date: "2026-10-12", title: "x", start_time: "07:00", end_time: "07:00" }).select();
+console.log("shift with start==end (zero length):", r2.error?.message || "accepted");
+const r3 = await supabase.from("gs_work_items").insert({ team_code: code, kind: "shift", start_date: "2026-10-12", due_date: "2026-10-12", title: "x", start_time: "25:00", end_time: "07:00" }).select();
+console.log("shift with 25:00:", r3.error?.message || "accepted");
+const r4 = await supabase.from("gs_work_items").insert({ team_code: code, kind: "shift", start_date: "1999-01-01", due_date: "1999-01-01", title: "ancient", start_time: "07:00", end_time: "15:00", required_guards: 0 }).select();
+console.log("required_guards=0:", r4.error?.message || "accepted", "| date 1999:", r4.error ? "-" : "accepted");
+const r5 = await supabase.from("gs_work_items").insert({ team_code: code, kind: "shift", start_date: "2026-10-12", due_date: "2026-10-12", title: "x", start_time: "07:00", end_time: "15:00", required_guards: 1000 }).select();
+console.log("required_guards=1000:", r5.error?.message || "accepted");
+// same-session second guard: session is a supervisor here, so test via fresh anon below if allowed
+const del = await supabase.from("gs_teams").delete().eq("code", code).select("code");
+console.log("cleanup:", del.data?.length);
+await supabase.auth.stopAutoRefresh(); process.exit(0);

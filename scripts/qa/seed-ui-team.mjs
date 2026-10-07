@@ -1,0 +1,28 @@
+// QA: צוות של 20 לבדיקה ידנית בדפדפן (לא נמחק אוטומטית — מנקים ידנית בסוף).
+import { appendFileSync } from "node:fs";
+import { supabase } from "../../src/lib/supabaseClient.js";
+import * as api from "../../src/lib/api.js";
+import { weekByOffset } from "../../src/lib/dates.js";
+import { missingRowsForWeek } from "../../src/lib/positions.js";
+import { positionsFor, mulberry } from "./lib.mjs";
+const OUT = process.env.QA_OUT;
+const rec = (o) => appendFileSync(OUT, JSON.stringify({ tag: "ui", ...o }) + "\n");
+const mode = process.argv[2] || "security", N = Number(process.argv[3] || 20);
+const rnd = mulberry(99);
+const email = `qa.ui.${Date.now()}@mailinator.com`;
+const reg = await api.registerSupervisor({ email, password: "Guardian!2345", fullName: "מפקד בדיקה", teamName: `QA UI ${mode} ${N}`, mode });
+rec({ kind: "team", code: reg.teamCode });
+rec({ kind: "user", id: (await supabase.auth.getUser()).data.user.id, role: "supervisor" });
+const names = Array.from({ length: N }, (_, i) => ["דנה","יוסי","מיכל","אבי","נועה","רון","שיר","גיל","טל","עמית","לירון","אורי","הדס","איתי","מור","ניר","רינת","שחר","עדי","אלון","יעל","ליאור"][i % 22] + " " + ["כהן","לוי","מזרחי","פרץ","ביטון","אברהם"][i % 6]);
+for (const n of names) await api.addGuard({ name: n, phone: "050-123456" + (i => String(i).padStart(1,"0"))(names.indexOf(n) % 10), teamCode: reg.teamCode });
+const data0 = await api.loadTeam(reg.teamCode);
+const positions = [];
+for (const d of positionsFor(mode, N)) positions.push(await api.createPosition({ ...d, shape: "template", active: true }, reg.teamCode));
+const sunday = weekByOffset(1)[0];
+await api.materializeTemplateShifts(positions.flatMap((p) => missingRowsForWeek(p, sunday, [])), reg.teamCode);
+const data = await api.loadTeam(reg.teamCode);
+const av = [];
+data.guards.forEach((g, gi) => { if (gi % 4 === 0) return; for (const s of data.shifts) { const r = rnd(); const st = r < 0.6 ? "available" : r < 0.7 ? "preferred" : r < 0.8 ? "maybe" : r < 0.92 ? "unavailable" : null; if (st) av.push({ shift_id: s.id, guard_id: g.id, status: st }); } });
+for (let i = 0; i < av.length; i += 500) await supabase.from("gs_availability").upsert(av.slice(i, i + 500), { onConflict: "shift_id,guard_id" });
+console.log(JSON.stringify({ email, password: "Guardian!2345", code: reg.teamCode, guards: data.guards.length, shifts: data.shifts.length, week: sunday }));
+await supabase.auth.stopAutoRefresh(); process.exit(0);
