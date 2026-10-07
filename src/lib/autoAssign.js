@@ -436,7 +436,7 @@ function scoreCandidate({ guard, shift, load, availability, rules, stats, check,
   // האוטומטי הזה מעולם לא ראה.
   const carriedLoad = carried?.load || 0;
   const carriedNights = carried?.nights || 0;
-  const target = Math.max(stats.loadTargetPerGuard * capacityOf(guard), 0.001);
+  const target = Math.max(stats.windowLoadTargetPerGuard * capacityOf(guard), 0.001);
   const fairness = Math.max(0, Math.min(1, 1 - (load.load + carriedLoad) / target));
   const fairnessPts = points(35 * fairness);
   score += fairnessPts;
@@ -455,7 +455,7 @@ function scoreCandidate({ guard, shift, load, availability, rules, stats, check,
   //    not against the hard cap, or nights pile onto whoever is free first.
   //    Same carried-load treatment as fairness above.
   if (isNightShift(shift)) {
-    const nightTarget = Math.max(stats.nightTargetPerGuard * capacityOf(guard), 0.001);
+    const nightTarget = Math.max(stats.windowNightTargetPerGuard * capacityOf(guard), 0.001);
     const nightFair = Math.max(0, Math.min(1, 1 - (load.nights + carriedNights) / nightTarget));
     const nightPts = points(22 * nightFair);
     score += nightPts;
@@ -648,16 +648,30 @@ export function autoAssign({
   // (capacityOf תמיד 1) זה בדיוק activeGuards.length, בדיוק כמו קודם.
   const totalCapacity = activeGuards.reduce((sum, g) => sum + capacityOf(g), 0) || 1;
 
+  // הנטל שהצוות כבר נשא בחלון ההוגנות (carriedLoad). היעד שמולו נמדד כל אדם
+  // חייב לכלול אותו — לא רק את השבוע הזה. אחרת הנטל המצטבר (עשרות שעות) מושווה
+  // ליעד של שבוע אחד, ההפרש בין משרה מלאה לחצי משרה הוא חצי שבוע בלבד, והמנוע
+  // מיישר את הנטל המצטבר של כולם: בחלון של 3 חודשים חצי משרה עבד בדיוק כמו
+  // משרה מלאה מהשבוע השני (נמדד, scripts/qa/sim-halftime.mjs). אותה נוסחה
+  // כמו fairnessPlan ב-fairness.js — החלק של כל אדם מהסך הכולל לפי חלק המשרה.
+  // בלי carriedLoad שני הסכומים אפס, והיעדים זהים ביט-לביט ליעדי השבוע.
+  const carriedTotal = activeGuards.reduce((sum, g) => sum + (carriedLoad[g.id]?.load || 0), 0);
+  const carriedNightsTotal = activeGuards.reduce((sum, g) => sum + (carriedLoad[g.id]?.nights || 0), 0);
+  const weekLoadTotal = openShifts.reduce((sum, s) => sum + shiftLoad(s, taskWeights) * Math.max(1, s.requiredGuards || 1), 0);
+
   const stats = {
     targetPerGuard: totalSlots / activeGuards.length,
     // "יעד ליחידת משרה אחת (מלאה)" — לא יעד סופי לאף שומר/ת בפני עצמו/ה.
     // scoreCandidate ו-balanceWorkload מכפילים בערך הזה ב-capacityOf(guard)
     // כדי לקבל את היעד האישי. כש-totalCapacity === activeGuards.length
     // (כולם במשרה מלאה) זו אותה נוסחה בדיוק כמו לפני התוספת הזו.
-    loadTargetPerGuard:
-      openShifts.reduce((sum, s) => sum + shiftLoad(s, taskWeights) * Math.max(1, s.requiredGuards || 1), 0) /
-      totalCapacity,
+    loadTargetPerGuard: weekLoadTotal / totalCapacity,
     nightTargetPerGuard: nightSlots / totalCapacity,
+    // היעד ליחידת משרה מלאה *כולל* חלון ההוגנות — מולו נמדדים load+carried
+    // (scoreCandidate, balanceWorkload). loadTargetPerGuard נשאר יעד השבוע
+    // לבדו, כי מולו מדווח perGuard[].target והציון של השבוע הזה (FAIR-04).
+    windowLoadTargetPerGuard: (weekLoadTotal + carriedTotal) / totalCapacity,
+    windowNightTargetPerGuard: (nightSlots + carriedNightsTotal) / totalCapacity,
     totalCapacity,
     // כמה "שווה" משמרת ממוצעת אצל הצוות הזה — אותה גזירה בדיוק כמו
     // fairness.js:85-87, כדי שיהיה נוסחה אחת בכל המוצר, לא שתיים שעלולות
@@ -988,7 +1002,7 @@ function balanceWorkload({
   const gapThreshold = stats.perShiftLoad;
 
   // "חוב", לא נטל גולמי: כמה כל שומר/ת חורג/ת מהיעד האישי שלו/ה
-  // (stats.loadTargetPerGuard * capacityOf(guard)). זה מה שהופך את
+  // (stats.windowLoadTargetPerGuard * capacityOf(guard), כולל חלון ההוגנות). זה מה שהופך את
   // האיזון ליחסי לחלק המשרה — שומר/ת בחצי משרה עם נטל 20 והיעד שלו/ה 20
   // אינו/ה "קל/ה" מול שומר/ת במשרה מלאה עם נטל 40 והיעד שלו/ה 40, אף
   // ששני הנטלים הגולמיים שונים פי שתיים. כשכולם במשרה מלאה כל היעדים
@@ -999,7 +1013,7 @@ function balanceWorkload({
   // עיקרון: מי שנכנס לאיזון הזה כבר עמוס משבועות קודמים לא אמור להיראות
   // "קל" רק כי השבוע הנוכחי עצמו עדיין ריק לו/ה.
   const debtOf = (g) =>
-    load.get(g.id).load + (carriedLoad[g.id]?.load || 0) - stats.loadTargetPerGuard * capacityOf(g);
+    load.get(g.id).load + (carriedLoad[g.id]?.load || 0) - stats.windowLoadTargetPerGuard * capacityOf(g);
 
   // משמרת שעוברת בין שני אנשים — הניקוד, הנימוק והחשבון של המקבל/ת.
   const reassign = (record, to, shift, check, from) => {
