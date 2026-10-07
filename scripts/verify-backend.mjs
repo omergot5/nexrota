@@ -60,10 +60,13 @@ const iso = (n) => {
 // (and this check) talks to gs_work_items (kind='shift'|'task') +
 // gs_work_item_assignments instead. date/label become start_date+due_date/
 // title; this is exactly what api.js's shiftRowToWorkItem does.
+// published:false במפורש, כמו ש-shiftToRow שולח: ברירת המחדל של העמודה ב-DB
+// היא true, ובלי זה כל שלוש המשמרות כבר מפורסמות והבדיקה בסעיף 6 בודקת את
+// המשמרת הלא נכונה.
 const shiftRows = [
-  { team_code: CODE, kind: "shift", start_date: iso(1), due_date: iso(1), title: "משמרת יום",  start_time: "07:00", end_time: "19:00", type: "morning", color: "#3B82F6" },
-  { team_code: CODE, kind: "shift", start_date: iso(1), due_date: iso(1), title: "משמרת לילה", start_time: "19:00", end_time: "07:00", type: "night",   color: "#6366F1" },
-  { team_code: CODE, kind: "shift", start_date: iso(2), due_date: iso(2), title: "משמרת יום",  start_time: "07:00", end_time: "19:00", type: "morning", color: "#3B82F6" },
+  { team_code: CODE, kind: "shift", start_date: iso(1), due_date: iso(1), title: "משמרת יום",  start_time: "07:00", end_time: "19:00", type: "morning", color: "#3B82F6", published: false },
+  { team_code: CODE, kind: "shift", start_date: iso(1), due_date: iso(1), title: "משמרת לילה", start_time: "19:00", end_time: "07:00", type: "night",   color: "#6366F1", published: false },
+  { team_code: CODE, kind: "shift", start_date: iso(2), due_date: iso(2), title: "משמרת יום",  start_time: "07:00", end_time: "19:00", type: "morning", color: "#3B82F6", published: false },
 ];
 const { data: shifts, error: shiftErr } = await sup.from("gs_work_items").insert(shiftRows).select();
 check("supervisor can insert shifts", !shiftErr && shifts?.length === 3, shiftErr?.message);
@@ -311,6 +314,44 @@ const { data: positionShifts } = await sup.from("gs_work_items")
   .select("id").eq("position_id", position?.id).eq("start_date", dupDate);
 check("exactly one shift row exists for this (position_id, date) after both duplicate attempts",
   positionShifts?.length === 1, `found ${positionShifts?.length}`);
+
+// ---------- 11. a guard cannot make themself supervisor (0034) ----------
+console.log("\n=== privilege lock (0034) ===");
+// guardSloppy owns profA (section 8). Every privileged column must stay put.
+await guardSloppy.from("gs_profiles").update({ role: "supervisor" }).eq("id", profA.profile_id);
+const { data: roleNow } = await sup.from("gs_profiles").select("role").eq("id", profA.profile_id).single();
+check("a guard cannot change their own role", roleNow?.role === "guard", `role is ${roleNow?.role}`);
+await guardSloppy.from("gs_profiles").update({ deadline_exempt: true, half_time: true }).eq("id", profA.profile_id);
+const { data: flagsNow } = await sup.from("gs_profiles").select("deadline_exempt, half_time").eq("id", profA.profile_id).single();
+check("a guard cannot exempt themself or change their own job share", flagsNow?.deadline_exempt === false && flagsNow?.half_time === false, JSON.stringify(flagsNow));
+const { data: phoneNow } = await guardSloppy.from("gs_profiles").update({ phone: "050-1112222" }).eq("id", profA.profile_id).select("phone");
+check("a guard can still update their own phone", phoneNow?.[0]?.phone === "050-1112222");
+// outsider (section 4) has a session and no profile: inserting a supervisor
+// row straight into the team must fail even without asking for the row back.
+const { data: outsiderUser } = await outsider.auth.getUser();
+await outsider.from("gs_profiles").insert({ user_id: outsiderUser.user.id, full_name: "פולש", role: "supervisor", team_code: CODE });
+const { data: intruder } = await sup.from("gs_profiles").select("id").eq("team_code", CODE).eq("full_name", "פולש");
+check("a stranger with the code cannot insert a supervisor profile", (intruder?.length || 0) === 0);
+const { data: supEdit } = await sup.from("gs_profiles").update({ deadline_exempt: true }).eq("id", profA.profile_id).select("id");
+check("the supervisor can still edit a guard", supEdit?.length === 1);
+
+// ---------- 12. swap decided atomically (0035) ----------
+console.log("\n=== swap requests (0035) ===");
+await sup.from("gs_work_item_assignments").insert({ work_item_id: shifts[2].id, guard_id: profA.profile_id, source: "auto" });
+const { data: swapRow, error: swapErr } = await guardSloppy.from("gs_swap_requests")
+  .insert({ team_code: CODE, shift_id: shifts[2].id, from_guard: profA.profile_id, to_guard: profB.profile_id }).select("id").single();
+check("a guard can ask to hand a shift over", !swapErr && Boolean(swapRow?.id), swapErr?.message);
+const { error: selfApprove } = await guardSloppy.rpc("gs_decide_swap", { p_swap_id: swapRow?.id, p_status: "approved" });
+check("the requester cannot approve their own request", /SWAP_FORBIDDEN/.test(selfApprove?.message || ""), selfApprove?.message);
+const { data: flip } = await guardB.from("gs_swap_requests").update({ status: "approved" }).eq("id", swapRow?.id).select("id");
+check("the target guard cannot mark it approved without moving the shift", (flip?.length || 0) === 0);
+const { error: approveErr } = await guardB.rpc("gs_decide_swap", { p_swap_id: swapRow?.id, p_status: "approved" });
+check("the target guard approves", !approveErr, approveErr?.message);
+const { data: onShift } = await sup.from("gs_work_item_assignments").select("guard_id, source").eq("work_item_id", shifts[2].id);
+check("the shift moved — and nobody was left off it", onShift?.length === 1 && onShift[0].guard_id === profB.profile_id, JSON.stringify(onShift));
+check("the moved assignment survives a re-run of the smart assignment (source manual)", onShift?.[0]?.source === "manual");
+const { data: swapAfter } = await sup.from("gs_swap_requests").select("status").eq("id", swapRow?.id).single();
+check("the request is marked approved", swapAfter?.status === "approved");
 
 // ---------- cleanup ----------
 await sup.from("gs_teams").delete().eq("code", CODE);

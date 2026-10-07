@@ -857,7 +857,7 @@ function MySwaps({ user, team, guards, shifts, availability = {}, swapRequests, 
 export default function GuardApp({ state }) {
   const {
     user, team, guards, shifts, availability, swapRequests, tasks, positions, actions, busy, error,
-    clearError, logout, offline, pending, undo,
+    clearError, logout, offline, pending, undo, joinTeam,
   } = state;
   const [view, setView] = useState("schedule");
   const profile = useSyncExternalStore(subscribeTerms, termProfile, termProfile);
@@ -870,6 +870,20 @@ export default function GuardApp({ state }) {
   // supervisor's roster unnoticed.
   const [nameNoticeSeen, setNameNoticeSeen] = useState(false);
   const showNameNotice = user.isNewProfile && !nameNoticeSeen;
+  // תיקון השם קורה כאן, באותו סשן — לא "צא וכנס שוב". יציאה פתחה סשן חדש
+  // והשאירה את הפרופיל השגוי בצוות לתמיד (ממצא 6, docs/qa/2026-10-07-qa-report.md).
+  // gs_join_team (0037) מזהה את הסשן, ואם לפרופיל אין עדיין היסטוריה —
+  // מאמץ את הרשומה של האחמ"ש בשם הנכון ומוחק את השגויה, או פשוט משנה את השם.
+  const [fixedName, setFixedName] = useState("");
+  const fixName = async (e) => {
+    e.preventDefault();
+    try {
+      await joinTeam({ teamCode: user.teamCode, fullName: fixedName });
+      setFixedName("");
+    } catch {
+      // ההודעה כבר בבאנר השגיאה למעלה (run ב-useGuardian) — לא כופלים.
+    }
+  };
 
   const incoming = swapRequests.filter(
     (r) => r.toGuard === user.id && r.status === "pending"
@@ -947,9 +961,21 @@ export default function GuardApp({ state }) {
           {showNameNotice && (
             <Alert tone="warn" onClose={() => setNameNoticeSeen(true)}>
               <b>נרשמת בתור "{user.name}" — פרופיל חדש.</b>{" "}
-              אם האחמ״ש כבר הוסיף אותך לצוות, ייתכן שהשם נכתב קצת אחרת. במקרה כזה
-              צא וכנס שוב עם השם המדויק שהוא רשם, אחרת המשמרות שלך יגיעו לרשומה השנייה.
+              אם האחמ״ש כבר הוסיף אותך לצוות, ייתכן שהשם נכתב קצת אחרת. כתוב כאן את השם
+              כמו שהוא רשם, אחרת המשמרות שלך יגיעו לרשומה השנייה.
               אם זו הפעם הראשונה שלך — הכל תקין, אפשר להתעלם.
+              <form onSubmit={fixName} className="flex gap-2 mt-2">
+                <Input
+                  value={fixedName}
+                  onChange={(e) => setFixedName(e.target.value)}
+                  placeholder="השם המדויק"
+                  aria-label="השם המדויק כפי שהאחמ״ש רשם"
+                  className="flex-1 min-w-0"
+                />
+                <Btn type="submit" size="sm" disabled={busy || !fixedName.trim()}>
+                  תקן שם
+                </Btn>
+              </form>
             </Alert>
           )}
           {view !== "availability" && (

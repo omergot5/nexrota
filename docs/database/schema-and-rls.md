@@ -106,9 +106,17 @@
 
 מופעל על כל הטבלאות. העיקרון:
 
-- **משתתף** — קורא משמרות שפורסמו בצוות שלו; כותב אך ורק את שורות הזמינות
-  שלו; פותח בקשת החלפה למשמרת שהוא משובץ בה.
+- **משתתף** — קורא את כל פריטי העבודה בצוות שלו, כולל משמרות שלא פורסמו: עליהן
+  הוא מגיש זמינות. **שיבוצים** של משמרת שלא פורסמה גלויים רק למנהל
+  (`gs_work_item_assignments_select` + `gs_work_item_visible`, 0036).
+  כותב אך ורק את שורות הזמינות שלו; פותח בקשת החלפה. בשורת הפרופיל שלו מותר לו
+  לשנות רק `phone` (טריגר `gs_profiles_lock_privileged`, 0034) — לא `role`, לא
+  פטורים, לא כשירות.
 - **מנהל** — CRUD מלא בגבולות ה-`team_code` שלו.
+- **פרופיל חדש** נוצר רק דרך `gs_create_team` / `gs_join_team` (SECURITY DEFINER)
+  או ע"י מנהל (שומר בלי `user_id`). אין הכנסה ישירה של פרופיל עצמי (0034).
+- **החלטה על בקשת החלפה** רק דרך `gs_decide_swap` (0035): מנהל או מי שהבקשה
+  נשלחה אליו; ההזזה והסטטוס באותה טרנזקציה. עדכון ישיר של `gs_swap_requests` — מנהל בלבד.
 - אף מדיניות אינה חוצה `team_code`.
 
 ---
@@ -124,6 +132,13 @@
 | `0004_task_templates_and_compatibility.sql` | שתי הטבלאות החדשות + RLS + זרעים + `override_note` |
 | `0005_task_hours.sql` | הוסיף `gs_tasks.start_time`/`end_time` (`time`, nullable, בלי ברירת מחדל, בלי backfill — Phase 2, UNIF-01/UNIF-04) |
 | `0006_qualification.sql` | הוסיף `gs_profiles.qualified_categories` (`jsonb`, nullable) ו-`gs_shifts.category` (`text`, nullable) — שתיהן בלי ברירת מחדל ובלי backfill (Phase 3, QUAL-01/QUAL-02/QUAL-03) |
+| … | (0007–0033 — ר' הקבצים עצמם) |
+| `0034_lock_profile_privileges.sql` | משתתף לא יכול לקדם את עצמו למנהל: נמחקה `gs_profiles_insert` + טריגר שמרשה למי שאינו מנהל לשנות רק `phone` |
+| `0035_decide_swap_rpc.sql` | `gs_decide_swap` — אישור/דחייה של החלפה בטרנזקציה אחת; `gs_swaps_update` למנהל בלבד |
+| `0036_hide_draft_assignments.sql` | ברירת מחדל `published=false`; שיבוצים של טיוטה גלויים רק למנהל |
+| `0037_join_name_normalization.sql` | `gs_norm_name` (גרשים, מקפים, רווחים, ניקוד) בהצטרפות ובאינדקס הייחודי; תיקון שם מאותו סשן |
+| `0038_cleanup_orphan_anonymous_users.sql` | cron לילי (03:37 UTC): מחיקת משתמשים אנונימיים בלי פרופיל שלא נכנסו 7 ימים |
+| `0039_join_self_joined_flag.sql` | `gs_profiles.self_joined` — רק פרופיל שנוצר בהצטרפות עצמית ניתן לתיקון שם, לא רשומה שהמנהל הכין |
 
 בנוסף הורצה `brand_shift_color_default` — שינוי ברירת המחדל של `gs_shifts.color`
 מ-`#3B82F6` ל-`#7FC0AE`.

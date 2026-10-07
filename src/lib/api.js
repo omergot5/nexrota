@@ -359,11 +359,26 @@ export async function updatePassword(password) {
   if (error) throw translateAuthError(error);
 }
 
+/**
+ * כניסה אנונימית (שומר בקוד צוות, הדגמה) מוגבלת בקצב לכל כתובת רשת — נמדד:
+ * כ-40 בשעה. פלוגה שנכנסת מאותה רשת (בסיס, WiFi משרדי) נתקעת בזה, ולכן
+ * "בדוק את החיבור לאינטרנט" הייתה הודעה שגויה ששולחת אנשים לחפש תקלה שאין.
+ */
+export function anonSignInError(error, fallback = "לא הצלחנו לפתוח כניסה — בדוק את החיבור לאינטרנט") {
+  if (error?.status === 429 || /rate limit|too many/i.test(error?.message || "")) {
+    return coded(
+      "RATE_LIMITED",
+      "יותר מדי כניסות מהרשת הזו בזמן קצר. נסו שוב בעוד כמה דקות, או התחברו מרשת אחרת (למשל סלולר)."
+    );
+  }
+  return new Error(fallback);
+}
+
 export async function joinAsGuard({ teamCode, fullName }) {
   let session = await getSession();
   if (!session) {
     const { error } = await supabase.auth.signInAnonymously();
-    if (error) throw new Error("לא הצלחנו לפתוח כניסה — בדוק את החיבור לאינטרנט");
+    if (error) throw anonSignInError(error);
   }
 
   const { data: rows, error } = await supabase.rpc("gs_join_team", {
@@ -378,16 +393,24 @@ export async function joinAsGuard({ teamCode, fullName }) {
     if (/ALREADY_IN_ANOTHER_TEAM/.test(error.message)) {
       throw new Error("המכשיר הזה כבר משויך לצוות אחר. התנתק תחילה ונסה שוב");
     }
+    if (/NAME_REQUIRED/.test(error.message)) {
+      throw coded("NAME_REQUIRED", "צריך להקליד שם מלא");
+    }
+    // סשן מוכר עם שם אחר, ולפרופיל כבר יש היסטוריה (0037): זה אדם אחר באותו
+    // טלפון, לא תיקון של טעות הקלדה — אסור להפוך אותו בשקט לבעל הפרופיל.
+    const inUse = /DEVICE_IN_USE:(.*)$/.exec(error.message || "");
+    if (inUse) {
+      throw coded("DEVICE_IN_USE", `המכשיר הזה מחובר בתור "${inUse[1].trim()}". כדי להיכנס בשם אחר — צא קודם מהחשבון.`);
+    }
     throw new Error("ההצטרפות נכשלה — נסה שוב");
   }
 
   const row = Array.isArray(rows) ? rows[0] : rows;
+  // התפקיד נקרא מהשורה עצמה ולא מונח: מנהל שהקליד בטעות את קוד הצוות שלו
+  // בטופס השומר מקבל בחזרה את הפרופיל שלו — והוא עדיין מנהל.
+  const profile = await getMyProfile();
   return {
-    id: row.profile_id,
-    teamCode: row.team_code,
-    name: row.full_name,
-    role: "guard",
-    isSupervisor: false,
+    ...(profile || { id: row.profile_id, teamCode: row.team_code, name: row.full_name, role: "guard", isSupervisor: false }),
     // True when nobody on the roster matched this name. Usually a genuinely
     // new person — but it is also what a misspelling looks like, and this is
     // the last moment the guard can still correct it themselves.
@@ -854,6 +877,20 @@ export async function updateTeamSettings(
   }
 }
 
+/**
+ * מחיקת הצוות כולו. כל טבלה תלוית-צוות מוגדרת ON DELETE CASCADE על
+ * team_code (נבדק חי ב-QA: אפס שורות יתומות בשש הטבלאות), כך שמחיקת השורה
+ * ב-gs_teams מוחקת גם אנשים, משמרות, שיבוצים, זמינות, עמדות ובקשות. רק
+ * הבעלים יכול (gs_teams_delete). `.select()` — שורה שחזרה = שורה שנמחקה.
+ */
+export async function deleteTeam(teamCode) {
+  const { data, error } = await supabase.from("gs_teams").delete().eq("code", teamCode).select("code");
+  if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("רק מי שפתח את הצוות יכול למחוק אותו");
+  }
+}
+
 export async function setGuardExempt(profileId, exempt) {
   // אותה בדיקה בדיוק כמו setGuardQualifications/setGuardWeekendPreference
   // ממש למטה — .select() ובדיקת שורה חוזרת, כי בלעדיה עדכון ש-RLS מסנן
@@ -970,12 +1007,23 @@ export async function createSwap({ teamCode, shiftId, fromGuard, toGuard, messag
   return swapFromRow(data);
 }
 
+const SWAP_ERRORS = {
+  SWAP_FORBIDDEN: "רק האחמ\"ש או מי שהבקשה נשלחה אליו יכולים להחליט עליה",
+  SWAP_NOT_PENDING: "כבר הוחלט על הבקשה הזו",
+  SWAP_NOT_FOUND: "הבקשה כבר לא קיימת",
+  SWAP_STALE: "השיבוץ השתנה מאז שהבקשה נשלחה — המבקש כבר לא משובץ למשמרת הזו",
+  SWAP_TARGET_ALREADY_ASSIGNED: "מי שהבקשה נשלחה אליו כבר משובץ למשמרת הזו",
+  SWAP_TARGET_NOT_IN_TEAM: "מי שהבקשה נשלחה אליו כבר לא בצוות",
+};
+
 /**
- * Approving a swap has to *move* the shift, not merely record a decision.
- * The move happens first: if the roster write fails the request stays pending,
- * which is recoverable — a request marked approved over an unchanged roster is
- * not, because nothing afterwards reveals that the two disagree.
+ * Approving a swap has to *move* the shift, not merely record a decision —
+ * and the move is two writes (out, in) plus the status. They run together
+ * inside gs_decide_swap (0035_decide_swap_rpc.sql), so a failure anywhere
+ * leaves the roster and the request exactly as they were. Doing them from
+ * here, one by one, once left a shift with nobody on it.
  *
+ * The RPC lets the supervisor or the guard the request was sent to decide.
  * Legality is checked by the caller through `checkAssignment`, so an approval
  * can never produce a roster the engine itself would have refused to generate.
  */
@@ -983,25 +1031,10 @@ export async function decideSwap(swap, status) {
   const id = typeof swap === "string" ? swap : swap?.id;
   if (!id) throw new Error("בקשת החלפה לא תקינה");
 
-  if (status === "approved" && typeof swap === "object") {
-    const { shiftId, fromGuard, toGuard } = swap;
-    if (shiftId && fromGuard && toGuard) {
-      await unassignGuard({ shiftId, guardId: fromGuard });
-      await assignGuard({
-        shiftId, guardId: toGuard, source: "swap",
-        reason: "החלפה שאושרה על ידי האחמ\"ש",
-      });
-    }
-  }
-
-  const { data, error } = await supabase
-    .from("gs_swap_requests")
-    .update({ status })
-    .eq("id", id)
-    .select("id");
-  if (error) throw new Error(error.message);
-  if (!data?.length) {
-    throw new Error("אין לך הרשאה להחליט על הבקשה הזו — התחבר מחדש ונסה שוב");
+  const { error } = await supabase.rpc("gs_decide_swap", { p_swap_id: id, p_status: status });
+  if (error) {
+    const code = Object.keys(SWAP_ERRORS).find((c) => error.message?.includes(c));
+    throw coded(code || "SWAP_FAILED", code ? SWAP_ERRORS[code] : "ההחלטה על הבקשה לא נשמרה — נסה שוב");
   }
 }
 

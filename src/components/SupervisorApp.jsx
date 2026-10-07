@@ -106,7 +106,7 @@ export default function SupervisorApp({ state }) {
   const {
     user, team, guards, shifts, availability, swapRequests, tasks,
     taskTemplates, compatibility, positions,
-    actions, busy, error, clearError, logout, pending, undo, offline,
+    actions, busy, error, clearError, logout, deleteTeam, pending, undo, offline,
   } = state;
 
   // ברירת המחדל היא העבודה עצמה, לא לוח בקרה. אחמ"ש שנכנס לאפליקציה בא
@@ -293,6 +293,7 @@ export default function SupervisorApp({ state }) {
         shifts={shifts}
         tasks={tasks}
         compatibility={compatibility}
+        onDeleteTeam={deleteTeam}
       />
     ),
     positions: (

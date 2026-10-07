@@ -34,6 +34,7 @@ import { refusalText, vetAssignment } from "../lib/assignVet.js";
 // אותו עיקרון ש-checkQualification כבר נוהג בו כאן: שכבת ה-state קוראת
 // למנוע, לא מדמה אותו.
 import { missingRowsForWeek } from "../lib/positions.js";
+import { isRelevantChange } from "../lib/realtimeScope.js";
 import { planTemplateSync } from "../lib/postWeek.js";
 // Phase 11 (INLINE-04): refresh() has no sequencing today — two overlapping
 // loadTeam() calls (any two quick actions, or an action racing the realtime
@@ -308,7 +309,10 @@ export function useGuardian() {
     // מהאירוע הראשון — כך גם זרם שלא נגמר לא משאיר את המסך ישן.
     let timer = null;
     let burstStart = 0;
-    const onChange = () => {
+    const onChange = (payload) => {
+      // מחיקה בצוות אחר מגיעה גם לכאן (Supabase לא מחיל RLS על DELETE) —
+      // ר' realtimeScope.js. בלי הסינון כל מחיקה במערכת רעננה כל משתמש.
+      if (!isRelevantChange(payload, dataRef.current)) return;
       const now = Date.now();
       if (!timer) burstStart = now;
       clearTimeout(timer);
@@ -551,7 +555,7 @@ export function useGuardian() {
           const session = await api.getSession();
           if (!session) {
             const { error: e } = await supabase.auth.signInAnonymously();
-            if (e) throw new Error("לא הצלחנו לפתוח הדגמה — בדוק את החיבור לאינטרנט");
+            if (e) throw api.anonSignInError(e, "לא הצלחנו לפתוח הדגמה — בדוק את החיבור לאינטרנט");
           } else {
             // session קיים כבר יכול להחזיק צוות הדגמה מביקור קודם (אותה
             // אנונימית נשמרת ב-localStorage) — בלי הבדיקה הזאת כל לחיצה
@@ -626,6 +630,7 @@ export function useGuardian() {
    * | `deleteTask` | stays-UndoBar | מחיקת-פריט-בודד תכופה, חומרה נמוכה — כמו `deleteShift` |
    * | `deletePosition` | in-scope-for-pre-confirm | מוחקת עמדה קבועה; cascade על שיבוצי-השבוע הנוכחי כשהיא ממומשת |
    * | `removeRoleCompatibility` | newly-protected (UndoBar, לא pre-confirm) | פער אמיתי שנמצא — לא הייתה לה שום הגנה. הרף המינימלי שנקבע הוא "לפחות UndoBar", לא פרה-אישור מלא |
+   * | `deleteTeam` (מחוץ ל-actions) | in-scope-for-pre-confirm | נוספה ב-QA 2026-10-07 (ממצא 9). מוחקת את הצוות וכל מה שתלוי בו, בלי דרך חזרה — UndoBar של 8 שניות לא מספיק כאן |
    *
    * Wave 2 (12-03/04/05) מחווט כל אחת מחמש השורות "in-scope-for-pre-confirm"
    * מאחורי `ConfirmDialog` (12-01) בפועל. `removeRoleCompatibility` לא
@@ -1145,6 +1150,21 @@ export function useGuardian() {
 
   const clearError = useCallback(() => setError(null), []);
 
+  // מחיקת הצוות כולו (פרה-אישור ב-ConfirmDialog, ר' טבלת הביקורת מעל
+  // actions). מחוץ ל-actions כי היא מסתיימת ביציאה, ו-logout לא חלק מהתלויות
+  // היציבות שלהן. אחרי המחיקה לחשבון אין פרופיל — כניסה הבאה מציעה לפתוח צוות.
+  const deleteTeam = useCallback(
+    () =>
+      run(
+        async () => {
+          await api.deleteTeam(dataRef.current.team?.code);
+          await logout();
+        },
+        { rethrow: true }
+      ),
+    [run, logout]
+  );
+
   return {
     status,
     user,
@@ -1159,6 +1179,7 @@ export function useGuardian() {
     joinTeam,
     startGuestDemo,
     logout,
+    deleteTeam,
     refresh,
     actions,
     clearError,

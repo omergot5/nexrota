@@ -2632,7 +2632,7 @@ function CommandHint({ guards }) {
 }
 
 export function TeamView({
-  user, team, guards, actions, busy, onSeedDemo, shifts = [], tasks = [], compatibility = [],
+  user, team, guards, actions, busy, onSeedDemo, shifts = [], tasks = [], compatibility = [], onDeleteTeam,
 }) {
   const [copied, setCopied] = useState(null); // 'code' | 'message' | null
   const [name, setName] = useState("");
@@ -2641,6 +2641,8 @@ export function TeamView({
   // מחזיק את האדם שנבחר להסרה (לא רק id) כדי שגוף הדיאלוג יוכל להציג את
   // שמו — null סוגר את הדיאלוג (CONFIRM-05).
   const [guardToRemove, setGuardToRemove] = useState(null);
+  // מחיקת הצוות — פרה-אישור (ConfirmDialog), לא UndoBar: אין דרך חזרה.
+  const [teamDeleteOpen, setTeamDeleteOpen] = useState(false);
 
   // ---- עורך כשירות (QUAL-01, QUAL-02, D-03, D-04) ----
   // אותה טקסונומיה בדיוק שטופס המשמרת וטופס המשימה קוראים ממנה (D-01),
@@ -2980,6 +2982,19 @@ export function TeamView({
               <CategoryWeightSettings team={team} actions={actions} busy={busy} categories={categories} />
             </div>
           </details>
+          {/* רק מי שפתח את הצוות (gs_teams_delete) — מנהל נוסף היה מקבל
+              שגיאה, אז לא מציעים לו את הכפתור בכלל. */}
+          {onDeleteTeam && team?.ownerId && team.ownerId === user?.userId && (
+            <div className="rounded-xl ring-1 ring-inset ring-danger/30 p-3 space-y-2">
+              <p className="text-sm font-bold text-content">מחיקת הצוות</p>
+              <p className="text-xs text-muted">
+                מוחק את הצוות לצמיתות: כל {guards.length} האנשים, המשמרות, השיבוצים, הזמינות והעמדות. אי אפשר לשחזר.
+              </p>
+              <Btn variant="danger" size="sm" icon="trash" onClick={() => setTeamDeleteOpen(true)} disabled={busy}>
+                מחק את הצוות
+              </Btn>
+            </div>
+          )}
         </div>
       </details>
 
@@ -3099,6 +3114,17 @@ export function TeamView({
         title={guardToRemove ? `להסיר את ${guardToRemove.name} מהצוות?` : ""}
         body={`${guardToRemove?.name || ""} יוסר/תוסר מהצוות, כולל השיבוצים, הזמינות ובקשות ההחלפה שדיווח/ה. הפעולה לא הפיכה.`}
         confirmLabel="הסר מהצוות"
+        tone="danger"
+        busy={busy}
+      />
+
+      <ConfirmDialog
+        open={teamDeleteOpen}
+        onClose={() => setTeamDeleteOpen(false)}
+        onConfirm={onDeleteTeam}
+        title={`למחוק את "${team?.name || "הצוות"}"?`}
+        body={`הצוות נמחק לצמיתות, יחד עם ${guards.length} האנשים בו, כל המשמרות, השיבוצים והזמינות. קוד הצוות ${team?.code || ""} יפסיק לעבוד. אי אפשר לשחזר.`}
+        confirmLabel="מחק לצמיתות"
         tone="danger"
         busy={busy}
       />
